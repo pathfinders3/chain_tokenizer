@@ -1,0 +1,48 @@
+<div class="container">
+    <header>
+      <h1>🔍 JavaScript Code Tokenizer</h1>
+      <p>자바스크립트 코드를 토큰으로 분석합니다</p>
+    </header>
+    
+    <div class="content">
+      <div class="panel">
+        <h2>📝 입력 코드</h2>
+        <textarea id="input" placeholder="JavaScript 코드를 입력하세요...">// 샘플 코드
+function hello(name) {
+  const greeting = `Hello, ${name}!`;
+  return greeting;
+}
+
+const result = hello("World");
+console.log(result);</textarea>
+        <div class="controls">
+          <button class="btn-primary" onclick="analyze()">토큰 분석</button>
+          <button class="btn-secondary" onclick="clearAll()">전체 지우기</button>
+          <button class="btn-secondary" onclick="loadSample()">샘플 로드</button>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>📊 토큰 결과</h2>
+        <div class="stats">
+          <div class="stat-item">
+            <span class="stat-label">총 토큰 수</span>
+            <span class="stat-value" id="tokenCount">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">키워드</span>
+            <span class="stat-value" id="keywordCount">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">식별자</span>
+            <span class="stat-value" id="identifierCount">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">문자열</span>
+            <span class="stat-value" id="stringCount">0</span>
+          </div>
+        </div>
+        <div id="output"></div>
+      </div>
+    </div>
+  </div>
