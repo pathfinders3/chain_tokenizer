@@ -395,6 +395,11 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
     let cur = startIdx;
     let prevAngle = startAngle !== null ? startAngle : null;
     
+    // 초기 타일 경로 업데이트
+    if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+      window.updateTilePath([tiles[startIdx]]);
+    }
+    
     if (startAngle !== null) {
       console.log(`Initial direction (prevAngle) set to: ${startAngle}° ${arrowFromAngle(startAngle)}`);
     }
@@ -416,6 +421,12 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
       orderIdx.push(nxt);
       unused.delete(nxt);
       cur = nxt;
+      
+      // 타일 경로 UI 업데이트
+      if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+        const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
+        window.updateTilePath(updatedOrderedTiles);
+      }
     }
 
     if (unused.size > 0) {
@@ -472,9 +483,18 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
   function askUserForNextTile(candidates, adjacentCandidates, cur, prevAngle, centers, k) {
     return new Promise((resolve) => {
       logCandidates(candidates, adjacentCandidates, cur, prevAngle, centers, k);
-      showInputSection(true);
-      updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates);
-      userInputResolver = (value) => { showInputSection(false); resolve(value); };
+      if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+        window.showInputSection(true);
+      }
+      if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
+        window.updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates);
+      }
+      userInputResolver = (value) => { 
+        if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+          window.showInputSection(false);
+        }
+        resolve(value); 
+      };
     });
   }
 
@@ -522,6 +542,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       let isAdjacentTile = false;
 
       const answerStr = String(answer).toLowerCase();
+      console.log(`User input received: "${answer}" (type: ${typeof answer})`);
       
       if (answerStr === 'stop') {
         console.log(`Stopped at tile ${orderIdx.length}. ${unused.size} tiles remain.`);
@@ -531,12 +552,14 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       
       if (answerStr === 'auto') {
         console.log('Switching to automatic selection.');
-        nxt = nextRule(cur, prevAngle, centers, unused, k);
+        nxt = nextRule(cur, prevAngle, centers, unused, k, tiles);
       } else {
         const choice = parseInt(answer, 10);
+        console.log(`Parsed choice: ${choice}, candidates: ${candidates.length}, adjacent: ${adjacentCandidates.length}`);
+        
         if (Number.isNaN(choice) || choice < 0) {
           console.log('Invalid selection. Using default rule.');
-          nxt = nextRule(cur, prevAngle, centers, unused, k);
+          nxt = nextRule(cur, prevAngle, centers, unused, k, tiles);
         } else if (choice < candidates.length) {
           nxt = candidates[choice].i;
           console.log(`Selected DFS tile at (${tiles[nxt].r}, ${tiles[nxt].c}).`);
@@ -560,7 +583,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
           }
         } else {
           console.log('Invalid selection. Using default rule.');
-          nxt = nextRule(cur, prevAngle, centers, unused, k);
+          nxt = nextRule(cur, prevAngle, centers, unused, k, tiles);
         }
       }
 
@@ -582,6 +605,11 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
 
       const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
       printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} --`);
+      
+      // 타일 경로 UI 업데이트
+      if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+        window.updateTilePath(updatedOrderedTiles);
+      }
     }
 
     const finalOrderedTiles = orderIdx.map(i => tiles[i]);
@@ -591,10 +619,45 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       console.log(`All ${orderIdx.length} tiles ordered successfully.`);
     }
     printPlacementAscii(grid, finalOrderedTiles, k, '-- Final Visual --');
+    
+    // 타일 경로 UI 업데이트
+    if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+      window.updateTilePath(finalOrderedTiles);
+    }
 
     return {
       orderedTiles: finalOrderedTiles,
       state: { orderIdx, unused, cur, prevAngle, centers, tiles, k, nextRule, maxAngleDiff, grid }
+    };
+  }
+  
+  // 타일 삭제 함수
+  if (typeof window !== 'undefined') {
+    window.removeTilesFromPath = function(index) {
+      console.log(`Removing tiles from index ${index} (inclusive)`);
+      
+      if (index === 0) {
+        console.error('Cannot remove the first tile. At least one tile must remain.');
+        return;
+      }
+      
+      // 삭제 전 타일들 (유지할 타일들)
+      const keptTiles = orderIdx.slice(0, index).map(i => tiles[i]);
+      console.log(`Keeping ${keptTiles.length} tiles: ${keptTiles.map(t => `(${t.r},${t.c})`).join(' ')}`);
+      
+      // UI 업데이트
+      printPlacementAscii(grid, keptTiles, k, `-- After Removal --`);
+      if (typeof window.updateTilePath === 'function') {
+        window.updateTilePath(keptTiles);
+      }
+      
+      // DFS 재실행하여 새로운 후보 찾기
+      console.log(`Re-running DFS with ${keptTiles.length} fixed tiles...`);
+      if (typeof window.rerunDFSWithNewTile === 'function') {
+        window.rerunDFSWithNewTile(keptTiles, null);
+      } else {
+        console.error('rerunDFSWithNewTile function not available.');
+      }
     };
   }
 
@@ -943,9 +1006,33 @@ function printBestTilePlacements(grid, k = 2, limit = 4, opts = {}) {
     if (order === "topleft") {
       tilesToShow = [...s.tiles].sort((a, b) => (a.r - b.r) || (a.c - b.c));
     } else if ((order === "nearest" || order === "minturn" || order === "weighted") && nextRule) {
-      const result = orderTilesWithNextRule(s.tiles, k, nextRule, startRule, maxAngleDiff, grid, customStartTile, startAngle);
-      tilesToShow = result.orderedTiles;
-      s.orderingState = result.state; // grid is now included in result.state
+      // showDirections가 false면 자동 선택하지 않고 state만 준비
+      if (!showDirections) {
+        // state만 설정하고 자동 선택 건너뜀 (사용자가 수동으로 선택할 수 있도록)
+        const centers = s.tiles.map(t => tileCenter(t, k));
+        const startIdx = selectStartTile(s.tiles, startRule, customStartTile);
+        
+        s.orderingState = {
+          orderIdx: [startIdx],
+          unused: new Set([...Array(s.tiles.length).keys()].filter(i => i !== startIdx)),
+          cur: startIdx,
+          prevAngle: startAngle !== null ? startAngle : null,
+          centers,
+          tiles: s.tiles,
+          k,
+          nextRule,
+          maxAngleDiff,
+          grid
+        };
+        
+        tilesToShow = [s.tiles[startIdx]];
+        console.log(`State prepared for manual selection. Starting tile: (${s.tiles[startIdx].r}, ${s.tiles[startIdx].c})`);
+      } else {
+        // 자동 선택 (기존 동작)
+        const result = orderTilesWithNextRule(s.tiles, k, nextRule, startRule, maxAngleDiff, grid, customStartTile, startAngle);
+        tilesToShow = result.orderedTiles;
+        s.orderingState = result.state;
+      }
     }
 
     if (showVisual) {
@@ -969,12 +1056,3 @@ function printBestTilePlacements(grid, k = 2, limit = 4, opts = {}) {
   out.placements = placements;
   return out;
 }
-  
-  /* ------------------------- Demo run ------------------------- */
-  // 초기 실행은 하지 않음. 이미지 로드 후 버튼 클릭 시 실행
-  // 2×2, best solutions 1개, 경로 순서는 weighted(거리+회전) 기반
-  // 사용자가 이미지를 로드한 후 버튼 클릭 시 실행되도록 blockMove.html에서 처리
-
-  // 3×3도 테스트하려면 아래 주석 해제:
-  // printBestTilePlacements(grid, 3, 4, { showVisual: true, showDirections: true, order: "weighted" });
-  

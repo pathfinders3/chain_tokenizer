@@ -102,6 +102,10 @@
         <label for="tileSelect">다음 타일을 선택하세요:</label>
         <span id="currentTileInfo" style="margin-left: 10px; font-weight: bold; color: #ffff00;">현재 타일: 없음</span>
         <br>
+        <div id="tilePath" style="margin: 10px 0; padding: 10px; background-color: #2d2d2d; border: 1px solid #444; min-height: 30px;">
+            <div style="font-size: 12px; color: #aaaaaa; margin-bottom: 5px;">연결된 타일 경로 (클릭하여 해당 타일부터 삭제):</div>
+            <div id="tilePathItems" style="display: flex; flex-wrap: wrap; gap: 5px;"></div>
+        </div>
         <select id="tileSelect">
             <option value="">-- 선택 --</option>
         </select>
@@ -141,11 +145,78 @@
         const autoSelectButton = document.getElementById('autoSelect');
         const stopSelectionButton = document.getElementById('stopSelection');
         const inputSection = document.getElementById('inputSection');
+        const tilePathItems = document.getElementById('tilePathItems');
+        
+        // 타일 경로를 저장하는 배열
+        let currentTilePath = [];
 
         // 입력 섹션 표시/숨김
         function showInputSection(show) {
             inputSection.style.display = show ? 'block' : 'none';
         }
+        
+        // 타일 경로 업데이트
+        function updateTilePath(tiles) {
+            currentTilePath = tiles.slice();
+            tilePathItems.innerHTML = '';
+            
+            if (tiles.length === 0) {
+                tilePathItems.innerHTML = '<span style="color: #aaaaaa;">타일 없음</span>';
+                return;
+            }
+            
+            tiles.forEach((tile, index) => {
+                const tileButton = document.createElement('button');
+                tileButton.textContent = String.fromCharCode(65 + (index % 26)); // A, B, C, ...
+                tileButton.title = `(${tile.r}, ${tile.c}) - 클릭하여 이 타일부터 삭제`;
+                tileButton.style.cssText = `
+                    padding: 5px 10px;
+                    background-color: #4a4a4a;
+                    color: #ffffff;
+                    border: 1px solid #666;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-weight: bold;
+                `;
+                
+                tileButton.addEventListener('mouseenter', () => {
+                    tileButton.style.backgroundColor = '#ff6666';
+                });
+                
+                tileButton.addEventListener('mouseleave', () => {
+                    tileButton.style.backgroundColor = '#4a4a4a';
+                });
+                
+                tileButton.addEventListener('click', () => {
+                    if (confirm(`타일 ${String.fromCharCode(65 + (index % 26))} (${tile.r}, ${tile.c})부터 끝까지 삭제하시겠습니까?`)) {
+                        removeTilesFrom(index);
+                    }
+                });
+                
+                tilePathItems.appendChild(tileButton);
+                
+                // 마지막 타일이 아니면 화살표 추가
+                if (index < tiles.length - 1) {
+                    const arrow = document.createElement('span');
+                    arrow.textContent = '→';
+                    arrow.style.cssText = 'color: #aaaaaa; margin: 0 2px;';
+                    tilePathItems.appendChild(arrow);
+                }
+            });
+        }
+        
+        // 특정 인덱스부터 타일 삭제
+        function removeTilesFrom(index) {
+            if (typeof window.removeTilesFromPath === 'function') {
+                window.removeTilesFromPath(index);
+            } else {
+                console.error('removeTilesFromPath function not available');
+            }
+        }
+        
+        // 전역으로 노출
+        window.updateTilePath = updateTilePath;
+        window.showInputSection = showInputSection;
 
         // 타일 선택 옵션 업데이트
         function createTileOption(index, text, color = null) {
@@ -178,14 +249,51 @@
                 });
             }
             
+            // select를 기본 옵션으로 리셋
+            tileSelect.selectedIndex = 0;
+            tileSelect.value = '';
+            
             document.getElementById('currentTileInfo').textContent = `현재 타일: (${tiles[cur].r}, ${tiles[cur].c})`;
+            
+            // 디버깅: 생성된 옵션 로그 출력
+            console.log(`Updated tile options: ${tileSelect.options.length} options total`);
+            for (let i = 0; i < tileSelect.options.length; i++) {
+                console.log(`  Option ${i}: value="${tileSelect.options[i].value}", text="${tileSelect.options[i].text}"`);
+            }
         }
+        
+        // 전역으로 노출
+        window.updateTileOptions = updateTileOptions;
 
         // 버튼 이벤트 리스너
         function handleUserInput(value) {
+            console.log(`handleUserInput called with value: "${value}" (type: ${typeof value})`);
+            
+            // 빈 값 체크 - 경고만 표시하고 계속 대기
+            if (value === '' || value === null || value === undefined) {
+                console.log('Empty or invalid selection. Please select an option.');
+                alert('옵션을 선택해주세요.');
+                return; // Promise 계속 대기
+            }
+            
+            // auto와 stop은 항상 허용
+            if (value === 'auto' || value === 'stop') {
+                console.log(`Special command received: ${value}`);
+                if (userInputResolver) {
+                    userInputResolver(value);
+                    userInputResolver = null;
+                }
+                return;
+            }
+            
+            // 숫자 선택의 경우 - 옵션 존재 여부와 관계없이 일단 전달
+            // JavaScript 코드에서 처리하도록
+            console.log(`Resolving with value: "${value}"`);
             if (userInputResolver) {
                 userInputResolver(value);
                 userInputResolver = null;
+            } else {
+                console.log('No userInputResolver available.');
             }
         }
         
@@ -358,12 +466,14 @@
         // DFS 재실행 함수 (인접 타일 선택 시)
         window.rerunDFSWithNewTile = function(existingTiles, newTile) {
             window.accumulatedTiles = existingTiles.slice();
-            console.log(`Re-running DFS with ${window.accumulatedTiles.length} accumulated tiles: ${window.accumulatedTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
+            console.log(`Re-running DFS with ${window.accumulatedTiles.length} fixed tiles: ${window.accumulatedTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
             
             const config = window.savedConfig;
+            
+            // DFS 재실행 - 자동 경로 계산 없이 후보만 찾기
             const solutions = printBestTilePlacements(window.currentGrid, config.tileSize, 1, {
-                showVisual: true,
-                showDirections: true,
+                showVisual: false,  // 시각화 끄기 (사용자가 선택할 때까지 기다림)
+                showDirections: false,
                 order: "weighted",
                 weighted: { wDist: 1.0, wTurn: 2.5, maxDist: 2.5 },
                 maxAngleDiff: 120,
@@ -375,17 +485,38 @@
                 fixedTiles: window.accumulatedTiles
             });
             
-            if (solutions?.[0]?.orderingState) {
-                console.log(`Resuming after DFS re-run. New solution: ${solutions[0].tiles.length} tiles (${window.accumulatedTiles.length} fixed)`);
+            // 새로운 placements 저장
+            if (solutions?.placements) {
+                window.savedPlacements = solutions.placements;
+                console.log(`Saved ${solutions.placements.length} new placements from DFS re-run.`);
+            }
+            
+            if (solutions?.[0]) {
+                console.log(`DFS found solution with ${solutions[0].tiles.length} total tiles (${window.accumulatedTiles.length} fixed + ${solutions[0].tiles.length - window.accumulatedTiles.length} new available)`);
+                
+                // orderingState 저장 (나중에 사용자가 선택을 시작할 때 사용)
+                window.currentOrderingState = solutions[0].orderingState;
+                
+                // 사용자가 다음 타일을 선택할 수 있도록 입력 섹션 표시
+                console.log('Waiting for user to select next tile...');
+                if (typeof window.showInputSection === 'function') {
+                    window.showInputSection(true);
+                }
+                
+                // resumeTileOrdering 호출하여 선택 대기 상태로 진입
                 resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid)
                     .then(result => {
                         if (result?.orderedTiles) {
-                            console.log("Ordered tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                            console.log("Tile selection completed. Final tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
                         }
                     })
-                    .catch(error => console.error("Error resuming:", error));
+                    .catch(error => console.error("Error during tile selection:", error));
             } else {
-                console.log("DFS could not find additional tiles. Try adjusting depth/iteration limits.");
+                console.log("DFS could not find any tiles with current fixed tiles. Try adjusting depth/iteration limits or removing some fixed tiles.");
+                // 입력 섹션 표시
+                if (typeof window.showInputSection === 'function') {
+                    window.showInputSection(true);
+                }
             }
         };
 
