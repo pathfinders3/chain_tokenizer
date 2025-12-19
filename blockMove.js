@@ -498,6 +498,15 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
     });
   }
 
+ /**
+ * 가능한 전체 배치 중에서 현재 타일과 인접해 있으면서 아직 사용되지 않은 타일 후보들을 반환한다.
+ *
+ * @param {Object} currentTile - 기준이 되는 현재 타일. {r: row index, c: column index}
+ * @param {number} k - 타일의 한 변의 크기(한 타일의 높이와 너비)
+ * @param {Array<Array<any>>} grid - 전체 퍼즐 그리드(2차원 배열, 높이 x 너비)
+ * @param {Array<Object>} existingTiles - 이미 선택(배치)된 타일들의 배열. 각 객체는 {r, c}를 가짐
+ * @returns {Array<Object>} adjacent - 아직 선택되지 않았으면서 currentTile과 인접한 타일들의 배열. 각 객체는 {r, c}
+ */
   function getAdjacentTileCandidates(currentTile, k, grid, existingTiles) {
     if (!allPlacements) return [];
     
