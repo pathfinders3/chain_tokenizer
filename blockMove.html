@@ -120,29 +120,19 @@
         let outputText = '';
 
         // 콘솔 메서드 오버라이드
-        const originalConsoleLog = console.log;
-        console.log = function(...args) {
-            outputText += args.join(' ') + '\n';
-            outputElement.value = outputText;
-            outputElement.scrollTop = outputElement.scrollHeight;
-            originalConsoleLog.apply(console, args);
-        };
-
-        const originalConsoleError = console.error;
-        console.error = function(...args) {
-            outputText += 'ERROR: ' + args.join(' ') + '\n';
-            outputElement.value = outputText;
-            outputElement.scrollTop = outputElement.scrollHeight;
-            originalConsoleError.apply(console, args);
-        };
-
-        const originalConsoleWarn = console.warn;
-        console.warn = function(...args) {
-            outputText += 'WARN: ' + args.join(' ') + '\n';
-            outputElement.value = outputText;
-            outputElement.scrollTop = outputElement.scrollHeight;
-            originalConsoleWarn.apply(console, args);
-        };
+        function redirectConsole(method, prefix = '') {
+            const original = console[method];
+            console[method] = function(...args) {
+                outputText += prefix + args.join(' ') + '\n';
+                outputElement.value = outputText;
+                outputElement.scrollTop = outputElement.scrollHeight;
+                original.apply(console, args);
+            };
+        }
+        
+        redirectConsole('log');
+        redirectConsole('error', 'ERROR: ');
+        redirectConsole('warn', 'WARN: ');
 
         // 사용자 입력 처리를 위한 전역 변수
         let userInputResolver = null;
@@ -158,6 +148,14 @@
         }
 
         // 타일 선택 옵션 업데이트
+        function createTileOption(index, text, color = null) {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = text;
+            if (color) option.style.color = color;
+            return option;
+        }
+        
         function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = []) {
             tileSelect.innerHTML = '<option value="">-- 선택 --</option>';
             
@@ -167,50 +165,33 @@
                 const dist = tileDist(centers[cur], centers[cand.i], k);
                 const ang = angleDegCart(centers[cur], centers[cand.i]);
                 const turn = prevAngle == null ? 0 : angleDiff(prevAngle, ang);
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = `${index + 1}. Tile at (${tile.r}, ${tile.c}) - Distance: ${dist.toFixed(2)}, Angle: ${ang.toFixed(1)}°, Turn: ${turn.toFixed(1)}°`;
-                tileSelect.appendChild(option);
+                const text = `${index + 1}. (${tile.r}, ${tile.c}) - Dist: ${dist.toFixed(2)}, Angle: ${ang.toFixed(1)}°, Turn: ${turn.toFixed(1)}°`;
+                tileSelect.appendChild(createTileOption(index, text));
             });
             
             // 인접 타일 추가
-            if (adjacentCandidates && adjacentCandidates.length > 0) {
+            if (adjacentCandidates?.length > 0) {
                 adjacentCandidates.forEach((adjTile, index) => {
                     const adjIndex = candidates.length + index;
-                    const option = document.createElement('option');
-                    option.value = adjIndex;
-                    option.textContent = `${adjIndex + 1}. [Adj.] Tile at (${adjTile.r}, ${adjTile.c})`;
-                    option.style.color = '#00ff00'; // 녹색으로 표시
-                    tileSelect.appendChild(option);
+                    const text = `${adjIndex + 1}. [Adj.] (${adjTile.r}, ${adjTile.c})`;
+                    tileSelect.appendChild(createTileOption(adjIndex, text, '#00ff00'));
                 });
             }
             
-            // 현재 타일 정보 업데이트
             document.getElementById('currentTileInfo').textContent = `현재 타일: (${tiles[cur].r}, ${tiles[cur].c})`;
         }
 
         // 버튼 이벤트 리스너
-        selectTileButton.addEventListener('click', () => {
+        function handleUserInput(value) {
             if (userInputResolver) {
-                const selectedValue = tileSelect.value;
-                userInputResolver(selectedValue);
+                userInputResolver(value);
                 userInputResolver = null;
             }
-        });
-
-        autoSelectButton.addEventListener('click', () => {
-            if (userInputResolver) {
-                userInputResolver('auto');
-                userInputResolver = null;
-            }
-        });
-
-        stopSelectionButton.addEventListener('click', () => {
-            if (userInputResolver) {
-                userInputResolver('stop');
-                userInputResolver = null;
-            }
-        });
+        }
+        
+        selectTileButton.addEventListener('click', () => handleUserInput(tileSelect.value));
+        autoSelectButton.addEventListener('click', () => handleUserInput('auto'));
+        stopSelectionButton.addEventListener('click', () => handleUserInput('stop'));
 
         // 초기에는 입력 섹션 숨김
         showInputSection(false);
@@ -223,56 +204,49 @@
         let startPos = { x: 0, y: 0 }; // 기본 시작 위치 (0,0)
 
         document.addEventListener('paste', (e) => {
-            const items = e.clipboardData.items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                    const blob = items[i].getAsFile();
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            inputCanvas.width = Math.min(img.width, 400);
-                            inputCanvas.height = Math.min(img.height, 400);
-                            inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
-                            inputCtx.drawImage(img, 0, 0, inputCanvas.width, inputCanvas.height);
-                            pastedImage = img;
-                            gridLoadStatus.textContent = '이미지가 캔버스에 로드되었습니다. 시작 위치를 클릭하거나 "이미지에서 그리드 로드" 버튼을 클릭하세요.';
-                            
-                            // 이미지를 localStorage에 저장
-                            saveImageToLocalStorage();
-                        };
-                        img.src = event.target.result;
+            const items = Array.from(e.clipboardData.items);
+            const imageItem = items.find(item => item.type.indexOf('image') !== -1);
+            
+            if (imageItem) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        loadImageOnCanvas(img, '이미지가 캔버스에 로드되었습니다. 시작 위치를 클릭하거나 "이미지에서 그리드 로드" 버튼을 클릭하세요.');
+                        saveImageToLocalStorage();
                     };
-                    reader.readAsDataURL(blob);
-                    break;
-                }
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(imageItem.getAsFile());
             }
         });
 
-        // 이미지를 localStorage에 저장하는 함수
+        // 이미지 로컬 저장 및 로드
         function saveImageToLocalStorage() {
             try {
-                const dataURL = inputCanvas.toDataURL('image/png');
-                localStorage.setItem('savedImage', dataURL);
+                localStorage.setItem('savedImage', inputCanvas.toDataURL('image/png'));
                 console.log('이미지가 localStorage에 저장되었습니다.');
             } catch (e) {
                 console.error('이미지 저장 실패:', e);
             }
         }
 
-        // 페이지 로드 시 localStorage에서 이미지 불러오기
+        function loadImageOnCanvas(img, message) {
+            inputCanvas.width = Math.min(img.width, 400);
+            inputCanvas.height = Math.min(img.height, 400);
+            inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+            inputCtx.drawImage(img, 0, 0, inputCanvas.width, inputCanvas.height);
+            pastedImage = img;
+            gridLoadStatus.textContent = message;
+        }
+
         function loadImageFromLocalStorage() {
             try {
                 const savedImageData = localStorage.getItem('savedImage');
                 if (savedImageData) {
                     const img = new Image();
                     img.onload = () => {
-                        inputCanvas.width = Math.min(img.width, 400);
-                        inputCanvas.height = Math.min(img.height, 400);
-                        inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
-                        inputCtx.drawImage(img, 0, 0, inputCanvas.width, inputCanvas.height);
-                        pastedImage = img;
-                        gridLoadStatus.textContent = '이전에 저장된 이미지가 자동으로 로드되었습니다.';
+                        loadImageOnCanvas(img, '이전에 저장된 이미지가 자동으로 로드되었습니다.');
                         console.log('localStorage에서 이미지를 불러왔습니다.');
                     };
                     img.src = savedImageData;
@@ -291,9 +265,8 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             startPos = { x, y };
-            gridLoadStatus.textContent = `시작 위치가 (${Math.floor(x)}, ${Math.floor(y)})로 설정되었습니다. "이미지에서 그리드 로드" 버튼을 클릭하세요.`;
+            gridLoadStatus.textContent = `시작 위치: (${Math.floor(x)}, ${Math.floor(y)}). "이미지에서 그리드 로드" 버튼을 클릭하세요.`;
             
-            // 클릭 위치에 표시를 위해 캔버스에 점 그리기
             inputCtx.beginPath();
             inputCtx.arc(x, y, 5, 0, 2 * Math.PI);
             inputCtx.fillStyle = 'red';
@@ -302,101 +275,92 @@
 
         // 이미지에서 그리드 로드 버튼 이벤트
         document.getElementById('loadGridFromImage').addEventListener('click', () => {
-            if (pastedImage) {
-                const newGrid = loadGridFromCanvas(inputCanvas, inputCtx, startPos);
-                if (newGrid && newGrid.length > 0 && newGrid[0].length > 0) {
-                    window.currentGrid = newGrid; // 전역 변수로 저장
-                    gridLoadStatus.textContent = '그리드가 성공적으로 로드되었습니다.';
-                    console.log('New grid loaded from image:', newGrid);
-                    // 초기 그리드 상태를 보여줌 (printGridOnly는 blockMove.js에 정의됨)
-                    if (typeof printGridOnly !== 'undefined') {
-                        printGridOnly(newGrid, 'Initial Grid State');
-                    }
-                    // '타일 계산 시작' 버튼 표시
-                    document.getElementById('startTileCalculation').style.display = 'inline-block';
-                } else {
-                    gridLoadStatus.textContent = '그리드 로드에 실패했습니다. 이미지가 올바른지 확인하세요.';
-                }
-            } else {
+            if (!pastedImage) {
                 gridLoadStatus.textContent = '이미지가 로드되지 않았습니다. CTRL-V로 이미지를 붙여넣으세요.';
+                return;
+            }
+            
+            const newGrid = loadGridFromCanvas(inputCanvas, inputCtx, startPos);
+            if (newGrid?.length > 0 && newGrid[0]?.length > 0) {
+                window.currentGrid = newGrid;
+                gridLoadStatus.textContent = '그리드가 성공적으로 로드되었습니다.';
+                console.log('New grid loaded from image:', newGrid);
+                if (typeof printGridOnly !== 'undefined') {
+                    printGridOnly(newGrid, 'Initial Grid State');
+                }
+                document.getElementById('startTileCalculation').style.display = 'inline-block';
+            } else {
+                gridLoadStatus.textContent = '그리드 로드에 실패했습니다. 이미지가 올바른지 확인하세요.';
             }
         });
 
         // 타일 계산 시작 버튼 이벤트
         document.getElementById('startTileCalculation').addEventListener('click', () => {
-            if (window.currentGrid) {
-                gridLoadStatus.textContent = '타일 계산을 시작합니다.';
-                document.getElementById('calculationStatus').style.display = 'block';
-                const iterationLimit = parseInt(document.getElementById('iterationLimitSelect').value, 10);
-                const depthLimit = parseInt(document.getElementById('depthLimitSelect').value, 10);
-                const startPosition = document.getElementById('startPositionSelect').value;
-                const tileSize = parseInt(document.getElementById('tileSizeSelect').value, 10);
-                const startAngle = parseFloat(document.getElementById('startAngleSelect').value);
-                let startRule = startPosition === 'topLeft' ? 'topleft' : (startPosition === 'topRight' ? 'topright' : 'custom');
-                let customStartTile = null;
-                if (startRule === 'custom') {
-                    const r = parseInt(document.getElementById('startTileR').value, 10);
-                    const c = parseInt(document.getElementById('startTileC').value, 10);
-                    customStartTile = { r, c };
-                    console.log(`Custom start tile specified: (${r}, ${c})`);
-                }
-                console.log(`Start angle specified: ${startAngle}°`);
-                const solutions = printBestTilePlacements(window.currentGrid, tileSize, 1, {
-                    showVisual: true,
-                    showDirections: true,
-                    order: "weighted",
-                    weighted: { wDist: 1.0, wTurn: 2.5, maxDist: 2.5 },
-                    maxAngleDiff: 60,
-                    iterationLimit: iterationLimit,
-                    depthLimit: depthLimit,
-                    startRule: startRule,
-                    customStartTile: customStartTile,
-                    startAngle: startAngle
-                });
-                document.getElementById('calculationStatus').style.display = 'none';
-                
-                // placements와 전체 설정을 저장
-                window.savedPlacements = solutions.placements;
-                window.savedConfig = {
-                    tileSize,
-                    iterationLimit,
-                    depthLimit,
-                    startRule,
-                    customStartTile,
-                    startAngle
-                };
-                window.accumulatedTiles = []; // 누적 타일 초기화
-                
-                if (solutions && solutions[0]?.orderingState) {
-                    console.log("Resuming tile ordering for the first solution...");
-                    resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid).then(resumedResult => {
-                        if (resumedResult && resumedResult.rerunning) {
-                            console.log("DFS re-run initiated. Waiting for new results...");
-                        } else if (resumedResult && resumedResult.orderedTiles) {
-                            console.log("Resumed ordered tiles:", resumedResult.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
-                        } else {
-                            console.warn("Resume completed with no result:", resumedResult);
-                        }
-                    }).catch(error => {
-                        console.error("Error while resuming tile ordering:", error);
-                    });
-                }
-            } else {
+            if (!window.currentGrid) {
                 gridLoadStatus.textContent = '그리드가 로드되지 않았습니다. 먼저 이미지를 로드하세요.';
+                return;
+            }
+            
+            gridLoadStatus.textContent = '타일 계산을 시작합니다.';
+            document.getElementById('calculationStatus').style.display = 'block';
+            
+            const iterationLimit = parseInt(document.getElementById('iterationLimitSelect').value, 10);
+            const depthLimit = parseInt(document.getElementById('depthLimitSelect').value, 10);
+            const startPosition = document.getElementById('startPositionSelect').value;
+            const tileSize = parseInt(document.getElementById('tileSizeSelect').value, 10);
+            const startAngle = parseFloat(document.getElementById('startAngleSelect').value);
+            
+            const startRuleMap = { topLeft: 'topleft', topRight: 'topright', custom: 'custom' };
+            const startRule = startRuleMap[startPosition] || 'topleft';
+            
+            let customStartTile = null;
+            if (startRule === 'custom') {
+                const r = parseInt(document.getElementById('startTileR').value, 10);
+                const c = parseInt(document.getElementById('startTileC').value, 10);
+                customStartTile = { r, c };
+                console.log(`Custom start tile: (${r}, ${c})`);
+            }
+            console.log(`Start angle: ${startAngle}°`);
+            
+            const solutions = printBestTilePlacements(window.currentGrid, tileSize, 1, {
+                showVisual: true,
+                showDirections: true,
+                order: "weighted",
+                weighted: { wDist: 1.0, wTurn: 2.5, maxDist: 2.5 },
+                maxAngleDiff: 60,
+                iterationLimit,
+                depthLimit,
+                startRule,
+                customStartTile,
+                startAngle
+            });
+            
+            document.getElementById('calculationStatus').style.display = 'none';
+            
+            window.savedPlacements = solutions.placements;
+            window.savedConfig = { tileSize, iterationLimit, depthLimit, startRule, customStartTile, startAngle };
+            window.accumulatedTiles = [];
+            
+            if (solutions?.[0]?.orderingState) {
+                console.log("Resuming tile ordering...");
+                resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid)
+                    .then(result => {
+                        if (result?.rerunning) {
+                            console.log("DFS re-run initiated.");
+                        } else if (result?.orderedTiles) {
+                            console.log("Ordered tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                        }
+                    })
+                    .catch(error => console.error("Error resuming tile ordering:", error));
             }
         });
         
         // DFS 재실행 함수 (인접 타일 선택 시)
         window.rerunDFSWithNewTile = function(existingTiles, newTile) {
-            // 누적 타일 업데이트 - existingTiles에 이미 모든 타일(기존 + 새 타일)이 포함되어 있음
-            window.accumulatedTiles = existingTiles.slice(); // 전체 타일 리스트로 교체
-            
-            console.log(`Re-running DFS with accumulated tiles: ${window.accumulatedTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
-            console.log(`Total accumulated tiles: ${window.accumulatedTiles.length}`);
+            window.accumulatedTiles = existingTiles.slice();
+            console.log(`Re-running DFS with ${window.accumulatedTiles.length} accumulated tiles: ${window.accumulatedTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
             
             const config = window.savedConfig;
-            
-            // 원래 설정 유지하면서 DFS 재실행 (누적된 모든 타일 고정)
             const solutions = printBestTilePlacements(window.currentGrid, config.tileSize, 1, {
                 showVisual: true,
                 showDirections: true,
@@ -405,27 +369,23 @@
                 maxAngleDiff: 120,
                 iterationLimit: config.iterationLimit,
                 depthLimit: config.depthLimit,
-                startRule: config.startRule,           // 원래 startRule 유지
-                customStartTile: config.customStartTile, // 원래 customStartTile 유지
+                startRule: config.startRule,
+                customStartTile: config.customStartTile,
                 startAngle: config.startAngle,
-                fixedTiles: window.accumulatedTiles // 누적된 모든 타일 고정
+                fixedTiles: window.accumulatedTiles
             });
             
-            if (solutions && solutions.length > 0 && solutions[0]?.orderingState) {
-                console.log("Resuming tile ordering after DFS re-run...");
-                console.log(`New solution has ${solutions[0].tiles.length} tiles (including ${window.accumulatedTiles.length} fixed tiles)`);
-                resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid).then(resumedResult => {
-                    if (resumedResult && resumedResult.orderedTiles) {
-                        console.log("Resumed ordered tiles:", resumedResult.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
-                    } else {
-                        console.error("Resume result is invalid:", resumedResult);
-                    }
-                }).catch(error => {
-                    console.error("Error while resuming tile ordering:", error);
-                });
+            if (solutions?.[0]?.orderingState) {
+                console.log(`Resuming after DFS re-run. New solution: ${solutions[0].tiles.length} tiles (${window.accumulatedTiles.length} fixed)`);
+                resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid)
+                    .then(result => {
+                        if (result?.orderedTiles) {
+                            console.log("Ordered tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                        }
+                    })
+                    .catch(error => console.error("Error resuming:", error));
             } else {
-                console.error("No valid solutions found after DFS re-run. Solutions:", solutions);
-                console.log("DFS could not find additional tiles with the given constraints. Try adjusting depth/iteration limits.");
+                console.log("DFS could not find additional tiles. Try adjusting depth/iteration limits.");
             }
         };
 
@@ -437,30 +397,27 @@
 
         // 캔버스에서 선택된 크기의 그리드를 로드하는 함수
         function loadGridFromCanvas(canvas, ctx, startPos = { x: 0, y: 0 }) {
-            // 사용자가 선택한 그리드 크기 가져오기
             const gridSize = parseInt(document.getElementById('gridSizeSelect').value, 10);
-            // 원본 이미지의 크기
-            const imgWidth = pastedImage ? pastedImage.width : canvas.width;
-            const imgHeight = pastedImage ? pastedImage.height : canvas.height;
-            // 캔버스 좌표를 이미지 좌표로 변환
-            const imgStartX = startPos.x * (imgWidth / canvas.width);
-            const imgStartY = startPos.y * (imgHeight / canvas.height);
+            const imgWidth = pastedImage?.width || canvas.width;
+            const imgHeight = pastedImage?.height || canvas.height;
+            const scaleX = imgWidth / canvas.width;
+            const scaleY = imgHeight / canvas.height;
+            const imgStartX = startPos.x * scaleX;
+            const imgStartY = startPos.y * scaleY;
+            
             const grid = [];
             for (let r = 0; r < gridSize; r++) {
                 const row = [];
                 for (let c = 0; c < gridSize; c++) {
-                    // 이미지의 시작 위치 + (c, r) 위치를 캔버스 좌표로 변환
-                    const imgX = imgStartX + c;
-                    const imgY = imgStartY + r;
-                    const canvasX = imgX * (canvas.width / imgWidth);
-                    const canvasY = imgY * (canvas.height / imgHeight);
-                    if (canvasX < canvas.width && canvasY < canvas.height && canvasX >= 0 && canvasY >= 0) {
+                    const canvasX = (imgStartX + c) / scaleX;
+                    const canvasY = (imgStartY + r) / scaleY;
+                    
+                    if (canvasX >= 0 && canvasX < canvas.width && canvasY >= 0 && canvasY < canvas.height) {
                         const pixelData = ctx.getImageData(Math.floor(canvasX), Math.floor(canvasY), 1, 1).data;
-                        // 검은색 근사치 확인 (RGB 기준으로 임의 설정, 예: R<50, G<50, B<50)
                         const isBlack = pixelData[0] < 50 && pixelData[1] < 50 && pixelData[2] < 50;
                         row.push(isBlack ? 1 : 0);
                     } else {
-                        row.push(0); // 캔버스 범위를 벗어나면 0으로 설정
+                        row.push(0);
                     }
                 }
                 grid.push(row);

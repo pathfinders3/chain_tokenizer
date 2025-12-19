@@ -205,8 +205,15 @@ function dist2(a, b) {
 }
 
 function tileDist(centA, centB, k) {
-  // centers는 grid-cell 단위, 타일 단위로 보려면 k로 나눔
   return Math.sqrt(dist2(centA, centB)) / k;
+}
+
+function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
+  const dist = Math.sqrt(dist2(centers[curIdx], centers[candidateIdx]));
+  const ang = angleDegCart(centers[curIdx], centers[candidateIdx]);
+  const turn = (prevAngle == null) ? 0 : angleDiff(prevAngle, ang);
+  const isAdjacent = areTilesAdjacent(tiles[curIdx], tiles[candidateIdx], k);
+  return { dist, ang, turn, isAdjacent };
 }
   
   // Strategy A: nearest neighbor
@@ -232,44 +239,39 @@ function tileDist(centA, centB, k) {
     return best;
   }
   
-  // Strategy C: weighted distance + turn (recommended)
+  function findClosestAdjacentTile(curIdx, centers, unusedSet, tiles, k) {
+    let best = null;
+    let bestD = Infinity;
+    for (const i of unusedSet) {
+      const info = getCandidateInfo(curIdx, i, centers, tiles, k, null);
+      if (info.isAdjacent && info.dist * info.dist < bestD) {
+        bestD = info.dist * info.dist;
+        best = i;
+      }
+    }
+    return best;
+  }
+
   function makeNextByWeightedWithMaxDist({ wDist = 1.0, wTurn = 2.5, maxDist = 2.5 } = {}) {
     return function next(curIdx, prevAngle, centers, unusedSet, k, tiles) {
       let best = null;
       let bestScore = Infinity;
 
-      // 1) maxDist 이내 후보만 우선
       for (const i of unusedSet) {
-        const d = Math.sqrt(dist2(centers[curIdx], centers[i]));
-        if (d > maxDist) continue;
-
-        // 닿는 조건 확인 (직접 닿거나 대각선으로 닿는 경우)
-        const curTile = tiles[curIdx];
-        const nextTile = tiles[i];
-        const isAdjacent = areTilesAdjacent(curTile, nextTile, k);
-        if (!isAdjacent) continue;
-
-        const ang = angleDegCart(centers[curIdx], centers[i]);
-        const turn = (prevAngle == null) ? 0 : angleDiff(prevAngle, ang);
-        const score = wDist * d + wTurn * turn;
-
-        if (score < bestScore) { bestScore = score; best = i; }
+        const info = getCandidateInfo(curIdx, i, centers, tiles, k, prevAngle);
+        if (info.dist > maxDist || !info.isAdjacent) continue;
+        
+        const score = wDist * info.dist + wTurn * info.turn;
+        if (score < bestScore) {
+          bestScore = score;
+          best = i;
+        }
       }
 
-      // 2) 반경 안에 후보가 하나도 없으면, 가장 가까운 타일 중 닿는 타일로 fallback
       if (best == null) {
-        let bestD = Infinity;
-        for (const i of unusedSet) {
-          const d = dist2(centers[curIdx], centers[i]);
-          const curTile = tiles[curIdx];
-          const nextTile = tiles[i];
-          const isAdjacent = areTilesAdjacent(curTile, nextTile, k);
-          if (isAdjacent && d < bestD) { bestD = d; best = i; }
-        }
+        best = findClosestAdjacentTile(curIdx, centers, unusedSet, tiles, k);
         if (best != null) {
-          console.log(`No tile found within maxDist. Falling back to closest adjacent tile at (${tiles[best].r}, ${tiles[best].c})`);
-        } else {
-          console.log(`No adjacent tile found even in fallback. Stopping selection.`);
+          console.log(`Fallback to closest adjacent tile at (${tiles[best].r}, ${tiles[best].c})`);
         }
       }
       return best;
@@ -277,58 +279,27 @@ function tileDist(centA, centB, k) {
   }
 
   function makeNextPreferAngleIfDiagonal({
-    diagTileDist = Math.SQRT2 + 1e-9, // √2 타일단위 이내면 "대각선(또는 그보다 가까움)"으로 취급
-    wTurn = 1.0,                      // 각도 우선에서는 이 값만 의미(가중치라기보다 스케일)
+    diagTileDist = Math.SQRT2 + 1e-9,
+    wTurn = 1.0,
   } = {}) {
     return function next(curIdx, prevAngle, centers, unusedSet, k, tiles) {
-      // 1) 대각선(√2 타일단위) 이내 후보 수집
       const close = [];
       for (const i of unusedSet) {
         const dTile = tileDist(centers[curIdx], centers[i], k);
         if (dTile <= diagTileDist) {
-          // 닿는 조건 확인 (직접 닿거나 대각선으로 닿는 경우)
-          const curTile = tiles[curIdx];
-          const nextTile = tiles[i];
-          const isAdjacent = areTilesAdjacent(curTile, nextTile, k);
-          if (isAdjacent) close.push({ i, dTile });
+          const info = getCandidateInfo(curIdx, i, centers, tiles, k, prevAngle);
+          if (info.isAdjacent) close.push({ i, dTile, turn: info.turn });
         }
       }
 
-      // 2) 가까운 후보가 있으면: 각도(회전량) 우선
       if (close.length > 0) {
-        let best = null;
-        let bestTurn = Infinity;
-        let bestDTile = Infinity;
-
-        for (const { i, dTile } of close) {
-          const ang = angleDegCart(centers[curIdx], centers[i]);
-          const turn = (prevAngle == null) ? 0 : angleDiff(prevAngle, ang);
-
-          // 1순위: turn 최소
-          // 2순위: dTile 최소 (동점일 때 더 가까운 것을)
-          if (turn < bestTurn || (turn === bestTurn && dTile < bestDTile)) {
-            bestTurn = turn;
-            bestDTile = dTile;
-            best = i;
-          }
-        }
-        return best;
+        close.sort((a, b) => a.turn - b.turn || a.dTile - b.dTile);
+        return close[0].i;
       }
 
-      // 3) 대각선 이내 후보가 없으면: 거리 우선(가장 가까운 타일 중 닿는 타일) - fallback
-      let best = null;
-      let bestD2 = Infinity;
-      for (const i of unusedSet) {
-        const d2 = dist2(centers[curIdx], centers[i]);
-        const curTile = tiles[curIdx];
-        const nextTile = tiles[i];
-        const isAdjacent = areTilesAdjacent(curTile, nextTile, k);
-        if (isAdjacent && d2 < bestD2) { bestD2 = d2; best = i; }
-      }
-      if (best != null) {
-        console.log(`No adjacent tile found within diagonal distance. Falling back to closest adjacent tile at (${tiles[best].r}, ${tiles[best].c})`);
-      } else {
-        console.log(`No adjacent tile found even in fallback for diagonal rule. Stopping selection.`);
+      const best = findClosestAdjacentTile(curIdx, centers, unusedSet, tiles, k);
+      if (best == null) {
+        console.log(`No adjacent tile found. Stopping selection.`);
       }
       return best;
     };
@@ -357,18 +328,12 @@ function tileDist(centA, centB, k) {
   }
 
 
-function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAngleDiff = Infinity, grid, customStartTile = null, startAngle = null) {
-    if (tiles.length <= 1) return tiles.slice();
-
-    const centers = tiles.map(t => tileCenter(t, k));
-
-    // pick start
+function selectStartTile(tiles, startRule, customStartTile) {
     let startIdx = 0;
     if (startRule === "topleft") {
-      console.log(`Top-Left selection - All tiles in solution: ${tiles.map((t, idx) => `[${idx}]:(${t.r},${t.c})`).join(" ")}`);
+      console.log(`Top-Left selection - All tiles: ${tiles.map((t, idx) => `[${idx}]:(${t.r},${t.c})`).join(" ")}`);
       for (let i = 1; i < tiles.length; i++) {
         if (tiles[i].r < tiles[startIdx].r || (tiles[i].r === tiles[startIdx].r && tiles[i].c < tiles[startIdx].c)) {
-          console.log(`  Updating startIdx from ${startIdx}:(${tiles[startIdx].r},${tiles[startIdx].c}) to ${i}:(${tiles[i].r},${tiles[i].c})`);
           startIdx = i;
         }
       }
@@ -379,20 +344,12 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
         }
       }
     } else if (startRule === "custom" && customStartTile) {
-      // Custom 시작 타일은 이미 DFS에서 고정되어 있으므로, 정확히 일치하는 타일을 찾음
-      let found = false;
-      for (let i = 0; i < tiles.length; i++) {
-        if (tiles[i].r === customStartTile.r && tiles[i].c === customStartTile.c) {
-          startIdx = i;
-          found = true;
-          break;
-        }
-      }
-      if (found) {
-        console.log(`Custom start tile found in solution at exact position: (${tiles[startIdx].r}, ${tiles[startIdx].c})`);
+      const found = tiles.findIndex(t => t.r === customStartTile.r && t.c === customStartTile.c);
+      if (found !== -1) {
+        startIdx = found;
+        console.log(`Custom start tile found at (${tiles[startIdx].r}, ${tiles[startIdx].c})`);
       } else {
-        console.log(`Warning: Custom start tile (${customStartTile.r}, ${customStartTile.c}) not found in solution. Using closest tile.`);
-        // Fallback: 가장 가까운 타일 찾기
+        console.log(`Warning: Custom start tile not found. Using closest tile.`);
         let minDist = Infinity;
         for (let i = 0; i < tiles.length; i++) {
           const dist = Math.sqrt((tiles[i].r - customStartTile.r)**2 + (tiles[i].c - customStartTile.c)**2);
@@ -401,13 +358,35 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
             startIdx = i;
           }
         }
-        console.log(`Closest tile in solution: (${tiles[startIdx].r}, ${tiles[startIdx].c})`);
       }
     } else if (typeof startRule === "function") {
-      startIdx = startRule(tiles, centers);
+      startIdx = startRule(tiles);
+    }
+    return startIdx;
+}
+
+function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAngleDiff = Infinity, grid, customStartTile = null, startAngle = null) {
+    if (tiles.length <= 1) {
+      return {
+        orderedTiles: tiles.slice(),
+        state: {
+          orderIdx: tiles.length === 1 ? [0] : [],
+          unused: new Set(),
+          cur: 0,
+          prevAngle: startAngle !== null ? startAngle : null,
+          centers: tiles.map(t => tileCenter(t, k)),
+          tiles,
+          k,
+          nextRule,
+          maxAngleDiff,
+          grid
+        }
+      };
     }
 
-    console.log(`Starting tile selected: (${tiles[startIdx].r}, ${tiles[startIdx].c}) based on rule '${startRule}'`);
+    const centers = tiles.map(t => tileCenter(t, k));
+    const startIdx = selectStartTile(tiles, startRule, customStartTile);
+    console.log(`Starting tile: (${tiles[startIdx].r}, ${tiles[startIdx].c}) [${startRule}]`);
 
     const unused = new Set([...Array(tiles.length).keys()]);
     unused.delete(startIdx);
@@ -423,13 +402,13 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
     while (unused.size) {
       const nxt = nextRule(cur, prevAngle, centers, unused, k, tiles);
       if (nxt == null) {
-        console.log(`중단됐습니다. 타일 ${orderIdx.length}. No suitable next tile found. ${unused.size} tiles remain unvisited.`);
+        console.log(`Stopped at tile ${orderIdx.length}. ${unused.size} tiles remain.`);
         break;
       }
 
       const newAngle = angleDegCart(centers[cur], centers[nxt]);
       if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
-        console.log(`중단됐습니다. 타일 ${orderIdx.length} due to angle difference (${angleDiff(prevAngle, newAngle).toFixed(1)}°) exceeding max allowed (${maxAngleDiff}°). ${unused.size} tiles remain unvisited.`);
+        console.log(`Stopped at tile ${orderIdx.length}. Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°. ${unused.size} tiles remain.`);
         break;
       }
 
@@ -440,7 +419,7 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
     }
 
     if (unused.size > 0) {
-      console.log(`Warning: 모든 타일이 처리되지 못했음. Only ${orderIdx.length} out of ${tiles.length} tiles were visited due to constraints.`);
+      console.log(`Warning: ${orderIdx.length}/${tiles.length} tiles visited.`);
     }
 
     // Return both the ordered tiles and the state for potential resumption
@@ -470,29 +449,29 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
     console.log(`Resuming tile ordering with original max angle difference: ${maxAngleDiff}°`);
   }
 
+  function logCandidates(candidates, adjacentCandidates, cur, prevAngle, centers, k) {
+    console.log(`\nCurrent tile: (${tiles[cur].r}, ${tiles[cur].c})`);
+    console.log('Available tiles:');
+    
+    candidates.forEach((cand, index) => {
+      const tile = tiles[cand.i];
+      const dist = tileDist(centers[cur], centers[cand.i], k);
+      const ang = angleDegCart(centers[cur], centers[cand.i]);
+      const turn = prevAngle == null ? 0 : angleDiff(prevAngle, ang);
+      console.log(`  ${index + 1}. (${tile.r}, ${tile.c}) - Dist: ${dist.toFixed(2)}, Angle: ${ang.toFixed(1)}°, Turn: ${turn.toFixed(1)}°`);
+    });
+    
+    if (adjacentCandidates.length > 0) {
+      console.log('Adjacent tiles (not in DFS):');
+      adjacentCandidates.forEach((cand, index) => {
+        console.log(`  ${candidates.length + index + 1}. [Adj.] (${cand.r}, ${cand.c})`);
+      });
+    }
+  }
+
   function askUserForNextTile(candidates, adjacentCandidates, cur, prevAngle, centers, k) {
     return new Promise((resolve) => {
-      console.log(`\nCurrent tile position: (${tiles[cur].r}, ${tiles[cur].c})`);
-      console.log('Available tiles around the current position:');
-      
-      // DFS 타일 출력
-      candidates.forEach((cand, index) => {
-        const tile = tiles[cand.i];
-        const dist = tileDist(centers[cur], centers[cand.i], k);
-        const ang = angleDegCart(centers[cur], centers[cand.i]);
-        const turn = prevAngle == null ? 0 : angleDiff(prevAngle, ang);
-        console.log(`  ${index + 1}. Tile at (${tile.r}, ${tile.c}) - Distance: ${dist.toFixed(2)} tile units, Angle: ${ang.toFixed(1)}°, Turn: ${turn.toFixed(1)}°`);
-      });
-      
-      // 인접 타일 출력
-      if (adjacentCandidates.length > 0) {
-        console.log('Adjacent tile candidates (not in DFS solution):');
-        adjacentCandidates.forEach((cand, index) => {
-          const adjIndex = candidates.length + index;
-          console.log(`  ${adjIndex + 1}. [Adj.] Tile at (${cand.r}, ${cand.c})`);
-        });
-      }
-      
+      logCandidates(candidates, adjacentCandidates, cur, prevAngle, centers, k);
       showInputSection(true);
       updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates);
       userInputResolver = (value) => { showInputSection(false); resolve(value); };
@@ -522,13 +501,9 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
   }
 
   function getTileCandidates(cur, unused, centers, k) {
-    const candidates = [];
-    for (const i of unused) {
-      const dist = tileDist(centers[cur], centers[i], k);
-      candidates.push({ i, dist });
-    }
-    candidates.sort((a, b) => a.dist - b.dist);
-    return candidates;
+    return Array.from(unused)
+      .map(i => ({ i, dist: tileDist(centers[cur], centers[i], k) }))
+      .sort((a, b) => a.dist - b.dist);
   }
 
   async function processNextTile() {
@@ -546,62 +521,57 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       let nxt = null;
       let isAdjacentTile = false;
 
-      if (String(answer).toLowerCase() === 'stop') {
-        console.log(`User stopped resuming at tile ${orderIdx.length}. ${unused.size} tiles remain unvisited.`);
+      const answerStr = String(answer).toLowerCase();
+      
+      if (answerStr === 'stop') {
+        console.log(`Stopped at tile ${orderIdx.length}. ${unused.size} tiles remain.`);
         generateAndCopyResultImage(grid, tiles, orderIdx, k);
         break;
-      } else if (String(answer).toLowerCase() === 'auto') {
-        console.log('Switching to automatic selection using default rule.');
+      }
+      
+      if (answerStr === 'auto') {
+        console.log('Switching to automatic selection.');
         nxt = nextRule(cur, prevAngle, centers, unused, k);
       } else {
         const choice = parseInt(answer, 10);
-        if (!Number.isNaN(choice) && choice >= 0) {
-          if (choice < candidates.length) {
-            // DFS 타일 선택
-            nxt = candidates[choice].i;
-            console.log(`User selected DFS tile at (${tiles[nxt].r}, ${tiles[nxt].c}).`);
-          } else if (choice < candidates.length + adjacentCandidates.length) {
-            // 인접 타일 선택 - DFS 재실행하여 남은 오렌지 셀로 최적 타일 찾기
-            const adjIdx = choice - candidates.length;
-            const selectedAdjTile = adjacentCandidates[adjIdx];
-            console.log(`User selected adjacent tile at (${selectedAdjTile.r}, ${selectedAdjTile.c}). Re-calculating with remaining orange cells...`);
-            
-            // 현재까지 선택한 타일에 새 타일 추가
-            const allSelectedTiles = [...currentOrderedTiles, selectedAdjTile];
-            
-            // DFS 재실행 - 기존 타일들은 고정하고 남은 오렌지 셀로 새 타일 찾기
-            if (typeof window !== 'undefined' && window.rerunDFSWithNewTile) {
-              window.rerunDFSWithNewTile(allSelectedTiles, selectedAdjTile);
-              // DFS 재실행 중임을 표시하고 현재 상태 반환
-              console.log('Initiating DFS re-run with existing tiles preserved...');
-              return {
-                orderedTiles: allSelectedTiles,
-                state: { orderIdx, unused, cur, prevAngle, centers, tiles, k, nextRule, maxAngleDiff, grid },
-                rerunning: true
-              };
-            } else {
-              console.error('DFS re-run function not available.');
-            }
+        if (Number.isNaN(choice) || choice < 0) {
+          console.log('Invalid selection. Using default rule.');
+          nxt = nextRule(cur, prevAngle, centers, unused, k);
+        } else if (choice < candidates.length) {
+          nxt = candidates[choice].i;
+          console.log(`Selected DFS tile at (${tiles[nxt].r}, ${tiles[nxt].c}).`);
+        } else if (choice < candidates.length + adjacentCandidates.length) {
+          const adjIdx = choice - candidates.length;
+          const selectedAdjTile = adjacentCandidates[adjIdx];
+          console.log(`Selected adjacent tile at (${selectedAdjTile.r}, ${selectedAdjTile.c}). Re-running DFS...`);
+          
+          const allSelectedTiles = [...currentOrderedTiles, selectedAdjTile];
+          
+          if (typeof window !== 'undefined' && window.rerunDFSWithNewTile) {
+            window.rerunDFSWithNewTile(allSelectedTiles, selectedAdjTile);
+            console.log('DFS re-run initiated.');
+            return {
+              orderedTiles: allSelectedTiles,
+              state: { orderIdx, unused, cur, prevAngle, centers, tiles, k, nextRule, maxAngleDiff, grid },
+              rerunning: true
+            };
           } else {
-            console.log(`Invalid selection. Using default rule to select next tile.`);
-            nxt = nextRule(cur, prevAngle, centers, unused, k);
+            console.error('DFS re-run function not available.');
           }
         } else {
-          console.log(`Invalid selection. Using default rule to select next tile.`);
+          console.log('Invalid selection. Using default rule.');
           nxt = nextRule(cur, prevAngle, centers, unused, k);
         }
       }
 
-      // isAdjacentTile 체크는 더 이상 필요 없음 (위에서 return으로 처리)
-
       if (nxt == null) {
-        console.log(`Stopped resuming at tile ${orderIdx.length}. No suitable next tile found. ${unused.size} tiles remain unvisited.`);
+        console.log(`Stopped at tile ${orderIdx.length}. ${unused.size} tiles remain.`);
         break;
       }
 
       const newAngle = angleDegCart(centers[cur], centers[nxt]);
       if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
-        console.log(`Stopped resuming at tile ${orderIdx.length} due to angle difference (${angleDiff(prevAngle, newAngle).toFixed(1)}°) exceeding max allowed (${maxAngleDiff}°). ${unused.size} tiles remain unvisited.`);
+        console.log(`Stopped at tile ${orderIdx.length}. Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
         break;
       }
 
@@ -611,19 +581,16 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       cur = nxt;
 
       const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
-      console.log('\nCurrent ordered tile path after selecting tile ' + orderIdx.length + ':');
-      printPlacementAscii(grid, updatedOrderedTiles, k, '-- Current Visual (Tile ' + orderIdx.length + ') --');
-    }
-
-    if (unused.size > 0) {
-      console.log(`Warning: Not all tiles were ordered after resuming. Only ${orderIdx.length} out of ${tiles.length} tiles were visited due to constraints.`);
-    } else {
-      console.log(`Successfully ordered all tiles after resuming. Total tiles ordered: ${orderIdx.length}.`);
+      printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} --`);
     }
 
     const finalOrderedTiles = orderIdx.map(i => tiles[i]);
-    console.log('\nFinal ordered tile path visualization:');
-    printPlacementAscii(grid, finalOrderedTiles, k, '-- Final Visual after Resuming --');
+    if (unused.size > 0) {
+      console.log(`Warning: ${orderIdx.length}/${tiles.length} tiles ordered.`);
+    } else {
+      console.log(`All ${orderIdx.length} tiles ordered successfully.`);
+    }
+    printPlacementAscii(grid, finalOrderedTiles, k, '-- Final Visual --');
 
     return {
       orderedTiles: finalOrderedTiles,
@@ -894,8 +861,8 @@ function printBestTilePlacements(grid, k = 2, limit = 4, opts = {}) {
 
     // Depth limit check
     if (depth >= depthLimit) {
-      if (iterationCount < 100) {
-        console.log(`Depth limit of ${depthLimit} reached at depth ${depth}. Stopping this branch.`);
+      if (iterationCount % 10000 === 0) {
+        console.log(`Depth limit ${depthLimit} reached at depth ${depth}.`);
       }
       return;
     }
