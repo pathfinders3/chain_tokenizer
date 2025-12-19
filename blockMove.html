@@ -158,8 +158,10 @@
         }
 
         // 타일 선택 옵션 업데이트
-        function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle) {
+        function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = []) {
             tileSelect.innerHTML = '<option value="">-- 선택 --</option>';
+            
+            // DFS 타일 추가
             candidates.forEach((cand, index) => {
                 const tile = tiles[cand.i];
                 const dist = tileDist(centers[cur], centers[cand.i], k);
@@ -170,6 +172,19 @@
                 option.textContent = `${index + 1}. Tile at (${tile.r}, ${tile.c}) - Distance: ${dist.toFixed(2)}, Angle: ${ang.toFixed(1)}°, Turn: ${turn.toFixed(1)}°`;
                 tileSelect.appendChild(option);
             });
+            
+            // 인접 타일 추가
+            if (adjacentCandidates && adjacentCandidates.length > 0) {
+                adjacentCandidates.forEach((adjTile, index) => {
+                    const adjIndex = candidates.length + index;
+                    const option = document.createElement('option');
+                    option.value = adjIndex;
+                    option.textContent = `${adjIndex + 1}. [Adj.] Tile at (${adjTile.r}, ${adjTile.c})`;
+                    option.style.color = '#00ff00'; // 녹색으로 표시
+                    tileSelect.appendChild(option);
+                });
+            }
+            
             // 현재 타일 정보 업데이트
             document.getElementById('currentTileInfo').textContent = `현재 타일: (${tiles[cur].r}, ${tiles[cur].c})`;
         }
@@ -293,8 +308,10 @@
                     window.currentGrid = newGrid; // 전역 변수로 저장
                     gridLoadStatus.textContent = '그리드가 성공적으로 로드되었습니다.';
                     console.log('New grid loaded from image:', newGrid);
-                    // 초기 그리드 상태를 보여줌
-                    printGridOnly(newGrid, 'Initial Grid State');
+                    // 초기 그리드 상태를 보여줌 (printGridOnly는 blockMove.js에 정의됨)
+                    if (typeof printGridOnly !== 'undefined') {
+                        printGridOnly(newGrid, 'Initial Grid State');
+                    }
                     // '타일 계산 시작' 버튼 표시
                     document.getElementById('startTileCalculation').style.display = 'inline-block';
                 } else {
@@ -338,10 +355,28 @@
                 });
                 document.getElementById('calculationStatus').style.display = 'none';
                 
+                // placements와 전체 설정을 저장
+                window.savedPlacements = solutions.placements;
+                window.savedConfig = {
+                    tileSize,
+                    iterationLimit,
+                    depthLimit,
+                    startRule,
+                    customStartTile,
+                    startAngle
+                };
+                window.accumulatedTiles = []; // 누적 타일 초기화
+                
                 if (solutions && solutions[0]?.orderingState) {
                     console.log("Resuming tile ordering for the first solution...");
-                    resumeTileOrdering(solutions[0].orderingState, 120).then(resumedResult => {
-                        console.log("Resumed ordered tiles:", resumedResult.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                    resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid).then(resumedResult => {
+                        if (resumedResult && resumedResult.rerunning) {
+                            console.log("DFS re-run initiated. Waiting for new results...");
+                        } else if (resumedResult && resumedResult.orderedTiles) {
+                            console.log("Resumed ordered tiles:", resumedResult.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                        } else {
+                            console.warn("Resume completed with no result:", resumedResult);
+                        }
                     }).catch(error => {
                         console.error("Error while resuming tile ordering:", error);
                     });
@@ -350,6 +385,49 @@
                 gridLoadStatus.textContent = '그리드가 로드되지 않았습니다. 먼저 이미지를 로드하세요.';
             }
         });
+        
+        // DFS 재실행 함수 (인접 타일 선택 시)
+        window.rerunDFSWithNewTile = function(existingTiles, newTile) {
+            // 누적 타일 업데이트 - existingTiles에 이미 모든 타일(기존 + 새 타일)이 포함되어 있음
+            window.accumulatedTiles = existingTiles.slice(); // 전체 타일 리스트로 교체
+            
+            console.log(`Re-running DFS with accumulated tiles: ${window.accumulatedTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
+            console.log(`Total accumulated tiles: ${window.accumulatedTiles.length}`);
+            
+            const config = window.savedConfig;
+            
+            // 원래 설정 유지하면서 DFS 재실행 (누적된 모든 타일 고정)
+            const solutions = printBestTilePlacements(window.currentGrid, config.tileSize, 1, {
+                showVisual: true,
+                showDirections: true,
+                order: "weighted",
+                weighted: { wDist: 1.0, wTurn: 2.5, maxDist: 2.5 },
+                maxAngleDiff: 120,
+                iterationLimit: config.iterationLimit,
+                depthLimit: config.depthLimit,
+                startRule: config.startRule,           // 원래 startRule 유지
+                customStartTile: config.customStartTile, // 원래 customStartTile 유지
+                startAngle: config.startAngle,
+                fixedTiles: window.accumulatedTiles // 누적된 모든 타일 고정
+            });
+            
+            if (solutions && solutions.length > 0 && solutions[0]?.orderingState) {
+                console.log("Resuming tile ordering after DFS re-run...");
+                console.log(`New solution has ${solutions[0].tiles.length} tiles (including ${window.accumulatedTiles.length} fixed tiles)`);
+                resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid).then(resumedResult => {
+                    if (resumedResult && resumedResult.orderedTiles) {
+                        console.log("Resumed ordered tiles:", resumedResult.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                    } else {
+                        console.error("Resume result is invalid:", resumedResult);
+                    }
+                }).catch(error => {
+                    console.error("Error while resuming tile ordering:", error);
+                });
+            } else {
+                console.error("No valid solutions found after DFS re-run. Solutions:", solutions);
+                console.log("DFS could not find additional tiles with the given constraints. Try adjusting depth/iteration limits.");
+            }
+        };
 
         // 첫 타일 위치 선택 시 Custom 옵션에 따라 입력 필드 표시/숨김
         document.getElementById('startPositionSelect').addEventListener('change', () => {
