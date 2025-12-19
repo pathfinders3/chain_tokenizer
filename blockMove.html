@@ -188,9 +188,7 @@
                 });
                 
                 tileButton.addEventListener('click', () => {
-                    if (confirm(`타일 ${String.fromCharCode(65 + (index % 26))} (${tile.r}, ${tile.c})부터 끝까지 삭제하시겠습니까?`)) {
-                        removeTilesFrom(index);
-                    }
+                    removeTilesFrom(index);
                 });
                 
                 tilePathItems.appendChild(tileButton);
@@ -491,11 +489,22 @@
                 console.log(`Saved ${solutions.placements.length} new placements from DFS re-run.`);
             }
             
-            if (solutions?.[0]) {
+            if (solutions?.[0]?.orderingState) {
                 console.log(`DFS found solution with ${solutions[0].tiles.length} total tiles (${window.accumulatedTiles.length} fixed + ${solutions[0].tiles.length - window.accumulatedTiles.length} new available)`);
                 
-                // orderingState 저장 (나중에 사용자가 선택을 시작할 때 사용)
+                // orderingState 저장
                 window.currentOrderingState = solutions[0].orderingState;
+                
+                // 시작 타일들 시각화 (고정된 타일들)
+                const startTiles = solutions[0].orderingState.orderIdx.map(i => solutions[0].orderingState.tiles[i]);
+                if (typeof printPlacementAscii === 'function') {
+                    printPlacementAscii(window.currentGrid, startTiles, config.tileSize, `-- Ready for Selection --`);
+                }
+                
+                // 타일 경로 UI 업데이트
+                if (typeof window.updateTilePath === 'function') {
+                    window.updateTilePath(startTiles);
+                }
                 
                 // 사용자가 다음 타일을 선택할 수 있도록 입력 섹션 표시
                 console.log('Waiting for user to select next tile...');
