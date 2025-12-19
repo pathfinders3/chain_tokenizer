@@ -763,10 +763,12 @@ function printBestTilePlacements(grid, k = 2, limit = 4, opts = {}) {
     if (coveredCount > bestCovered) {
       bestCovered = coveredCount;
       bestSolutions.length = 0;
+      console.log(`New best coverage found: ${bestCovered} cells with ${tiles.length} tiles`);
     }
 
     const sig = tiles.map(t => `${t.r},${t.c}`).join(";");
     if (!bestSolutions.some(s => s.sig === sig)) {
+      console.log(`Recording solution: ${tiles.length} tiles covering ${coveredCount} cells: ${tiles.map(t => `(${t.r},${t.c})`).join(" ")}`);
       bestSolutions.push({
         sig,
         tiles: tiles.slice(),
@@ -821,7 +823,22 @@ function printBestTilePlacements(grid, k = 2, limit = 4, opts = {}) {
       const pm = placements[pi].mask;
       if ((pm & (covered | skipped)) !== 0n) continue;
 
-      tiles.push({ r: placements[pi].r, c: placements[pi].c });
+      const newTile = { r: placements[pi].r, c: placements[pi].c };
+      
+      // 인접성 체크: 첫 타일이거나, 기존 타일 중 하나와 인접해야 함
+      let isAdjacentToExisting = tiles.length === 0; // 첫 타일은 항상 허용
+      if (!isAdjacentToExisting) {
+        for (const existingTile of tiles) {
+          if (areTilesAdjacent(existingTile, newTile, k)) {
+            isAdjacentToExisting = true;
+            break;
+          }
+        }
+      }
+      
+      if (!isAdjacentToExisting) continue; // 인접하지 않으면 스킵
+
+      tiles.push(newTile);
       dfs(covered | pm, skipped, tiles, depth + 1);
       tiles.pop();
 
@@ -830,6 +847,10 @@ function printBestTilePlacements(grid, k = 2, limit = 4, opts = {}) {
   }
 
   console.log(`Starting DFS with iteration limit: ${iterationLimit}, depth limit: ${depthLimit}`);
+  if (initialTiles.length > 0) {
+    console.log(`DFS starting with ${initialTiles.length} pre-fixed tile(s): ${initialTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
+    console.log(`Initial coverage: ${popcount(initialCovered)} cells`);
+  }
   dfs(initialCovered, 0n, initialTiles.slice());
   console.log(`DFS completed. Total iterations: ${iterationCount}`);
 
