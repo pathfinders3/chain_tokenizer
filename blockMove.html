@@ -41,26 +41,6 @@
                 <option value="8">8x8</option>
                 <option value="16">16x16</option>
             </select>
-            <label for="iterationLimitSelect">반복 횟수 제한:</label>
-            <select id="iterationLimitSelect">
-                <option value="100000">100,000</option>
-                <option value="50000">50,000</option>
-                <option value="20000">20,000</option>
-                <option value="10000">10,000</option>
-            </select>
-            <label for="depthLimitSelect">깊이 제한:</label>
-            <select id="depthLimitSelect">
-                <option value="15">15</option>
-                <option value="20">20</option>
-                <option value="25">25</option>
-                <option value="30">30</option>
-                <option value="35">35</option>
-                <option value="40">40</option>
-                <option value="50" selected>50</option>
-                <option value="60">60</option>
-                <option value="70">70</option>
-            </select>
-            <p style="font-size: 12px; color: #aaaaaa;">참고: 큰 그리드(16x16 등)에서는 깊이 제한 50 이상을 권장합니다.</p>
             <button id="loadGridFromImage">이미지에서 그리드 로드</button>
             <button id="startTileCalculation" style="display: none;">타일 계산 시작</button>
             <label for="startPositionSelect">첫 타일 위치:</label>
@@ -110,7 +90,6 @@
             <option value="">-- 선택 --</option>
         </select>
         <button id="selectTile">선택</button>
-        <button id="autoSelect">자동 선택</button>
         <button id="stopSelection">중지</button>
     </div>
     <div id="canvasContainer" style="margin-top: 20px; display: none;">
@@ -142,7 +121,6 @@
         let userInputResolver = null;
         const tileSelect = document.getElementById('tileSelect');
         const selectTileButton = document.getElementById('selectTile');
-        const autoSelectButton = document.getElementById('autoSelect');
         const stopSelectionButton = document.getElementById('stopSelection');
         const inputSection = document.getElementById('inputSection');
         const tilePathItems = document.getElementById('tilePathItems');
@@ -228,22 +206,11 @@
         function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = []) {
             tileSelect.innerHTML = '<option value="">-- 선택 --</option>';
             
-            // DFS 타일 추가
-            candidates.forEach((cand, index) => {
-                const tile = tiles[cand.i];
-                const dist = tileDist(centers[cur], centers[cand.i], k);
-                const ang = angleDegCart(centers[cur], centers[cand.i]);
-                const turn = prevAngle == null ? 0 : angleDiff(prevAngle, ang);
-                const text = `${index + 1}. (${tile.r}, ${tile.c}) - Dist: ${dist.toFixed(2)}, Angle: ${ang.toFixed(1)}°, Turn: ${turn.toFixed(1)}°`;
-                tileSelect.appendChild(createTileOption(index, text));
-            });
-            
             // 인접 타일 추가
             if (adjacentCandidates?.length > 0) {
                 adjacentCandidates.forEach((adjTile, index) => {
-                    const adjIndex = candidates.length + index;
-                    const text = `${adjIndex + 1}. [Adj.] (${adjTile.r}, ${adjTile.c})`;
-                    tileSelect.appendChild(createTileOption(adjIndex, text, '#00ff00'));
+                    const text = `${index}. (${adjTile.r}, ${adjTile.c})`;
+                    tileSelect.appendChild(createTileOption(index, text));
                 });
             }
             
@@ -274,8 +241,8 @@
                 return; // Promise 계속 대기
             }
             
-            // auto와 stop은 항상 허용
-            if (value === 'auto' || value === 'stop') {
+            // stop은 항상 허용
+            if (value === 'stop') {
                 console.log(`Special command received: ${value}`);
                 if (userInputResolver) {
                     userInputResolver(value);
@@ -296,7 +263,6 @@
         }
         
         selectTileButton.addEventListener('click', () => handleUserInput(tileSelect.value));
-        autoSelectButton.addEventListener('click', () => handleUserInput('auto'));
         stopSelectionButton.addEventListener('click', () => handleUserInput('stop'));
 
         // 초기에는 입력 섹션 숨김
@@ -407,13 +373,11 @@
                 return;
             }
             
-            gridLoadStatus.textContent = '타일 계산을 시작합니다.';
+            gridLoadStatus.textContent = '타일 배치를 찾고 있습니다.';
             document.getElementById('calculationStatus').style.display = 'block';
             
-            const iterationLimit = parseInt(document.getElementById('iterationLimitSelect').value, 10);
-            const depthLimit = parseInt(document.getElementById('depthLimitSelect').value, 10);
-            const startPosition = document.getElementById('startPositionSelect').value;
             const tileSize = parseInt(document.getElementById('tileSizeSelect').value, 10);
+            const startPosition = document.getElementById('startPositionSelect').value;
             const startAngle = parseFloat(document.getElementById('startAngleSelect').value);
             
             const startRuleMap = { topLeft: 'topleft', topRight: 'topright', custom: 'custom' };
@@ -428,14 +392,7 @@
             }
             console.log(`Start angle: ${startAngle}°`);
             
-            const solutions = printBestTilePlacements(window.currentGrid, tileSize, 1, {
-                showVisual: true,
-                showDirections: true,
-                order: "weighted",
-                weighted: { wDist: 1.0, wTurn: 2.5, maxDist: 2.5 },
-                maxAngleDiff: 60,
-                iterationLimit,
-                depthLimit,
+            const result = getAllPossiblePlacements(window.currentGrid, tileSize, {
                 startRule,
                 customStartTile,
                 startAngle
@@ -443,92 +400,48 @@
             
             document.getElementById('calculationStatus').style.display = 'none';
             
-            window.savedPlacements = solutions.placements;
-            window.savedConfig = { tileSize, iterationLimit, depthLimit, startRule, customStartTile, startAngle };
-            window.accumulatedTiles = [];
-            
-            if (solutions?.[0]?.orderingState) {
-                console.log("Resuming tile ordering...");
-                resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid)
-                    .then(result => {
-                        if (result?.rerunning) {
-                            console.log("DFS re-run initiated.");
-                        } else if (result?.orderedTiles) {
-                            console.log("Ordered tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
-                        }
-                    })
-                    .catch(error => console.error("Error resuming tile ordering:", error));
-            }
-        });
-        
-        // DFS 재실행 함수 (인접 타일 선택 시)
-        window.rerunDFSWithNewTile = function(existingTiles, newTile) {
-            window.accumulatedTiles = existingTiles.slice();
-            console.log(`Re-running DFS with ${window.accumulatedTiles.length} fixed tiles: ${window.accumulatedTiles.map(t => `(${t.r},${t.c})`).join(", ")}`);
-            
-            const config = window.savedConfig;
-            
-            // DFS 재실행 - 자동 경로 계산 없이 후보만 찾기
-            const solutions = printBestTilePlacements(window.currentGrid, config.tileSize, 1, {
-                showVisual: false,  // 시각화 끄기 (사용자가 선택할 때까지 기다림)
-                showDirections: false,
-                order: "weighted",
-                weighted: { wDist: 1.0, wTurn: 2.5, maxDist: 2.5 },
-                maxAngleDiff: 120,
-                iterationLimit: config.iterationLimit,
-                depthLimit: config.depthLimit,
-                startRule: config.startRule,
-                customStartTile: config.customStartTile,
-                startAngle: config.startAngle,
-                fixedTiles: window.accumulatedTiles
-            });
-            
-            // 새로운 placements 저장
-            if (solutions?.placements) {
-                window.savedPlacements = solutions.placements;
-                console.log(`Saved ${solutions.placements.length} new placements from DFS re-run.`);
+            if (!result.placements || result.placements.length === 0) {
+                console.log('No valid tile placements found.');
+                return;
             }
             
-            if (solutions?.[0]?.orderingState) {
-                console.log(`DFS found solution with ${solutions[0].tiles.length} total tiles (${window.accumulatedTiles.length} fixed + ${solutions[0].tiles.length - window.accumulatedTiles.length} new available)`);
-                
-                // orderingState 저장
-                window.currentOrderingState = solutions[0].orderingState;
-                
-                // 시작 타일들 시각화 (고정된 타일들)
-                const startTiles = solutions[0].orderingState.orderIdx.map(i => solutions[0].orderingState.tiles[i]);
-                if (typeof printPlacementAscii === 'function') {
-                    printPlacementAscii(window.currentGrid, startTiles, config.tileSize, `-- Ready for Selection --`);
-                }
-                
-                // 타일 경로 UI 업데이트
-                if (typeof window.updateTilePath === 'function') {
-                    window.updateTilePath(startTiles);
-                }
-                
-                // 사용자가 다음 타일을 선택할 수 있도록 입력 섹션 표시
-                console.log('Waiting for user to select next tile...');
-                if (typeof window.showInputSection === 'function') {
-                    window.showInputSection(true);
-                }
-                
-                // resumeTileOrdering 호출하여 선택 대기 상태로 진입
-                resumeTileOrdering(solutions[0].orderingState, 120, window.savedPlacements, window.currentGrid)
+            window.savedPlacements = result.placements;
+            window.savedConfig = { tileSize, startRule, customStartTile, startAngle };
+            
+            console.log(`Found ${result.placements.length} possible tile placements.`);
+            console.log(`Starting with tile at (${result.initialTiles[0].r}, ${result.initialTiles[0].c})`);
+            
+            // 초기 타일 표시
+            printPlacementAscii(window.currentGrid, result.initialTiles, tileSize, '-- Starting Position --');
+            if (typeof window.updateTilePath === 'function') {
+                window.updateTilePath(result.initialTiles);
+            }
+            
+            // 사용자 선택 모드 시작
+            const nextRule = makeNextByWeightedWithMaxDist({ wDist: 1.0, wTurn: 2.5, maxDist: 2.5 });
+            const orderingResult = orderTilesWithNextRule(
+                result.initialTiles,
+                tileSize,
+                nextRule,
+                startRule,
+                120,
+                window.currentGrid,
+                customStartTile,
+                startAngle
+            );
+            
+            if (orderingResult?.state) {
+                console.log("Starting manual tile selection...");
+                resumeTileOrdering(orderingResult.state, 120, window.savedPlacements, window.currentGrid)
                     .then(result => {
                         if (result?.orderedTiles) {
                             console.log("Tile selection completed. Final tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
                         }
                     })
                     .catch(error => console.error("Error during tile selection:", error));
-            } else {
-                console.log("DFS could not find any tiles with current fixed tiles. Try adjusting depth/iteration limits or removing some fixed tiles.");
-                // 입력 섹션 표시
-                if (typeof window.showInputSection === 'function') {
-                    window.showInputSection(true);
-                }
             }
-        };
-
+        });
+        
         // 첫 타일 위치 선택 시 Custom 옵션에 따라 입력 필드 표시/숨김
         document.getElementById('startPositionSelect').addEventListener('change', () => {
             const startPosition = document.getElementById('startPositionSelect').value;
