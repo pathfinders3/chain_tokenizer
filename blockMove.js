@@ -406,16 +406,14 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
 
     const orderIdx = [startIdx];
     let cur = startIdx;
-    let prevAngle = startAngle !== null ? startAngle : null;
+    let prevAngle = null; // 2개의 타일이 있어야 방향이 결정되므로 null로 시작
     
     // 초기 타일 경로 업데이트
     if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
       window.updateTilePath([tiles[startIdx]]);
     }
     
-    if (startAngle !== null) {
-      console.log(`Initial direction (prevAngle) set to: ${startAngle}° ${arrowFromAngle(startAngle)}`);
-    }
+    console.log(`Starting with null prevAngle (direction will be determined after 2 tiles are selected)`);
 
     while (unused.size) {
       const nxt = nextRule(cur, prevAngle, centers, unused, k, tiles);
@@ -617,9 +615,16 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         console.log(`Warning: Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
       }
 
-      prevAngle = newAngle;
       orderIdx.push(nxt);
       cur = nxt;
+      
+      // 2개 이상의 타일이 있을 때만 prevAngle 업데이트 (방향 결정)
+      if (orderIdx.length >= 2) {
+        prevAngle = newAngle;
+        if (orderIdx.length === 2) {
+          console.log(`Direction established: ${prevAngle.toFixed(1)}° ${arrowFromAngle(prevAngle)} (after 2 tiles selected)`);
+        }
+      }
 
       const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
       printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} --`);
