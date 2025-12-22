@@ -194,6 +194,28 @@
         window.updateTilePath = updateTilePath;
         window.showInputSection = showInputSection;
 
+        // 각도를 화살표로 변환하는 함수
+        function getArrowFromAngle(deg) {
+            const dirs = [
+                { a: 0,   ch: "→" },
+                { a: 45,  ch: "↗" },
+                { a: 90,  ch: "↑" },
+                { a: 135, ch: "↖" },
+                { a: 180, ch: "←" },
+                { a: 225, ch: "↙" },
+                { a: 270, ch: "↓" },
+                { a: 315, ch: "↘" },
+            ];
+            let best = dirs[0];
+            let bestDiff = 1e9;
+            for (const d of dirs) {
+                let diff = Math.abs(deg - d.a);
+                diff = Math.min(diff, 360 - diff);
+                if (diff < bestDiff) { bestDiff = diff; best = d; }
+            }
+            return best.ch;
+        }
+
         // 타일 선택 옵션 업데이트
         function createTileOption(index, text, color = null) {
             const option = document.createElement('option');
@@ -206,12 +228,40 @@
         function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = []) {
             tileSelect.innerHTML = '<option value="">-- 선택 --</option>';
             
+            // textarea에 표시할 텍스트 준비
+            let textareaInfo = `\nAvailable adjacent tiles:\n`;
+            
             // 인접 타일 추가
             if (adjacentCandidates?.length > 0) {
                 adjacentCandidates.forEach((adjTile, index) => {
-                    const text = `${index}. (${adjTile.r}, ${adjTile.c})`;
-                    tileSelect.appendChild(createTileOption(index, text));
+                    let text = `${index}. (${adjTile.r}, ${adjTile.c})`;
+                    let angleInfo = '';
+                    
+                    // 각도 정보가 있으면 추가
+                    if (adjTile.angle !== undefined) {
+                        const arrow = getArrowFromAngle(adjTile.angle);
+                        angleInfo = ` - ${adjTile.angle.toFixed(1)}° ${arrow}`;
+                        if (adjTile.diff !== null && adjTile.diff !== undefined) {
+                            angleInfo += ` (Δ${adjTile.diff.toFixed(1)}°)`;
+                        }
+                        text += angleInfo;
+                    }
+                    
+                    // textarea에 추가
+                    textareaInfo += `  ${text}\n`;
+                    
+                    // select 옵션 생성 (녹색 표시)
+                    const displayText = `${index}. (${adjTile.r}, ${adjTile.c})${angleInfo}`;
+                    const color = adjTile.isPreferred ? '#00ff00' : null;
+                    tileSelect.appendChild(createTileOption(index, displayText, color));
                 });
+            }
+            
+            // textarea 업데이트
+            const outputArea = document.getElementById('output');
+            if (outputArea) {
+                outputArea.value += textareaInfo;
+                outputArea.scrollTop = outputArea.scrollHeight;
             }
             
             // select를 기본 옵션으로 리셋

@@ -475,25 +475,51 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
 
   function logCandidates(adjacentCandidates, cur, prevAngle, centers, k) {
     console.log(`\nCurrent tile: (${tiles[cur].r}, ${tiles[cur].c})`);
+    console.log(`prevAngle (시작/이전 각도): ${prevAngle !== null ? prevAngle.toFixed(1) + '°' : 'null'}`);
     
     if (adjacentCandidates.length > 0) {
       console.log('Available adjacent tiles:');
       adjacentCandidates.forEach((cand, index) => {
-        console.log(`  ${index}. (${cand.r}, ${cand.c})`);
+        // 후보 타일의 중심 좌표 계산
+        const candCenter = tileCenter(cand, k);
+        const angle = angleDegCart(centers[cur], candCenter);
+        const arrow = arrowFromAngle(angle);
+        
+        // prevAngle과의 차이 계산
+        let angleInfo = `${angle.toFixed(1)}° ${arrow}`;
+        if (prevAngle !== null) {
+          const diff = angleDiff(prevAngle, angle);
+          console.log(`  DEBUG: 후보 ${index} - prevAngle=${prevAngle.toFixed(1)}°, angle=${angle.toFixed(1)}°, diff=${diff.toFixed(1)}°`);
+          const isPreferred = diff <= 45;
+          // 콘솔에서 녹색 표시 (ANSI 색상 코드)
+          const color = isPreferred ? '\x1b[32m' : '\x1b[0m'; // 녹색 또는 기본색
+          const reset = '\x1b[0m';
+          angleInfo = `${color}${angle.toFixed(1)}° ${arrow} (Δ${diff.toFixed(1)}°)${reset}`;
+        }
+        
+        console.log(`  ${index}. (${cand.r}, ${cand.c}) - ${angleInfo}`);
       });
     } else {
       console.log('No adjacent tiles available.');
     }
   }
 
-  function askUserForNextTile(candidates, adjacentCandidates, cur, prevAngle, centers, k) {
+  function askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k) {
     return new Promise((resolve) => {
       logCandidates(adjacentCandidates, cur, prevAngle, centers, k);
       if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
         window.showInputSection(true);
       }
       if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
-        window.updateTileOptions([], tiles, cur, centers, k, prevAngle, adjacentCandidates);
+        // 각 후보에 대한 각도 정보 계산
+        const candidatesWithAngles = adjacentCandidates.map(cand => {
+          const candCenter = tileCenter(cand, k);
+          const angle = angleDegCart(centers[cur], candCenter);
+          const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
+          const isPreferred = (prevAngle !== null) && (diff <= 45);
+          return { ...cand, angle, diff, isPreferred };
+        });
+        window.updateTileOptions([], tiles, cur, centers, k, prevAngle, candidatesWithAngles);
       }
       userInputResolver = (value) => { 
         if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
@@ -553,7 +579,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         break;
       }
 
-      const answer = await askUserForNextTile([], adjacentCandidates, cur, prevAngle, centers, k);
+      const answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
       let nxt = null;
 
       const answerStr = String(answer).toLowerCase();
