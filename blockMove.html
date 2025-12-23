@@ -229,7 +229,16 @@
             tileSelect.innerHTML = '<option value="">-- 선택 --</option>';
             
             // textarea에 표시할 텍스트 준비
-            let textareaInfo = `\nAvailable adjacent tiles:\n`;
+            let textareaInfo = `\n`;
+            
+            // 타일이 있는 경우 강조 표시
+            if (adjacentCandidates?.length >= 1) {
+                textareaInfo += `${'='.repeat(50)}\n`;
+                textareaInfo += `*** 주의: 선택 가능한 타일이 ${adjacentCandidates.length}개 있습니다! ***\n`;
+                textareaInfo += `${'='.repeat(50)}\n`;
+            }
+            
+            textareaInfo += `Available adjacent tiles:\n`;
             
             // 인접 타일 추가
             if (adjacentCandidates?.length > 0) {
@@ -255,12 +264,21 @@
                     const color = adjTile.isPreferred ? '#00ff00' : null;
                     tileSelect.appendChild(createTileOption(index, displayText, color));
                 });
+                
+                // 타일이 있는 경우 하단에도 강조 표시
+                if (adjacentCandidates.length >= 1) {
+                    textareaInfo += `${'='.repeat(50)}\n`;
+                }
             }
             
             // textarea 업데이트
+            // 콘솔 리다이렉션과 동기화하기 위해 outputText에 직접 추가
+            if (typeof outputText !== 'undefined') {
+                outputText += textareaInfo;
+            }
             const outputArea = document.getElementById('output');
             if (outputArea) {
-                outputArea.value += textareaInfo;
+                outputArea.value = outputText || outputArea.value + textareaInfo;
                 outputArea.scrollTop = outputArea.scrollHeight;
             }
             
