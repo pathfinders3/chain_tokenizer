@@ -286,11 +286,11 @@
                         text += angleInfo;
                     }
                     
-                    // 각도가 비슷하면 별표 추가, 아니면 같은 길이의 공백 추가
+                    // 각도가 비슷하면 별표 추가, 아니면 같은 길이의 전각 공백 추가
                     if (adjTile.isPreferred) {
                         text = `★★ ${text}`;
                     } else {
-                        text = `    ${text}`;  // 별표 2개와 공백 1개 = 총 4칸 공백
+                        text = `　　 ${text}`;  // 전각 공백 2개와 일반 공백 1개
                     }
                     
                     // textarea에 추가
