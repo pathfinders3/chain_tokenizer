@@ -581,6 +581,12 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       const answerStr = String(answer).toLowerCase();
       // console.log(`User input received: "${answer}" (type: ${typeof answer})`);
       
+      // 'refresh' 명령은 타일 삭제 후 루프를 다시 시작하는 신호
+      if (answerStr === 'refresh') {
+        console.log(`Refreshing tile selection after removal...`);
+        continue; // 루프 처음부터 다시 시작
+      }
+      
       if (answerStr === 'stop') {
         console.log(`Stopped at tile ${orderIdx.length}.`);
         generateAndCopyResultImage(grid, tiles, orderIdx, k);
@@ -658,33 +664,35 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         return;
       }
       
-      // 삭제 전 타일들 (유지할 타일들)
-      const keptTiles = orderIdx.slice(0, index).map(i => tiles[i]);
-      console.log(`Keeping ${keptTiles.length} tiles: ${keptTiles.map(t => `(${t.r},${t.c})`).join(' ')}`);
-      
-      // orderIdx 업데이트
+      // tiles, centers, orderIdx를 index 위치에서 잘라냄
+      tiles.length = index;
+      centers.length = index;
       orderIdx.length = index;
-      cur = orderIdx[orderIdx.length - 1];
       
-      // UI 업데이트
-      printPlacementAscii(grid, keptTiles, k, `-- After Removal --`);
-      if (typeof window.updateTilePath === 'function') {
-        window.updateTilePath(keptTiles);
+      cur = index - 1;
+      
+      // prevAngle 업데이트: 남은 타일이 2개 이상일 때만 각도 유지
+      if (tiles.length >= 2) {
+        prevAngle = angleDegCart(centers[tiles.length - 2], centers[tiles.length - 1]);
+      } else {
+        prevAngle = null;
       }
       
-      console.log(`Tiles removed. ${keptTiles.length} tiles remaining. You can continue selecting from tile (${tiles[cur].r}, ${tiles[cur].c})`);
+      console.log(`Keeping ${tiles.length} tiles: ${tiles.map(t => `(${t.r},${t.c})`).join(' ')}`);
       
-      // 사용자가 다음 타일을 선택할 수 있도록 입력 섹션 표시
-      if (typeof window.showInputSection === 'function') {
-        const adjacentCandidates = getAdjacentTileCandidates(tiles[cur], k, grid, keptTiles);
-        if (adjacentCandidates.length > 0) {
-          window.showInputSection(true);
-          if (typeof window.updateTileOptions === 'function') {
-            window.updateTileOptions([], tiles, cur, centers, k, prevAngle, adjacentCandidates);
-          }
-        } else {
-          console.log('No adjacent tiles available from this position.');
-        }
+      // UI 업데이트
+      printPlacementAscii(grid, tiles, k, `-- After Removal --`);
+      if (typeof window.updateTilePath === 'function') {
+        window.updateTilePath(tiles.slice());
+      }
+      
+      console.log(`Tiles removed. ${tiles.length} tiles remaining. You can continue selecting from tile (${tiles[cur].r}, ${tiles[cur].c})`);
+      
+      // 현재 대기 중인 Promise를 강제로 재시작 (processNextTile 루프를 새로 고침)
+      if (typeof window !== 'undefined' && userInputResolver) {
+        // 'refresh' 특수 명령으로 루프를 재시작
+        userInputResolver('refresh');
+        userInputResolver = null;
       }
     };
   }
