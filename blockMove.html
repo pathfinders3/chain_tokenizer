@@ -286,6 +286,13 @@
                         text += angleInfo;
                     }
                     
+                    // 각도가 비슷하면 별표 추가, 아니면 같은 길이의 공백 추가
+                    if (adjTile.isPreferred) {
+                        text = `★★ ${text}`;
+                    } else {
+                        text = `    ${text}`;  // 별표 2개와 공백 1개 = 총 4칸 공백
+                    }
+                    
                     // textarea에 추가
                     textareaInfo += `  ${text}\n`;
                     
