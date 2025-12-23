@@ -504,7 +504,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
 
   function askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k) {
     return new Promise((resolve) => {
-      logCandidates(adjacentCandidates, cur, prevAngle, centers, k);
+      // logCandidates(adjacentCandidates, cur, prevAngle, centers, k);
       if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
         window.showInputSection(true);
       }
@@ -580,7 +580,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       let nxt = null;
 
       const answerStr = String(answer).toLowerCase();
-      console.log(`User input received: "${answer}" (type: ${typeof answer})`);
+      // console.log(`User input received: "${answer}" (type: ${typeof answer})`);
       
       if (answerStr === 'stop') {
         console.log(`Stopped at tile ${orderIdx.length}.`);
@@ -589,7 +589,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       }
       
       const choice = parseInt(answer, 10);
-      console.log(`Parsed choice: ${choice}, adjacent candidates: ${adjacentCandidates.length}`);
+      // console.log(`Parsed choice: ${choice}, adjacent candidates: ${adjacentCandidates.length}`);
       
       if (Number.isNaN(choice) || choice < 0 || choice >= adjacentCandidates.length) {
         console.log('Invalid selection. Please select a valid tile.');

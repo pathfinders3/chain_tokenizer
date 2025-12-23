@@ -331,7 +331,7 @@
 
         // 버튼 이벤트 리스너
         function handleUserInput(value) {
-            console.log(`handleUserInput called with value: "${value}" (type: ${typeof value})`);
+            // console.log(`handleUserInput called with value: "${value}" (type: ${typeof value})`);
             
             // 빈 값 체크 - 경고만 표시하고 계속 대기
             if (value === '' || value === null || value === undefined) {
@@ -352,7 +352,7 @@
             
             // 숫자 선택의 경우 - 옵션 존재 여부와 관계없이 일단 전달
             // JavaScript 코드에서 처리하도록
-            console.log(`Resolving with value: "${value}"`);
+            // console.log(`Resolving with value: "${value}"`);
             if (userInputResolver) {
                 userInputResolver(value);
                 userInputResolver = null;
