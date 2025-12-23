@@ -28,6 +28,18 @@
             resize: vertical;
             white-space: pre;
         }
+        select {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #444;
+            padding: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        option {
+            background-color: #2d2d2d;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -226,7 +238,25 @@
         }
         
         function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = []) {
-            tileSelect.innerHTML = '<option value="">-- 선택 --</option>';
+            tileSelect.innerHTML = '';
+            
+            // '-- 선택 --' 옵션 생성
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            
+            // 선택 가능한 타일이 1개만 있으면 붉은색으로 표시하고 표식 추가
+            if (adjacentCandidates?.length === 1) {
+                defaultOption.textContent = '⓵ -- 선택 --';
+                defaultOption.style.color = '#ff0000';
+                // select 요소 자체도 붉은색으로 변경 (닫혀있을 때 보이도록)
+                tileSelect.style.color = '#ff0000';
+            } else {
+                defaultOption.textContent = '-- 선택 --';
+                // select 요소 색상을 기본값으로 복원
+                tileSelect.style.color = '';
+            }
+            
+            tileSelect.appendChild(defaultOption);
             
             // textarea에 표시할 텍스트 준비
             let textareaInfo = `\n`;
