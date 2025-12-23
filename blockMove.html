@@ -455,7 +455,6 @@
             if (newGrid?.length > 0 && newGrid[0]?.length > 0) {
                 window.currentGrid = newGrid;
                 gridLoadStatus.textContent = '그리드가 성공적으로 로드되었습니다.';
-                console.log('New grid loaded from image:', newGrid);
                 if (typeof printGridOnly !== 'undefined') {
                     printGridOnly(newGrid, 'Initial Grid State');
                 }
@@ -508,7 +507,6 @@
             window.savedConfig = { tileSize, startRule, customStartTile, startAngle };
             
             console.log(`Found ${result.placements.length} possible tile placements.`);
-            console.log(`Starting with tile at (${result.initialTiles[0].r}, ${result.initialTiles[0].c})`);
             
             // 초기 타일 표시
             printPlacementAscii(window.currentGrid, result.initialTiles, tileSize, '-- Starting Position --');

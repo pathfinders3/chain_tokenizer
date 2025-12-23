@@ -399,7 +399,6 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
 
     const centers = tiles.map(t => tileCenter(t, k));
     const startIdx = selectStartTile(tiles, startRule, customStartTile);
-    console.log(`Starting tile: (${tiles[startIdx].r}, ${tiles[startIdx].c}) [${startRule}]`);
 
     const unused = new Set([...Array(tiles.length).keys()]);
     unused.delete(startIdx);
@@ -597,7 +596,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       }
       
       const selectedTile = adjacentCandidates[choice];
-      console.log(`Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+      console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
       
       // 선택된 타일을 tiles 배열에 추가하고 인덱스를 얻음
       const existingIdx = tiles.findIndex(t => t.r === selectedTile.r && t.c === selectedTile.c);
