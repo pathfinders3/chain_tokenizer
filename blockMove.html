@@ -102,6 +102,7 @@
             <option value="">-- 선택 --</option>
         </select>
         <button id="selectTile">선택</button>
+        <button id="autoSelect">자동선택</button>
         <button id="stopSelection">중지</button>
     </div>
     <div id="canvasContainer" style="margin-top: 20px; display: none;">
@@ -361,7 +362,39 @@
             }
         }
         
+        // 자동선택 함수: 선택가능한 타일이 1개일 때 계속 자동 선택
+        function handleAutoSelect() {
+            const options = tileSelect.options;
+            // 첫 번째 옵션은 "-- 선택 --"이므로 실제 타일 옵션 개수는 options.length - 1
+            const tileCount = options.length - 1;
+            
+            if (tileCount === 0) {
+                console.log('자동선택: 선택 가능한 타일이 없습니다.');
+                alert('선택 가능한 타일이 없습니다.');
+                return;
+            }
+            
+            if (tileCount === 1) {
+                // 선택 가능한 타일이 1개인 경우 자동 선택
+                const value = options[1].value; // 첫 번째 타일 옵션
+                console.log(`자동선택: 타일 ${value}를 선택합니다.`);
+                
+                // 자동선택 모드 활성화
+                window.autoSelectMode = true;
+                handleUserInput(value);
+            } else {
+                // 2개 이상인 경우
+                console.log(`자동선택: 선택 가능한 타일이 ${tileCount}개입니다. 수동으로 선택해주세요.`);
+                alert(`선택 가능한 타일이 ${tileCount}개입니다. 수동으로 선택해주세요.`);
+            }
+        }
+        
         selectTileButton.addEventListener('click', () => handleUserInput(tileSelect.value));
+        
+        // 자동선택 버튼 이벤트 리스너
+        const autoSelectButton = document.getElementById('autoSelect');
+        autoSelectButton.addEventListener('click', handleAutoSelect);
+        
         stopSelectionButton.addEventListener('click', () => handleUserInput('stop'));
 
         // 초기에는 입력 섹션 숨김

@@ -572,10 +572,26 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       
       if (adjacentCandidates.length === 0) {
         console.log(`No more adjacent tiles available. ${orderIdx.length} tiles selected.`);
+        // 자동선택 모드 해제
+        if (typeof window !== 'undefined') {
+          window.autoSelectMode = false;
+        }
         break;
       }
 
-      const answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
+      let answer;
+      // 자동선택 모드이고 선택 가능한 타일이 정확히 1개인 경우 자동 선택
+      if (typeof window !== 'undefined' && window.autoSelectMode && adjacentCandidates.length === 1) {
+        answer = '0'; // 첫 번째(유일한) 타일 자동 선택
+        console.log(`자동선택 모드: 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동으로 선택합니다.`);
+      } else {
+        // 자동선택 모드가 아니거나, 선택 가능한 타일이 0개 또는 2개 이상인 경우 수동 선택
+        if (typeof window !== 'undefined' && window.autoSelectMode) {
+          console.log(`자동선택 모드 종료: 선택 가능한 타일이 ${adjacentCandidates.length}개입니다.`);
+          window.autoSelectMode = false; // 자동선택 모드 해제
+        }
+        answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
+      }
       let nxt = null;
 
       const answerStr = String(answer).toLowerCase();
