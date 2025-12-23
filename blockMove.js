@@ -554,7 +554,6 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       // 기존에 선택된 타일들과 겹치는지 확인
       const overlapsWithExisting = existingTiles.some(t => tilesOverlap(t, { r: p.r, c: p.c }, k));
       if (overlapsWithExisting) {
-        console.log(`Tile at (${p.r}, ${p.c}) overlaps with existing tiles - excluded`);
         continue;
       }
       
