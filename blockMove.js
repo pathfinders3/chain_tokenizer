@@ -812,6 +812,7 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         // 자동선택 모드 해제
         if (typeof window !== 'undefined') {
           window.autoSelectMode = false;
+          window.autoSelectAngleMode = false;
         }
         break;
       }
@@ -821,7 +822,23 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       if (typeof window !== 'undefined' && window.autoSelectMode && adjacentCandidates.length === 1) {
         answer = '0'; // 첫 번째(유일한) 타일 자동 선택
         console.log(`자동선택 모드: 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동으로 선택합니다.`);
-      } else {
+      } 
+      // 각도 기준 자동선택 모드: 모든 후보 타일이 각도가 비슷한 경우에만 자동 선택
+      else if (typeof window !== 'undefined' && window.autoSelectAngleMode && adjacentCandidates.length > 0) {
+        const allPreferred = adjacentCandidates.every(t => t.isPreferred);
+        
+        if (allPreferred) {
+          // 모든 타일이 각도가 비슷함 -> 첫 번째(가장 선호되는) 타일 자동 선택
+          answer = '0';
+          console.log(`각도 기준 자동선택: 모든 타일이 각도가 비슷합니다. 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동 선택합니다.`);
+        } else {
+          // 각도가 다른 타일이 있음 -> 자동선택 중지
+          console.log(`각도 기준 자동선택 종료: 각도가 크게 다른 타일이 있습니다. 수동 선택을 기다립니다.`);
+          window.autoSelectAngleMode = false;
+          answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
+        }
+      } 
+      else {
         // 자동선택 모드가 아니거나, 선택 가능한 타일이 0개 또는 2개 이상인 경우 수동 선택
         if (typeof window !== 'undefined' && window.autoSelectMode) {
           console.log(`자동선택 모드 종료: 선택 가능한 타일이 ${adjacentCandidates.length}개입니다.`);

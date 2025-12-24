@@ -40,6 +40,29 @@
             background-color: #2d2d2d;
             color: #ffffff;
         }
+        button {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        button:hover {
+            background-color: #3d3d3d;
+        }
+        button:active {
+            background-color: #4d4d4d;
+        }
+        #autoSelectAngle {
+            background-color: #2d4d2d;
+            border-color: #4a7c59;
+        }
+        #autoSelectAngle:hover {
+            background-color: #3d5d3d;
+        }
     </style>
 </head>
 <body>
@@ -104,6 +127,7 @@
         </select>
         <button id="selectTile">선택</button>
         <button id="autoSelect">자동선택</button>
+        <button id="autoSelectAngle">각도 기준 자동선택</button>
         <button id="stopSelection">중지</button>
     </div>
     <div id="canvasContainer" style="margin-top: 20px; display: none;">
@@ -454,11 +478,35 @@
             }
         }
         
+        // 각도 기준 자동선택 함수: 각도가 비슷한 타일들만 있을 때 계속 자동 선택
+        function handleAutoSelectAngle() {
+            const options = tileSelect.options;
+            const tileCount = options.length - 1;
+            
+            if (tileCount === 0) {
+                console.log('각도 기준 자동선택: 선택 가능한 타일이 없습니다.');
+                alert('선택 가능한 타일이 없습니다.');
+                return;
+            }
+            
+            // 첫 번째 타일 선택 (가장 선호되는 타일 또는 첫 번째 옵션)
+            const value = options[1].value;
+            console.log(`각도 기준 자동선택 모드 시작: 타일 ${value}를 선택합니다.`);
+            
+            // 각도 기준 자동선택 모드 활성화
+            window.autoSelectAngleMode = true;
+            handleUserInput(value);
+        }
+        
         selectTileButton.addEventListener('click', () => handleUserInput(tileSelect.value));
         
         // 자동선택 버튼 이벤트 리스너
         const autoSelectButton = document.getElementById('autoSelect');
         autoSelectButton.addEventListener('click', handleAutoSelect);
+        
+        // 각도 기준 자동선택 버튼 이벤트 리스너
+        const autoSelectAngleButton = document.getElementById('autoSelectAngle');
+        autoSelectAngleButton.addEventListener('click', handleAutoSelectAngle);
         
         stopSelectionButton.addEventListener('click', () => handleUserInput('stop'));
 
