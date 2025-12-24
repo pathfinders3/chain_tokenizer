@@ -45,14 +45,15 @@
 <body>
     <h1>Block Move Solver Output</h1>
     <div id="inputCanvasContainer" style="margin-bottom: 20px;">
-        <p>이미지를 붙여넣으려면 아래 캔버스에 CTRL-V를 사용하세요. 시작 위치를 지정하려면 캔버스를 클릭하세요:</p>
-        <canvas id="inputCanvas" width="400" height="400" style="border: 1px solid #444; cursor: crosshair;"></canvas>
+        <p>이미지를 붙여넣으려면 아래 캔버스에 CTRL-V를 사용하세요:</p>
+        <canvas id="inputCanvas" width="400" height="400" style="border: 1px solid #444;"></canvas>
         <div style="margin-top: 10px;">
-            <label for="gridSizeSelect">그리드 크기 선택:</label>
+            <label for="gridSizeSelect">표시 영역 크기:</label>
             <select id="gridSizeSelect">
                 <option value="8">8x8</option>
-                <option value="16">16x16</option>
+                <option value="16" selected>16x16</option>
             </select>
+            <span id="fullGridInfo" style="margin-left: 10px; color: #aaaaaa; font-size: 12px;"></span>
             <button id="loadGridFromImage">이미지에서 그리드 로드</button>
             <button id="startTileCalculation" style="display: none;">타일 계산 시작</button>
             <label for="startPositionSelect">첫 타일 위치:</label>
@@ -527,27 +528,6 @@
         // 페이지 로드 시 이미지 불러오기
         loadImageFromLocalStorage();
 
-        // 캔버스 클릭 이벤트로 시작 위치 지정
-        inputCanvas.addEventListener('click', (e) => {
-            if (!pastedImage) return;
-            
-            const rect = inputCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            startPos = { x, y };
-            gridLoadStatus.textContent = `시작 위치: (${Math.floor(x)}, ${Math.floor(y)}). "이미지에서 그리드 로드" 버튼을 클릭하세요.`;
-            
-            // 원본 이미지를 다시 그려서 이전 빨간 점 제거
-            inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
-            inputCtx.drawImage(pastedImage, 0, 0, inputCanvas.width, inputCanvas.height);
-            
-            // 새로운 시작 위치에 빨간 점 표시
-            inputCtx.beginPath();
-            inputCtx.arc(x, y, 5, 0, 2 * Math.PI);
-            inputCtx.fillStyle = 'red';
-            inputCtx.fill();
-        });
-
         // 이미지에서 그리드 로드 버튼 이벤트
         document.getElementById('loadGridFromImage').addEventListener('click', () => {
             if (!pastedImage) {
@@ -555,11 +535,7 @@
                 return;
             }
             
-            // 그리드를 읽기 전에 원본 이미지를 복원 (빨간 점 제거)
-            inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
-            inputCtx.drawImage(pastedImage, 0, 0, inputCanvas.width, inputCanvas.height);
-            
-            const newGrid = loadGridFromCanvas(inputCanvas, inputCtx, startPos);
+            const newGrid = loadGridFromCanvas(inputCanvas, inputCtx, { x: 0, y: 0 });
             if (newGrid?.length > 0 && newGrid[0]?.length > 0) {
                 window.currentGrid = newGrid;
                 gridLoadStatus.textContent = '그리드가 성공적으로 로드되었습니다.';
@@ -658,22 +634,24 @@
 
         // 캔버스에서 선택된 크기의 그리드를 로드하는 함수
         function loadGridFromCanvas(canvas, ctx, startPos = { x: 0, y: 0 }) {
-            const gridSize = parseInt(document.getElementById('gridSizeSelect').value, 10);
+            // 이미지 전체 크기를 기준으로 그리드 생성
             const imgWidth = pastedImage?.width || canvas.width;
             const imgHeight = pastedImage?.height || canvas.height;
             const scaleX = imgWidth / canvas.width;
             const scaleY = imgHeight / canvas.height;
-            // 클릭한 위치를 중심으로 하기 위해 gridSize/2만큼 왼쪽 위로 이동
-            const halfGrid = gridSize / 2;
-            const imgStartX = (startPos.x - halfGrid) * scaleX;
-            const imgStartY = (startPos.y - halfGrid) * scaleY;
+            
+            // 실제 이미지 크기로 그리드 생성 (픽셀 단위)
+            const gridWidth = Math.ceil(imgWidth);
+            const gridHeight = Math.ceil(imgHeight);
+            
+            console.log(`Loading full grid from image: ${gridWidth}x${gridHeight} pixels`);
             
             const grid = [];
-            for (let r = 0; r < gridSize; r++) {
+            for (let r = 0; r < gridHeight; r++) {
                 const row = [];
-                for (let c = 0; c < gridSize; c++) {
-                    const canvasX = (imgStartX + c) / scaleX;
-                    const canvasY = (imgStartY + r) / scaleY;
+                for (let c = 0; c < gridWidth; c++) {
+                    const canvasX = c / scaleX;
+                    const canvasY = r / scaleY;
                     
                     if (canvasX >= 0 && canvasX < canvas.width && canvasY >= 0 && canvasY < canvas.height) {
                         const pixelData = ctx.getImageData(Math.floor(canvasX), Math.floor(canvasY), 1, 1).data;
@@ -685,6 +663,13 @@
                 }
                 grid.push(row);
             }
+            
+            // UI에 전체 그리드 크기 정보 표시
+            const fullGridInfo = document.getElementById('fullGridInfo');
+            if (fullGridInfo) {
+                fullGridInfo.textContent = `(전체 이미지: ${gridWidth}x${gridHeight})`;
+            }
+            
             return grid;
         }
 

@@ -72,11 +72,80 @@ const DEMO_GRID = [
     return out;
   }
   
+  // 제한된 영역만 표시하는 함수 (현재 타일 주변만)
+  function printPlacementAsciiLimited(grid, tiles, k, currentTileIndex = null, viewSize = 16, title = "") {
+    if (!grid || !Array.isArray(grid) || grid.length === 0 || !Array.isArray(grid[0])) {
+      console.error("printPlacementAsciiLimited(): invalid grid (expected 2D array)", grid);
+      throw new TypeError("printPlacementAsciiLimited(): invalid grid (expected 2D array)");
+    }
+    
+    const H = grid.length;
+    const W = grid[0].length;
+    
+    // 현재 타일을 중심으로 표시 영역 계산
+    let centerR = Math.floor(H / 2);
+    let centerC = Math.floor(W / 2);
+    
+    if (currentTileIndex !== null && tiles.length > 0 && currentTileIndex >= 0 && currentTileIndex < tiles.length) {
+      const currentTile = tiles[currentTileIndex];
+      centerR = currentTile.r + Math.floor(k / 2);
+      centerC = currentTile.c + Math.floor(k / 2);
+    } else if (tiles.length > 0) {
+      // 마지막 타일을 중심으로
+      const lastTile = tiles[tiles.length - 1];
+      centerR = lastTile.r + Math.floor(k / 2);
+      centerC = lastTile.c + Math.floor(k / 2);
+    }
+    
+    // 표시 영역 계산
+    const halfView = Math.floor(viewSize / 2);
+    const startR = Math.max(0, centerR - halfView);
+    const endR = Math.min(H, startR + viewSize);
+    const startC = Math.max(0, centerC - halfView);
+    const endC = Math.min(W, startC + viewSize);
+    
+    // 전체 그리드 렌더링
+    const fullView = renderPlacementGrid(grid, tiles, k);
+    
+    // 제한된 영역만 추출
+    const limitedView = [];
+    for (let r = startR; r < endR; r++) {
+      limitedView.push(fullView[r].slice(startC, endC));
+    }
+    
+    if (title) console.log(title);
+    console.log(`Viewing area: rows ${startR}-${endR-1}, cols ${startC}-${endC-1} (Full grid: ${H}x${W})`);
+
+    // 열 헤더 (시작 열 번호부터)
+    const colHeader = "     " + [...Array(limitedView[0].length)].map((_, i) => ((startC + i) % 10)).join(" ");
+    console.log(colHeader);
+
+    for (let r = 0; r < limitedView.length; r++) {
+      const actualR = startR + r;
+      console.log(String(actualR).padStart(2, " ") + " | " + limitedView[r].join(" "));
+    }
+    console.log("Legend: '.'=0(일반), 'o'=1(오렌지 미덮임), 문자=타일로 덮인 영역");
+  }
+
   function printPlacementAscii(grid, tiles, k, title = "") {
     if (!grid || !Array.isArray(grid) || grid.length === 0 || !Array.isArray(grid[0])) {
       console.error("printPlacementAscii(): invalid grid (expected 2D array)", grid);
       throw new TypeError("printPlacementAscii(): invalid grid (expected 2D array)");
     }
+    
+    // 그리드가 너무 크면 제한된 뷰 사용
+    const H = grid.length;
+    const W = grid[0].length;
+    const maxDisplaySize = 32; // 32x32 이상이면 제한된 뷰 사용
+    
+    if (H > maxDisplaySize || W > maxDisplaySize) {
+      const viewSize = typeof window !== 'undefined' ? 
+        parseInt(document.getElementById('gridSizeSelect')?.value || 16, 10) : 16;
+      printPlacementAsciiLimited(grid, tiles, k, tiles.length - 1, viewSize, title);
+      return;
+    }
+    
+    // 작은 그리드는 전체 표시
     const view = renderPlacementGrid(grid, tiles, k);
     if (title) console.log(title);
 
@@ -94,6 +163,28 @@ const DEMO_GRID = [
       console.error("printGridOnly(): invalid grid (expected 2D array)", grid);
       throw new TypeError("printGridOnly(): invalid grid (expected 2D array)");
     }
+    
+    const H = grid.length;
+    const W = grid[0].length;
+    const maxDisplaySize = 32; // 32x32 이상이면 요약 표시
+    
+    if (H > maxDisplaySize || W > maxDisplaySize) {
+      if (title) console.log(title);
+      console.log(`Grid size: ${H}x${W} (too large to display fully)`);
+      
+      // 오렌지 셀 개수 세기
+      let orangeCount = 0;
+      for (let r = 0; r < H; r++) {
+        for (let c = 0; c < W; c++) {
+          if (grid[r][c] === 1) orangeCount++;
+        }
+      }
+      console.log(`Orange cells: ${orangeCount}`);
+      console.log("Legend: '.'=0(일반), 'o'=1(오렌지)");
+      return;
+    }
+    
+    // 작은 그리드는 전체 표시
     const out = Array.from({ length: grid.length }, (_, r) =>
       Array.from({ length: grid[0].length }, (_, c) => (grid[r][c] === 1 ? "o" : "."))
     );
