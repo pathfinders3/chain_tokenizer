@@ -168,6 +168,152 @@ const DEMO_GRID = [
     return { angles, deltas };
   }
   
+  /* ------------------------- 타일 그룹핑 함수 ------------------------- */
+  /**
+   * 타일들을 각도가 비슷한 그룹으로 나눔
+   * @param {Array} tiles - 순서대로 정렬된 타일 배열 [{r, c}, ...]
+   * @param {number} k - 타일 크기 (2 or 3)
+   * @param {number} angleThreshold - 각도 차이 임계값 (기본 45도)
+   * @returns {Array} 그룹 배열 [{ tiles: [...], avgAngle: number, angles: [...] }, ...]
+   */
+  function groupTilesByAngle(tiles, k, angleThreshold = 45) {
+    if (!tiles || tiles.length < 2) {
+      console.log("타일이 2개 미만이라 그룹핑을 수행할 수 없습니다.");
+      return tiles.length === 1 ? [{ tiles: tiles.slice(), avgAngle: null, angles: [] }] : [];
+    }
+
+    const centers = tiles.map(t => tileCenter(t, k));
+    const angles = [];
+    
+    // 각 타일 간 각도 계산
+    for (let i = 0; i < centers.length - 1; i++) {
+      angles.push(angleDegCart(centers[i], centers[i + 1]));
+    }
+
+    // 그룹 분할 지점 찾기
+    const splitPoints = [0]; // 첫 번째 그룹은 인덱스 0부터 시작
+    
+    for (let i = 1; i < angles.length; i++) {
+      // 이전 각도들의 평균 계산
+      const prevAngles = angles.slice(splitPoints[splitPoints.length - 1], i);
+      const avgAngle = prevAngles.reduce((sum, a) => sum + a, 0) / prevAngles.length;
+      
+      // 현재 각도와 평균 각도의 차이
+      const diff = angleDiff(avgAngle, angles[i]);
+      
+      if (diff > angleThreshold) {
+        splitPoints.push(i); // i번째 각도부터 새 그룹 시작
+      }
+    }
+
+    // 그룹 생성
+    const groups = [];
+    for (let g = 0; g < splitPoints.length; g++) {
+      const startIdx = splitPoints[g];
+      const endIdx = g < splitPoints.length - 1 ? splitPoints[g + 1] : angles.length;
+      
+      const groupTiles = tiles.slice(startIdx, endIdx + 1);
+      const groupAngles = angles.slice(startIdx, endIdx);
+      const avgAngle = groupAngles.length > 0
+        ? groupAngles.reduce((sum, a) => sum + a, 0) / groupAngles.length
+        : null;
+      
+      groups.push({
+        tiles: groupTiles,
+        angles: groupAngles,
+        avgAngle: avgAngle
+      });
+    }
+
+    return groups;
+  }
+
+  /**
+   * 그룹핑 결과를 콘솔에 출력
+   */
+  function printTileGroups(groups, k) {
+    console.log("\n" + "=".repeat(60));
+    console.log("타일 그룹핑 결과");
+    console.log("=".repeat(60));
+
+    if (groups.length === 0) {
+      console.log("그룹이 없습니다.");
+      return;
+    }
+
+    const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    
+    // 먼저 전체 타일 배열을 만들어서 각 타일의 전역 인덱스를 찾음
+    const allTiles = [];
+    groups.forEach(group => {
+      group.tiles.forEach(tile => {
+        // 이미 존재하는 타일인지 확인 (좌표로 비교)
+        const existingIndex = allTiles.findIndex(t => t.r === tile.r && t.c === tile.c);
+        if (existingIndex === -1) {
+          allTiles.push(tile);
+        }
+      });
+    });
+
+    groups.forEach((group, groupIdx) => {
+      console.log(`\n그룹 ${groupIdx + 1} (${group.tiles.length}개 타일):`);
+      
+      if (group.avgAngle !== null) {
+        console.log(`  평균 각도: ${group.avgAngle.toFixed(1)}° ${arrowFromAngle(group.avgAngle)}`);
+      } else {
+        console.log(`  평균 각도: N/A (단일 타일)`);
+      }
+
+      console.log(`  타일 목록: ${group.tiles.map(t => {
+        const globalIndex = allTiles.findIndex(tile => tile.r === t.r && tile.c === t.c);
+        const label = labels[globalIndex % labels.length];
+        return `${label}(${t.r},${t.c})`;
+      }).join(" → ")}`);
+
+      if (group.angles.length > 0) {
+        console.log(`  각도 변화: ${group.angles.map(a => a.toFixed(1) + "°").join(", ")}`);
+      }
+    });
+
+    console.log("\n" + "=".repeat(60));
+  }
+
+  /**
+   * 그룹 정보를 반환 (HTML에서 사용)
+   */
+  function formatGroupsForDisplay(groups) {
+    const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    
+    // 먼저 전체 타일 배열을 만들어서 각 타일의 전역 인덱스를 찾음
+    const allTiles = [];
+    groups.forEach(group => {
+      group.tiles.forEach(tile => {
+        // 이미 존재하는 타일인지 확인 (좌표로 비교)
+        const existingIndex = allTiles.findIndex(t => t.r === tile.r && t.c === tile.c);
+        if (existingIndex === -1) {
+          allTiles.push(tile);
+        }
+      });
+    });
+
+    return groups.map((group, groupIdx) => {
+      const tileLabels = group.tiles.map(tile => {
+        // 전체 타일 목록에서 이 타일의 인덱스 찾기
+        const globalIndex = allTiles.findIndex(t => t.r === tile.r && t.c === tile.c);
+        return labels[globalIndex % labels.length];
+      });
+
+      return {
+        groupNumber: groupIdx + 1,
+        tileCount: group.tiles.length,
+        avgAngle: group.avgAngle,
+        arrow: group.avgAngle !== null ? arrowFromAngle(group.avgAngle) : "N/A",
+        tileLabels: tileLabels.join("→"),
+        tiles: group.tiles.map(t => `(${t.r},${t.c})`).join(", ")
+      };
+    });
+  }
+
   function printTileDirectionsAndDeltas(tiles, k, title = "Directions & ΔAngles") {
     const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const { angles, deltas } = computeTileDirectionsAndDeltas(tiles, k);
@@ -664,8 +810,23 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       window.updateTilePath(finalOrderedTiles);
     }
 
+    // 타일 선택 완료 후 자동으로 그룹핑 수행
+    const angleThreshold = (typeof window !== 'undefined' && window.groupingAngleThreshold) 
+      ? window.groupingAngleThreshold 
+      : 45;
+    
+    const groups = groupTilesByAngle(finalOrderedTiles, k, angleThreshold);
+    printTileGroups(groups, k);
+    
+    // HTML에 그룹 정보 전달
+    if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+      const groupsForDisplay = formatGroupsForDisplay(groups);
+      window.displayTileGroups(groupsForDisplay);
+    }
+
     return {
       orderedTiles: finalOrderedTiles,
+      groups: groups,
       state: { orderIdx, cur, prevAngle, centers, tiles, k, nextRule, maxAngleDiff, grid }
     };
   }
@@ -874,4 +1035,11 @@ function getAllPossiblePlacements(grid, k = 2, opts = {}) {
     totalOrange,
     k
   };
+}
+
+// 전역 함수 노출 (HTML에서 사용 가능하도록)
+if (typeof window !== 'undefined') {
+  window.groupTilesByAngle = groupTilesByAngle;
+  window.printTileGroups = printTileGroups;
+  window.formatGroupsForDisplay = formatGroupsForDisplay;
 }
