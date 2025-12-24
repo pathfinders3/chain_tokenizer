@@ -823,17 +823,40 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         answer = '0'; // 첫 번째(유일한) 타일 자동 선택
         console.log(`자동선택 모드: 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동으로 선택합니다.`);
       } 
-      // 각도 기준 자동선택 모드: 모든 후보 타일이 각도가 비슷한 경우에만 자동 선택
+      // 각도 기준 자동선택 모드: preferred 타일 중 각도차가 최소인 타일을 자동 선택
       else if (typeof window !== 'undefined' && window.autoSelectAngleMode && adjacentCandidates.length > 0) {
-        const allPreferred = adjacentCandidates.every(t => t.isPreferred);
+        // 각 후보에 대한 각도 정보 계산
+        const candidatesWithAngles = adjacentCandidates.map(cand => {
+          const candCenter = tileCenter(cand, k);
+          const angle = angleDegCart(centers[cur], candCenter);
+          const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
+          const isPreferred = (prevAngle !== null) && (diff <= 45);
+          return { ...cand, angle, diff, isPreferred };
+        });
         
-        if (allPreferred) {
-          // 모든 타일이 각도가 비슷함 -> 첫 번째(가장 선호되는) 타일 자동 선택
-          answer = '0';
-          console.log(`각도 기준 자동선택: 모든 타일이 각도가 비슷합니다. 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동 선택합니다.`);
+        // preferred 타일들만 필터링
+        const preferredTiles = candidatesWithAngles.filter(t => t.isPreferred);
+        
+        if (preferredTiles.length > 0) {
+          // preferred 타일이 있음 -> 그 중 각도차가 최소인 타일 선택
+          let bestTile = preferredTiles[0];
+          let minDiff = bestTile.diff !== null ? bestTile.diff : Infinity;
+          
+          for (let i = 1; i < preferredTiles.length; i++) {
+            const currentDiff = preferredTiles[i].diff !== null ? preferredTiles[i].diff : Infinity;
+            if (currentDiff < minDiff) {
+              minDiff = currentDiff;
+              bestTile = preferredTiles[i];
+            }
+          }
+          
+          // 원래 candidatesWithAngles 배열에서의 인덱스 찾기
+          const selectedIndex = candidatesWithAngles.findIndex(t => t.r === bestTile.r && t.c === bestTile.c);
+          answer = String(selectedIndex);
+          console.log(`각도 기준 자동선택: 각도차가 최소인 타일 (${bestTile.r}, ${bestTile.c})를 선택합니다. (각도차: ${minDiff.toFixed(1)}°, preferred 타일 ${preferredTiles.length}개 중 선택)`);
         } else {
-          // 각도가 다른 타일이 있음 -> 자동선택 중지
-          console.log(`각도 기준 자동선택 종료: 각도가 크게 다른 타일이 있습니다. 수동 선택을 기다립니다.`);
+          // preferred 타일이 없음 -> 자동선택 중지
+          console.log(`각도 기준 자동선택 종료: 각도가 비슷한 타일(Δ≤45°)이 없습니다. 수동 선택을 기다립니다.`);
           window.autoSelectAngleMode = false;
           answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
         }
