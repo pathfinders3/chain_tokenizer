@@ -149,6 +149,48 @@
         redirectConsole('error', 'ERROR: ');
         redirectConsole('warn', 'WARN: ');
 
+        // 타일 선택 결과를 관리하는 클로저 패턴
+        const TileResultManager = (() => {
+            let result = null;
+            
+            return {
+                // 결과 저장
+                save: (data) => {
+                    if (!data) {
+                        console.warn('[TileResultManager] Invalid data provided');
+                        return false;
+                    }
+                    result = data;
+                    console.log(`[TileResultManager] ✓ Saved: ${data.orderedTiles?.length || 0} tiles, ${data.groups?.length || 0} groups`);
+                    return true;
+                },
+                
+                // 전체 결과 반환
+                get: () => result,
+                
+                // 타일 배열만 반환
+                getTiles: () => result?.orderedTiles || [],
+                
+                // 그룹 배열만 반환
+                getGroups: () => result?.groups || [],
+                
+                // 상태 정보 반환
+                getState: () => result?.state,
+                
+                // 결과 존재 여부
+                hasResult: () => result !== null,
+                
+                // 결과 삭제
+                clear: () => {
+                    result = null;
+                    console.log('[TileResultManager] Cleared');
+                }
+            };
+        })();
+        
+        // 전역으로 노출 (콘솔에서도 접근 가능)
+        window.TileResultManager = TileResultManager;
+
         // 사용자 입력 처리를 위한 전역 변수
         let userInputResolver = null;
         const tileSelect = document.getElementById('tileSelect');
@@ -585,6 +627,9 @@
                     .then(result => {
                         if (result?.orderedTiles) {
                             console.log("Tile selection completed. Final tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
+                            
+                            // TileResultManager에 결과 저장
+                            TileResultManager.save(result);
                         }
                     })
                     .catch(error => console.error("Error during tile selection:", error));
