@@ -120,6 +120,9 @@
             <button id="regroupButton" style="margin-left: 10px; padding: 5px 15px; background-color: #4a4a4a; color: #ffffff; border: 1px solid #666; cursor: pointer;">
                 다시 그룹핑
             </button>
+            <button id="copyToClipboard" style="margin-left: 10px; padding: 5px 15px; background-color: #0066cc; color: #ffffff; border: 1px solid #0055aa; cursor: pointer; font-weight: bold;">
+                📋 클립보드에 복사
+            </button>
             <span style="margin-left: 15px; color: #aaaaaa; font-size: 12px;">
                 (각도 차이가 임계값을 초과하면 새로운 그룹으로 분리됩니다)
             </span>
@@ -526,12 +529,19 @@
 
         // 캔버스 클릭 이벤트로 시작 위치 지정
         inputCanvas.addEventListener('click', (e) => {
+            if (!pastedImage) return;
+            
             const rect = inputCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             startPos = { x, y };
             gridLoadStatus.textContent = `시작 위치: (${Math.floor(x)}, ${Math.floor(y)}). "이미지에서 그리드 로드" 버튼을 클릭하세요.`;
             
+            // 원본 이미지를 다시 그려서 이전 빨간 점 제거
+            inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+            inputCtx.drawImage(pastedImage, 0, 0, inputCanvas.width, inputCanvas.height);
+            
+            // 새로운 시작 위치에 빨간 점 표시
             inputCtx.beginPath();
             inputCtx.arc(x, y, 5, 0, 2 * Math.PI);
             inputCtx.fillStyle = 'red';
@@ -544,6 +554,10 @@
                 gridLoadStatus.textContent = '이미지가 로드되지 않았습니다. CTRL-V로 이미지를 붙여넣으세요.';
                 return;
             }
+            
+            // 그리드를 읽기 전에 원본 이미지를 복원 (빨간 점 제거)
+            inputCtx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+            inputCtx.drawImage(pastedImage, 0, 0, inputCanvas.width, inputCanvas.height);
             
             const newGrid = loadGridFromCanvas(inputCanvas, inputCtx, startPos);
             if (newGrid?.length > 0 && newGrid[0]?.length > 0) {
@@ -649,8 +663,10 @@
             const imgHeight = pastedImage?.height || canvas.height;
             const scaleX = imgWidth / canvas.width;
             const scaleY = imgHeight / canvas.height;
-            const imgStartX = startPos.x * scaleX;
-            const imgStartY = startPos.y * scaleY;
+            // 클릭한 위치를 중심으로 하기 위해 gridSize/2만큼 왼쪽 위로 이동
+            const halfGrid = gridSize / 2;
+            const imgStartX = (startPos.x - halfGrid) * scaleX;
+            const imgStartY = (startPos.y - halfGrid) * scaleY;
             
             const grid = [];
             for (let r = 0; r < gridSize; r++) {
@@ -720,6 +736,57 @@
             
             groupsDisplay.innerHTML = html;
         };
+
+        // 클립보드에 복사 버튼 이벤트
+        document.getElementById('copyToClipboard').addEventListener('click', () => {
+            const result = TileResultManager.get();
+            
+            if (!result || !result.orderedTiles || result.orderedTiles.length === 0) {
+                alert('저장된 타일 데이터가 없습니다.\n먼저 타일을 선택하고 "중지" 버튼을 눌러주세요.');
+                return;
+            }
+            
+            // JSON 형식으로 데이터 준비
+            const exportData = {
+                tiles: result.orderedTiles,
+                groups: result.groups.map(g => ({
+                    tiles: g.tiles,
+                    avgAngle: g.avgAngle,
+                    angles: g.angles,
+                    tileCount: g.tiles.length
+                })),
+                metadata: {
+                    totalTiles: result.orderedTiles.length,
+                    totalGroups: result.groups.length,
+                    timestamp: new Date().toISOString(),
+                    source: 'Block Move Solver'
+                }
+            };
+            
+            // 클립보드에 복사
+            navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
+                .then(() => {
+                    // 성공 메시지
+                    const copyButton = document.getElementById('copyToClipboard');
+                    const originalText = copyButton.innerHTML;
+                    copyButton.innerHTML = '✓ 복사 완료!';
+                    copyButton.style.backgroundColor = '#00aa00';
+                    
+                    console.log('✓ 데이터가 클립보드에 복사되었습니다.');
+                    console.log(`- 총 타일: ${exportData.metadata.totalTiles}개`);
+                    console.log(`- 총 그룹: ${exportData.metadata.totalGroups}개`);
+                    
+                    // 3초 후 원래대로
+                    setTimeout(() => {
+                        copyButton.innerHTML = originalText;
+                        copyButton.style.backgroundColor = '#0066cc';
+                    }, 3000);
+                })
+                .catch(err => {
+                    console.error('클립보드 복사 실패:', err);
+                    alert('클립보드 복사에 실패했습니다.\n' + err.message);
+                });
+        });
 
         // 다시 그룹핑 버튼 이벤트
         document.getElementById('regroupButton').addEventListener('click', () => {
