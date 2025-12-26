@@ -1,4 +1,14 @@
-<div class="row">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Block2 Vectors</title>
+  <link rel="icon" type="image/png" href="block2_vectors.png">
+  <link rel="stylesheet" href="block2_vectors.css">
+</head>
+<body>
+  <div class="row">
     <div>
       <canvas id="cv" width="900" height="700"></canvas>
     </div>
@@ -35,12 +45,16 @@
         <input id="drawPcaLine" type="checkbox">
         그룹: PCA(최소자승) “추정 직선”도 함께 그리기(점선)
       </label>
-
+      <label>
+        <input id="drawPcaLineAnchored" type="checkbox">
+        그룹: PCA "앵커 연결 직선" 그리기(실선, 연결점 고정)
+      </label>
       <button id="rerender">다시 그리기</button>
 
       <div class="small" style="margin-top:10px;">
         - 엔드포인트 직선: 그룹의 첫 타일 중심 → 마지막 타일 중심<br/>
-        - PCA 직선: 그룹 점들을 가장 잘 설명하는 직선을 추정(벡터화에 유리)
+        - PCA 직선: 그룹 점들을 가장 잘 설명하는 직선을 추정(벡터화에 유리)<br/>
+        - PCA 앵커 연결 직선: 공유 타일(연결점)을 앵커로 고정, 그룹 간 연결 보장
       </div>
 
       <h3 style="margin-top:14px;">JSON</h3>
@@ -50,3 +64,7 @@
       <div class="legend" id="legend"></div>
     </div>
   </div>
+
+  <script src="block2_vectors.js"></script>
+</body>
+</html>
