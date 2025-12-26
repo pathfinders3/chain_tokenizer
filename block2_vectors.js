@@ -179,6 +179,90 @@ function fitLinePCAWithAnchors(anchor0, anchor1, direction){
   };
 }
 
+/**
+ * 모든 그룹의 PCA 앵커 연결 직선을 미리 계산 (2-Pass 렌더링)
+ * 원형 경로를 탐지하여 완벽한 연결 보장
+ */
+function computePCALinesWithAnchors(groups, cell, pad){
+  if (groups.length === 0) return [];
+  
+  // 원형 경로 탐지: 마지막 그룹의 끝 타일 == 첫 그룹의 시작 타일
+  const firstGroup = groups[0];
+  const lastGroup = groups[groups.length - 1];
+  const firstTiles = firstGroup.tiles || [];
+  const lastTiles = lastGroup.tiles || [];
+  
+  let isCircular = false;
+  if (firstTiles.length > 0 && lastTiles.length > 0){
+    const firstStart = firstTiles[0];
+    const lastEnd = lastTiles[lastTiles.length - 1];
+    isCircular = tileEquals(lastEnd, firstStart);
+    if (isCircular){
+      console.log('🔄 원형 경로 탐지:', lastEnd, '→', firstStart);
+    }
+  }
+  
+  // 1st Pass: 초기 계산
+  const lineData = [];
+  let prevEndPoint = null;
+  
+  for (let gi = 0; gi < groups.length; gi++){
+    const g = groups[gi];
+    const tiles = g.tiles || [];
+    if (tiles.length === 0){
+      lineData.push(null);
+      continue;
+    }
+    
+    const pts = tiles.map(t => tileCenterPx(t, cell, pad));
+    
+    // 시작 앵커
+    let anchor0 = pts[0];
+    if (gi > 0 && prevEndPoint !== null){
+      const prevGroup = groups[gi - 1];
+      const prevTiles = prevGroup.tiles || [];
+      if (prevTiles.length > 0 && tileEquals(prevTiles[prevTiles.length - 1], tiles[0])){
+        anchor0 = prevEndPoint;
+        console.log(`G${gi} 시작 앵커 (G${gi-1}과 공유):`, tiles[0], `→ 픽셀:`, anchor0);
+      }
+    }
+    
+    // 끝 앵커
+    let anchor1 = pts[pts.length - 1];
+    if (gi < groups.length - 1){
+      const nextGroup = groups[gi + 1];
+      const nextTiles = nextGroup.tiles || [];
+      if (nextTiles.length > 0 && tileEquals(tiles[tiles.length - 1], nextTiles[0])){
+        anchor1 = tileCenterPx(tiles[tiles.length - 1], cell, pad);
+        console.log(`G${gi} 끝 앵커 (G${gi+1}과 공유):`, tiles[tiles.length - 1], `→ 픽셀:`, anchor1);
+      }
+    }
+    
+    // PCA 방향 계산
+    const direction = getPCADirection(pts);
+    const { p0, p1 } = fitLinePCAWithAnchors(anchor0, anchor1, direction);
+    
+    lineData.push({ p0, p1, anchor0, anchor1, direction, pts });
+    prevEndPoint = p1;
+  }
+  
+  // 원형 경로인 경우: 첫 그룹의 시작점을 마지막 그룹의 끝점으로 조정
+  if (isCircular && lineData[0] && prevEndPoint){
+    console.log('🔄 원형 경로 연결: G0 시작점 =', lineData[0].p0, '→', prevEndPoint);
+    
+    // 첫 그룹을 마지막 그룹의 끝점에서 시작하도록 재계산
+    const firstLineData = lineData[0];
+    const { p0: newP0, p1: newP1 } = fitLinePCAWithAnchors(
+      prevEndPoint, 
+      firstLineData.anchor1, 
+      firstLineData.direction
+    );
+    lineData[0] = { ...firstLineData, p0: newP0, p1: newP1 };
+  }
+  
+  return lineData;
+}
+
 /** === 3) 렌더 === */
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -303,8 +387,13 @@ function render(){
 
   const groups = data.groups || [];
   
-  // 이전 그룹의 끝점을 저장 (연결을 위해)
-  let prevGroupEndPoint = null;
+  // === PCA 앵커 연결 직선: 2-Pass 렌더링 ===
+  let pcaAnchoredLines = null;
+  
+  if (elDrawPcaLineAnchored.checked){
+    // 1st Pass: 모든 그룹의 앵커와 끝점을 미리 계산
+    pcaAnchoredLines = computePCALinesWithAnchors(groups, cell, pad);
+  }
   
   (groups).forEach((g, gi) => {
     const color = GROUP_COLORS[gi % GROUP_COLORS.length];
@@ -346,59 +435,12 @@ function render(){
       drawLine(p0, p1, color, 2.5, true);
     }
 
-    // PCA 앵커 연결 직선(실선)
-    if (elDrawPcaLineAnchored.checked && pts.length >= 2){
-      // 시작 앵커: 이전 그룹과 공유 타일이 있으면 이전 그룹의 끝점 사용, 없으면 첫 타일
-      let anchor0 = pts[0];
-      let isSharedStart = false;
-      if (gi > 0 && prevGroupEndPoint !== null){
-        const prevGroup = groups[gi - 1];
-        const prevTiles = prevGroup.tiles || [];
-        if (prevTiles.length > 0){
-          const prevLast = prevTiles[prevTiles.length - 1];
-          const currFirst = tiles[0];
-          if (tileEquals(prevLast, currFirst)){
-            // 공유 타일 발견 - 이전 그룹의 끝점을 그대로 사용
-            anchor0 = prevGroupEndPoint;
-            isSharedStart = true;
-            console.log(`G${gi} 시작 앵커 (G${gi-1}과 공유):`, currFirst, `→ 픽셀:`, anchor0);
-          }
-        }
-      }
-
-      // 끝 앵커: 다음 그룹과 공유 타일이 있으면 그 점, 없으면 마지막 타일
-      let anchor1 = pts[pts.length - 1];
-      let isSharedEnd = false;
-      if (gi < groups.length - 1){
-        const nextGroup = groups[gi + 1];
-        const nextTiles = nextGroup.tiles || [];
-        if (nextTiles.length > 0){
-          const currLast = tiles[tiles.length - 1];
-          const nextFirst = nextTiles[0];
-          if (tileEquals(currLast, nextFirst)){
-            // 공유 타일 발견
-            anchor1 = tileCenterPx(currLast, cell, pad);
-            isSharedEnd = true;
-            console.log(`G${gi} 끝 앵커 (G${gi+1}과 공유):`, currLast, `→ 픽셀:`, anchor1);
-          }
-        }
-      }
-
-      // PCA 방향 계산
-      const direction = getPCADirection(pts);
-      
-      // 앵커 기반 직선 생성
-      const { p0, p1 } = fitLinePCAWithAnchors(anchor0, anchor1, direction);
-      
-      // 이 그룹의 끝점을 저장 (다음 그룹에서 사용)
-      prevGroupEndPoint = p1;
-      
-      // 실선으로 그리기 (더 굵게)
-      drawLine(p0, p1, color, 3.5, false);
-      
-      // 앵커 점 강조
-      drawDot(p0, color, 5);
-      drawDot(p1, color, 5);
+    // PCA 앵커 연결 직선(실선) - 2nd Pass: 미리 계산된 정보로 그리기
+    if (pcaAnchoredLines && pcaAnchoredLines[gi]){
+      const lineInfo = pcaAnchoredLines[gi];
+      drawLine(lineInfo.p0, lineInfo.p1, color, 3.5, false);
+      drawDot(lineInfo.p0, color, 5);
+      drawDot(lineInfo.p1, color, 5);
     }
 
     // 그룹 라벨(중앙 근처)
