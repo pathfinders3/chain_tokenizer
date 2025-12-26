@@ -1,0 +1,52 @@
+<div class="row">
+    <div>
+      <canvas id="cv" width="900" height="700"></canvas>
+    </div>
+
+    <div class="panel">
+      <h3>옵션</h3>
+
+      <label>
+        Cell 크기(px):
+        <input id="cell" type="number" min="6" max="80" step="1" value="12">
+      </label>
+
+      <label>
+        <input id="showGrid" type="checkbox" checked>
+        격자(Grid) 표시
+      </label>
+
+      <label>
+        <input id="showAllTiles" type="checkbox" checked>
+        전체 tiles 점 표시(회색)
+      </label>
+
+      <label>
+        <input id="highlightGroups" type="checkbox" checked>
+        그룹 tiles 하이라이트(그룹 색)
+      </label>
+
+      <label>
+        <input id="drawEndpointLine" type="checkbox" checked>
+        그룹: 시작~끝 “엔드포인트 직선” 그리기
+      </label>
+
+      <label>
+        <input id="drawPcaLine" type="checkbox">
+        그룹: PCA(최소자승) “추정 직선”도 함께 그리기(점선)
+      </label>
+
+      <button id="rerender">다시 그리기</button>
+
+      <div class="small" style="margin-top:10px;">
+        - 엔드포인트 직선: 그룹의 첫 타일 중심 → 마지막 타일 중심<br/>
+        - PCA 직선: 그룹 점들을 가장 잘 설명하는 직선을 추정(벡터화에 유리)
+      </div>
+
+      <h3 style="margin-top:14px;">JSON</h3>
+      <textarea id="jsonArea"></textarea>
+      <div class="small">JSON을 수정한 뒤 “다시 그리기”를 누르세요.</div>
+
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
