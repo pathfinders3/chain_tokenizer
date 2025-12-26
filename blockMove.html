@@ -826,13 +826,37 @@
             
             // JSON 형식으로 데이터 준비
             const exportData = {
+                _schema: {
+                    tiles: "전체 타일 배열 - 각 타일은 {r: 행, c: 열, angle: 각도, direction: 방향}",
+                    groups: "같은 방향의 타일 그룹 배열 - 각 그룹은 유사한 각도를 가진 타일들의 모음",
+                    "groups[].tiles": "그룹 내 타일 인덱스 배열",
+                    "groups[].avgAngle": "그룹의 평균 각도 (도 단위, 0=동쪽, 90=북쪽, 180=서쪽, 270=남쪽)",
+                    "groups[].direction": "그룹의 방향을 나타내는 텍스트",
+                    "groups[].angles": "그룹 내 각 타일의 개별 각도 배열",
+                    metadata: "데이터 메타정보 (타일 수, 그룹 수, 생성 시간 등)"
+                },
                 tiles: result.orderedTiles,
-                groups: result.groups.map(g => ({
-                    tiles: g.tiles,
-                    avgAngle: g.avgAngle,
-                    angles: g.angles,
-                    tileCount: g.tiles.length
-                })),
+                groups: result.groups.map(g => {
+                    // 평균 각도를 기반으로 방향 결정
+                    const angle = g.avgAngle;
+                    let direction = '';
+                    if (angle >= 337.5 || angle < 22.5) direction = '동쪽 (East, →)';
+                    else if (angle >= 22.5 && angle < 67.5) direction = '북동쪽 (Northeast, ↗)';
+                    else if (angle >= 67.5 && angle < 112.5) direction = '북쪽 (North, ↑)';
+                    else if (angle >= 112.5 && angle < 157.5) direction = '북서쪽 (Northwest, ↖)';
+                    else if (angle >= 157.5 && angle < 202.5) direction = '서쪽 (West, ←)';
+                    else if (angle >= 202.5 && angle < 247.5) direction = '남서쪽 (Southwest, ↙)';
+                    else if (angle >= 247.5 && angle < 292.5) direction = '남쪽 (South, ↓)';
+                    else direction = '남동쪽 (Southeast, ↘)';
+                    
+                    return {
+                        tiles: g.tiles,
+                        avgAngle: g.avgAngle,
+                        direction: direction,
+                        angles: g.angles,
+                        tileCount: g.tiles.length
+                    };
+                }),
                 metadata: {
                     totalTiles: result.orderedTiles.length,
                     totalGroups: result.groups.length,
