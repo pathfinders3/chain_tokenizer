@@ -515,33 +515,6 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
     };
   }
 
-  function makeNextPreferAngleIfDiagonal({
-    diagTileDist = Math.SQRT2 + 1e-9,
-    wTurn = 1.0,
-  } = {}) {
-    return function next(curIdx, prevAngle, centers, unusedSet, k, tiles) {
-      const close = [];
-      for (const i of unusedSet) {
-        const dTile = tileDist(centers[curIdx], centers[i], k);
-        if (dTile <= diagTileDist) {
-          const info = getCandidateInfo(curIdx, i, centers, tiles, k, prevAngle);
-          if (info.isAdjacent) close.push({ i, dTile, turn: info.turn });
-        }
-      }
-
-      if (close.length > 0) {
-        close.sort((a, b) => a.turn - b.turn || a.dTile - b.dTile);
-        return close[0].i;
-      }
-
-      const best = findClosestAdjacentTile(curIdx, centers, unusedSet, tiles, k);
-      if (best == null) {
-        console.log(`No adjacent tile found. Stopping selection.`);
-      }
-      return best;
-    };
-  }
-
   // 타일이 닿는지 확인하는 함수 (직접 닿거나 대각선으로 닿는 경우)
   function areTilesAdjacent(tileA, tileB, k) {
     const r1 = tileA.r, c1 = tileA.c;
