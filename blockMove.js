@@ -453,29 +453,6 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
   return { dist, ang, turn, isAdjacent };
 }
   
-  // Strategy A: nearest neighbor
-  function nextByNearest(curIdx, prevAngle, centers, unusedSet) {
-    let best = null;
-    let bestD = Infinity;
-    for (const i of unusedSet) {
-      const d = dist2(centers[curIdx], centers[i]);
-      if (d < bestD) { bestD = d; best = i; }
-    }
-    return best;
-  }
-  
-  // Strategy B: minimal turning (needs prevAngle to be meaningful)
-  function nextByMinTurn(curIdx, prevAngle, centers, unusedSet) {
-    let best = null;
-    let bestTurn = Infinity;
-    for (const i of unusedSet) {
-      const ang = angleDegCart(centers[curIdx], centers[i]);
-      const turn = (prevAngle == null) ? 0 : angleDiff(prevAngle, ang);
-      if (turn < bestTurn) { bestTurn = turn; best = i; }
-    }
-    return best;
-  }
-  
   function findClosestAdjacentTile(curIdx, centers, unusedSet, tiles, k) {
     let best = null;
     let bestD = Infinity;
