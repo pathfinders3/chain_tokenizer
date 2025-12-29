@@ -460,7 +460,7 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
       const info = getCandidateInfo(curIdx, i, centers, tiles, k, null);
       if (info.isAdjacent && info.dist * info.dist < bestD) {
         bestD = info.dist * info.dist;
-        best = i;
+        best = i; // 가장 가까운 인접 타일의 인덱스를 저장
       }
     }
     return best;
@@ -473,6 +473,7 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
 
       for (const i of unusedSet) {
         const info = getCandidateInfo(curIdx, i, centers, tiles, k, prevAngle);
+        // 최대 거리 초과 또는 인접하지 않은 타일은 제외
         if (info.dist > maxDist || !info.isAdjacent) continue;
         
         const score = wDist * info.dist + wTurn * info.turn;
@@ -482,6 +483,7 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
         }
       }
 
+      // 조건을 만족하는 타일이 없으면 폴백: 가장 가까운 인접 타일 선택
       if (best == null) {
         best = findClosestAdjacentTile(curIdx, centers, unusedSet, tiles, k);
         if (best != null) {
@@ -601,15 +603,19 @@ function orderTilesWithNextRule(tiles, k, nextRule, startRule = "topleft", maxAn
     
     console.log(`Starting with null prevAngle (direction will be determined after 2 tiles are selected)`);
 
+    // 아직 사용되지 않은 타일이 있는 동안 다음 타일을 찾아 경로를 확장
+    // 종료 조건: 1) nextRule이 null 반환 (인접한 타일 없음), 2) 각도 차이가 maxAngleDiff 초과
     while (unused.size) {
       const nxt = nextRule(cur, prevAngle, centers, unused, k, tiles);
       if (nxt == null) {
+        // 조건을 만족하는 인접 타일이 없어 경로 종료
         console.log(`Stopped at tile ${orderIdx.length}. ${unused.size} tiles remain.`);
         break;
       }
 
       const newAngle = angleDegCart(centers[cur], centers[nxt]);
       if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
+        // 각도 차이가 허용 범위를 초과하여 경로 종료
         console.log(`Stopped at tile ${orderIdx.length}. Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°. ${unused.size} tiles remain.`);
         break;
       }
