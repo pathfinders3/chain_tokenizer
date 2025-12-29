@@ -715,6 +715,10 @@
                             
                             // TileResultManager에 결과 저장
                             TileResultManager.save(result);
+                            
+                            // resumeTileOrdering() 종료 후 추가 작업 수행 위치
+                            console.log("=== resumeTileOrdering() 완료 - 추가 작업 시작 지점 ===");
+                            // TODO: 여기에 그룹 배열 수정 등의 추가 작업 코드 추가
                         }
                     })
                     .catch(error => console.error("Error during tile selection:", error));
