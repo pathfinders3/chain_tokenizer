@@ -361,6 +361,11 @@ const DEMO_GRID = [
         return `${label}(${t.r},${t.c})`;
       }).join(" → ")}`);
 
+      // 끝점이 있는 경우 표시
+      if (group.endpoint) {
+        console.log(`  끝점: (${group.endpoint.r}, ${group.endpoint.c})`);
+      }
+
       if (group.angles.length > 0) {
         console.log(`  각도 변화: ${group.angles.map(a => a.toFixed(1) + "°").join(", ")}`);
       }
@@ -400,7 +405,8 @@ const DEMO_GRID = [
         avgAngle: group.avgAngle,
         arrow: group.avgAngle !== null ? arrowFromAngle(group.avgAngle) : "N/A",
         tileLabels: tileLabels.join("→"),
-        tiles: group.tiles.map(t => `(${t.r},${t.c})`).join(", ")
+        tiles: group.tiles.map(t => `(${t.r},${t.c})`).join(", "),
+        endpoint: group.endpoint ? `(${group.endpoint.r}, ${group.endpoint.c})` : null
       };
     });
   }
@@ -909,6 +915,84 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
     if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
       const groupsForDisplay = formatGroupsForDisplay(groups);
       window.displayTileGroups(groupsForDisplay);
+    }
+
+    // 마지막 그룹에 끝점 추가하기 위한 사용자 입력
+    console.log('\n마지막 그룹에 끝점을 추가합니다.');
+    const lastGroup = groups.length > 0 ? groups[groups.length - 1] : null;
+    
+    if (lastGroup) {
+      // 모든 가능한 배치를 후보로 제시 (사용된 것도 포함)
+      const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+      const allCandidates = allPlacements.map(p => ({ r: p.r, c: p.c }));
+      
+      console.log(`마지막 그룹의 현재 타일 수: ${lastGroup.tiles.length}`);
+      console.log(`끝점으로 추가할 타일을 선택하세요 (사용된 타일도 선택 가능).`);
+      
+      // 사용자에게 타일 선택 요청 (used 상태 무시)
+      const endpointAnswer = await new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+          window.showInputSection(true);
+        }
+        if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
+          // 모든 배치를 후보로 표시 (used 무시하고 모두 표시)
+          const candidatesWithAngles = allCandidates.map(cand => {
+            const candCenter = tileCenter(cand, k);
+            const lastTile = lastGroup.tiles[lastGroup.tiles.length - 1];
+            const lastTileCenter = tileCenter(lastTile, k);
+            const angle = angleDegCart(lastTileCenter, candCenter);
+            return { ...cand, angle, diff: null, isPreferred: true }; // 모두 선택 가능하도록 표시
+          });
+          window.updateTileOptions([], tiles, cur, centers, k, null, candidatesWithAngles, true); // true: 끝점 선택 모드
+        }
+        userInputResolver = (value) => { 
+          if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+            window.showInputSection(false);
+          }
+          resolve(value); 
+        };
+      });
+      
+      const endpointAnswerStr = String(endpointAnswer).toLowerCase();
+      if (endpointAnswerStr !== 'stop') {
+        const endpointChoice = parseInt(endpointAnswer, 10);
+        if (!Number.isNaN(endpointChoice) && endpointChoice >= 0 && endpointChoice < allCandidates.length) {
+          const selectedEndpoint = allCandidates[endpointChoice];
+          console.log(`끝점으로 (${selectedEndpoint.r}, ${selectedEndpoint.c})를 선택했습니다.`);
+          
+          // 마지막 그룹의 tiles 배열에 끝점 추가
+          lastGroup.tiles.push(selectedEndpoint);
+          lastGroup.endpoint = selectedEndpoint; // 참조용으로도 저장
+          
+          // 마지막 타일에서 끝점까지의 각도 계산 및 추가
+          const lastTile = lastGroup.tiles[lastGroup.tiles.length - 2]; // 끝점 바로 직전 타일
+          const lastTileCenter = tileCenter(lastTile, k);
+          const endpointCenter = tileCenter(selectedEndpoint, k);
+          const finalAngle = angleDegCart(lastTileCenter, endpointCenter);
+          lastGroup.angles.push(finalAngle);
+          
+          // 평균 각도 재계산
+          if (lastGroup.angles.length > 0) {
+            lastGroup.avgAngle = lastGroup.angles.reduce((sum, a) => sum + a, 0) / lastGroup.angles.length;
+          }
+          
+          console.log(`마지막 그룹의 tiles 배열에 끝점이 추가되었습니다: (${selectedEndpoint.r}, ${selectedEndpoint.c})`);
+          console.log(`마지막 그룹 타일 수: ${lastGroup.tiles.length}개`);
+          
+          // 그룹 정보 다시 표시
+          printTileGroups(groups, k);
+          
+          // HTML에 업데이트된 그룹 정보 전달
+          if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+            const groupsForDisplay = formatGroupsForDisplay(groups);
+            window.displayTileGroups(groupsForDisplay);
+          }
+        } else {
+          console.log('잘못된 선택입니다. 끝점 추가를 건너뜁니다.');
+        }
+      } else {
+        console.log('끝점 추가를 건너뜁니다.');
+      }
     }
 
     return {

@@ -327,7 +327,7 @@
             return option;
         }
         
-        function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = []) {
+        function updateTileOptions(candidates, tiles, cur, centers, k, prevAngle, adjacentCandidates = [], isEndpointMode = false) {
             // 각도 정보가 포함된 후보 목록 저장
             window.lastAdjacentCandidates = adjacentCandidates;
             
@@ -337,8 +337,14 @@
             const defaultOption = document.createElement('option');
             defaultOption.value = '';
             
+            // 끝점 선택 모드인 경우
+            if (isEndpointMode) {
+                defaultOption.textContent = '⭐ -- 끝점 선택 --';
+                defaultOption.style.color = '#ff00ff';
+                tileSelect.style.color = '#ff00ff';
+            }
             // 선택 가능한 타일이 1개만 있으면 붉은색으로 표시하고 표식 추가
-            if (adjacentCandidates?.length === 1) {
+            else if (adjacentCandidates?.length === 1) {
                 defaultOption.textContent = '⓵ -- 선택 --';
                 defaultOption.style.color = '#ff0000';
                 // select 요소 자체도 붉은색으로 변경 (닫혀있을 때 보이도록)
@@ -354,14 +360,21 @@
             // textarea에 표시할 텍스트 준비
             let textareaInfo = `\n`;
             
+            // 끝점 선택 모드인 경우 안내 메시지
+            if (isEndpointMode) {
+                textareaInfo += `${'='.repeat(50)}\n`;
+                textareaInfo += `*** 마지막 그룹의 끝점을 선택하세요 ***\n`;
+                textareaInfo += `*** (사용된 타일도 선택 가능) ***\n`;
+                textareaInfo += `${'='.repeat(50)}\n`;
+            }
             // 타일이 있는 경우 강조 표시
-            if (adjacentCandidates?.length >= 1) {
+            else if (adjacentCandidates?.length >= 1) {
                 textareaInfo += `${'='.repeat(50)}\n`;
                 textareaInfo += `*** 주의: 선택 가능한 타일이 ${adjacentCandidates.length}개 있습니다! ***\n`;
                 textareaInfo += `${'='.repeat(50)}\n`;
             }
             
-            textareaInfo += `Available adjacent tiles:\n`;
+            textareaInfo += `${isEndpointMode ? 'Available endpoints:' : 'Available adjacent tiles:'}\n`;
             
             // 인접 타일 추가
             if (adjacentCandidates?.length > 0) {
@@ -379,19 +392,19 @@
                         text += angleInfo;
                     }
                     
-                    // 각도가 비슷하면 별표 추가, 아니면 같은 길이의 전각 공백 추가
-                    if (adjTile.isPreferred) {
+                    // 끝점 모드가 아니고 각도가 비슷하면 별표 추가, 아니면 같은 길이의 전각 공백 추가
+                    if (!isEndpointMode && adjTile.isPreferred) {
                         text = `★★ ${text}`;
-                    } else {
+                    } else if (!isEndpointMode) {
                         text = `　　 ${text}`;  // 전각 공백 2개와 일반 공백 1개
                     }
                     
                     // textarea에 추가
                     textareaInfo += `  ${text}\n`;
                     
-                    // select 옵션 생성 (녹색 표시)
+                    // select 옵션 생성
                     const displayText = `${index}. (${adjTile.r}, ${adjTile.c})${angleInfo}`;
-                    const color = adjTile.isPreferred ? '#00ff00' : null;
+                    const color = isEndpointMode ? '#ff00ff' : (adjTile.isPreferred ? '#00ff00' : null);
                     tileSelect.appendChild(createTileOption(index, displayText, color));
                 });
                 
@@ -807,12 +820,20 @@
                                 ${group.tileLabels}
                             </span>
                         </div>
-                        <div>
+                        <div style="margin-bottom: 5px;">
                             <span style="color: #aaaaaa;">좌표:</span> 
                             <span style="color: #cccccc; font-size: 12px;">
                                 ${group.tiles}
                             </span>
                         </div>
+                        ${group.endpoint ? `
+                        <div>
+                            <span style="color: #aaaaaa;">끝점:</span> 
+                            <span style="color: #ff00ff; font-weight: bold; font-size: 14px;">
+                                ${group.endpoint}
+                            </span>
+                        </div>
+                        ` : ''}
                     </div>
                 `;
             });
