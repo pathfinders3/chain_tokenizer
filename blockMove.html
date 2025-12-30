@@ -338,8 +338,51 @@
             });
         }
         
+        // 사이클 완성 후 독립 그룹 시작 프롬프트
+        function showCycleCompletePrompt(unusedCount, callback) {
+            const newGroupPrompt = document.getElementById('newGroupPrompt');
+            const newGroupMessage = document.getElementById('newGroupMessage');
+            const continueButton = document.getElementById('continueNewGroup');
+            const stopButton = document.getElementById('stopNewGroup');
+            
+            // 메시지 설정
+            newGroupMessage.textContent = `🔄 사이클 완성! 아직 ${unusedCount}개의 미사용 타일이 남았습니다. 독립적인 새 그룹을 시작하시겠습니까?`;
+            
+            // 버튼 텍스트 변경
+            continueButton.textContent = '독립 그룹 시작';
+            stopButton.textContent = '종료';
+            
+            // 프롬프트 표시
+            newGroupPrompt.style.display = 'block';
+            
+            // 이벤트 리스너 정리 (중복 방지)
+            const newContinueButton = continueButton.cloneNode(true);
+            const newStopButton = stopButton.cloneNode(true);
+            continueButton.parentNode.replaceChild(newContinueButton, continueButton);
+            stopButton.parentNode.replaceChild(newStopButton, stopButton);
+            
+            // 독립 그룹 시작 버튼 클릭
+            newContinueButton.addEventListener('click', () => {
+                // 버튼 텍스트 원래대로 복구
+                newContinueButton.textContent = '새 그룹으로 계속';
+                newStopButton.textContent = '종료';
+                newGroupPrompt.style.display = 'none';
+                callback('start-new');
+            });
+            
+            // 종료 버튼 클릭
+            newStopButton.addEventListener('click', () => {
+                // 버튼 텍스트 원래대로 복구
+                newContinueButton.textContent = '새 그룹으로 계속';
+                newStopButton.textContent = '종료';
+                newGroupPrompt.style.display = 'none';
+                callback('stop');
+            });
+        }
+        
         // 전역으로 노출
         window.showNewGroupPrompt = showNewGroupPrompt;
+        window.showCycleCompletePrompt = showCycleCompletePrompt;
 
         // 각도를 화살표로 변환하는 함수
         function getArrowFromAngle(deg) {

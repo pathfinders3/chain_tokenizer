@@ -609,7 +609,7 @@ function askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngl
  * 그룹핑 수행 및 끝점 선택 처리
  * 끝점 주변에 미사용 타일이 있으면 새 그룹 시작 여부를 사용자에게 묻고 처리
  */
-async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
+async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, existingGroups = null) {
   const finalOrderedTiles = orderIdx.map(i => tiles[i]);
   
   // 타일 선택 완료 후 자동으로 그룹핑 수행
@@ -617,7 +617,15 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
     ? window.groupingAngleThreshold 
     : 45;
   
-  const groups = groupTilesByAngle(finalOrderedTiles, k, angleThreshold);
+  // 기존 그룹이 있으면 보존, 없으면 새로 그룹핑
+  let groups;
+  if (existingGroups && existingGroups.length > 0) {
+    groups = existingGroups;
+    console.log(`기존 ${groups.length}개 그룹 보존됨.`);
+  } else {
+    groups = groupTilesByAngle(finalOrderedTiles, k, angleThreshold);
+  }
+  
   printTileGroups(groups, k);
   
   // HTML에 그룹 정보 전달
@@ -750,9 +758,48 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
       console.log(`  ${idx}. (${tile.r}, ${tile.c}) - ${angle.toFixed(1)}° ${arrow}${groupInfo}`);
     });
     
-    // 사이클 완성으로 종료
+    // 사이클 완성 - 하지만 unused 타일이 있는지 확인
     console.log('\n✅ 사이클이 완성되었습니다!');
     console.log(`마지막 그룹의 끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c})이(가) 이미 사용된 타일과 연결됩니다.`);
+    
+    // 전체 배치에서 아직 사용되지 않은 타일 확인
+    const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+    const usedTileSet = new Set(currentOrderedTiles.map(t => `${t.r},${t.c}`));
+    const remainingUnusedTiles = allPlacements.filter(p => !usedTileSet.has(`${p.r},${p.c}`));
+    
+    if (remainingUnusedTiles.length > 0) {
+      console.log(`\n⚠️  아직 ${remainingUnusedTiles.length}개의 미사용 타일이 남아 있습니다.`);
+      console.log('독립적인 새 그룹을 시작할 수 있습니다.');
+      console.log('='.repeat(60) + '\n');
+      
+      // 사용자에게 독립 그룹 시작 여부 확인
+      const continueAnswer = await new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.showCycleCompletePrompt === 'function') {
+          window.showCycleCompletePrompt(remainingUnusedTiles.length, (answer) => {
+            resolve(answer);
+          });
+        } else {
+          // 콘솔 환경에서는 자동으로 종료
+          resolve('stop');
+        }
+      });
+      
+      if (continueAnswer === 'start-new') {
+        return {
+          groups,
+          shouldContinue: true,
+          isIndependentGroup: true,
+          remainingUnusedTiles: remainingUnusedTiles,
+          cycleCompleted: true,
+          cycleConnection: usedTiles[0]
+        };
+      } else {
+        console.log('\n독립 그룹 시작을 건너뜁니다. 타일 선택이 완료되었습니다.');
+      }
+    } else {
+      console.log('모든 타일이 사용되었습니다.');
+    }
+    
     console.log('타일 선택이 완료되었습니다.');
     console.log('='.repeat(60) + '\n');
     
@@ -1104,10 +1151,181 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
     // 그룹핑 및 끝점 처리 (새 그룹 시작 로직 포함)
     let result = await handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers);
     
-    // 새 그룹을 시작해야 하는 경우
-    while (result.shouldContinue && result.newGroupStart) {
-      console.log('\n새 그룹을 시작합니다.');
-      console.log('='.repeat(60));
+    // 독립 그룹 시작 또는 연결된 새 그룹 시작
+    while (result.shouldContinue) {
+      // 독립 그룹 시작 (사이클 완성 후 unused 타일이 있는 경우)
+      if (result.isIndependentGroup) {
+        console.log('\n🆕 독립적인 새 그룹을 시작합니다.');
+        console.log('='.repeat(60));
+        
+        // 모든 타일(used 포함)을 후보로 제시
+        const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+        const allCandidates = allPlacements.map(p => ({ r: p.r, c: p.c }));
+        
+        console.log(`총 ${allCandidates.length}개의 타일 중에서 시작 타일을 선택하세요 (used 타일도 선택 가능).`);
+        
+        // 사용자에게 시작 타일 선택 요청
+        const startTileAnswer = await new Promise((resolve) => {
+          if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+            window.showInputSection(true);
+          }
+          if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
+            // 모든 타일을 후보로 표시
+            const candidatesWithAngles = allCandidates.map(cand => {
+              return { ...cand, angle: 0, diff: null, isPreferred: true };
+            });
+            window.updateTileOptions([], tiles, tiles.length - 1, centers, k, null, candidatesWithAngles, false);
+          }
+          userInputResolver = (value) => { 
+            if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+              window.showInputSection(false);
+            }
+            resolve(value); 
+          };
+        });
+        
+        const startTileAnswerStr = String(startTileAnswer).toLowerCase();
+        if (startTileAnswerStr === 'stop') {
+          console.log('독립 그룹 시작을 중단합니다.');
+          break;
+        }
+        
+        const startTileChoice = parseInt(startTileAnswer, 10);
+        if (Number.isNaN(startTileChoice) || startTileChoice < 0 || startTileChoice >= allCandidates.length) {
+          console.log('잘못된 선택입니다. 독립 그룹 시작을 중단합니다.');
+          break;
+        }
+        
+        const selectedStartTile = allCandidates[startTileChoice];
+        console.log(`독립 그룹 시작 타일: (${selectedStartTile.r}, ${selectedStartTile.c})`);
+        
+        // 새 그룹 생성
+        const newGroup = {
+          tiles: [selectedStartTile],
+          angles: [],
+          avgAngle: null,
+          endpoint: null
+        };
+        result.groups.push(newGroup);
+        
+        console.log(`새 그룹 ${result.groups.length}이(가) 생성되었습니다.`);
+        
+        // 시작 타일을 현재 타일로 설정
+        const startTileIdx = tiles.findIndex(t => t.r === selectedStartTile.r && t.c === selectedStartTile.c);
+        if (startTileIdx !== -1) {
+          cur = startTileIdx;
+        } else {
+          // 타일이 tiles 배열에 없으면 추가
+          tiles.push(selectedStartTile);
+          centers.push(tileCenter(selectedStartTile, k));
+          orderIdx.push(tiles.length - 1);
+          cur = tiles.length - 1;
+        }
+        
+        // prevAngle 초기화 (새 독립 그룹이므로)
+        prevAngle = null;
+        
+        // 그룹 정보 표시
+        printTileGroups(result.groups, k);
+        
+        // HTML에 업데이트된 그룹 정보 전달
+        if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+          const groupsForDisplay = formatGroupsForDisplay(result.groups);
+          window.displayTileGroups(groupsForDisplay);
+        }
+        
+        console.log('\n타일 선택을 계속합니다...');
+        console.log('='.repeat(60) + '\n');
+        
+        // 새 독립 그룹에서 타일 선택 시작
+        const currentGroup = result.groups[result.groups.length - 1];
+        
+        while (true) {
+          const currentOrderedTiles = orderIdx.map(i => tiles[i]);
+          const adjacentCandidates = getAdjacentTileCandidates(tiles[cur], k, grid, currentOrderedTiles);
+          
+          if (adjacentCandidates.length === 0) {
+            console.log(`No more adjacent tiles available. ${orderIdx.length} tiles selected.`);
+            if (typeof window !== 'undefined') {
+              window.autoSelectMode = false;
+              window.autoSelectAngleMode = false;
+            }
+            break;
+          }
+
+          let answer = await tryAutoSelectTile(adjacentCandidates, tiles, cur, centers, k, prevAngle);
+          if (answer === null) {
+            answer = await askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngle);
+          }
+
+          const answerStr = String(answer).toLowerCase();
+          if (answerStr === 'refresh') {
+            console.log(`Refreshing tile selection after removal...`);
+            continue;
+          }
+          
+          if (answerStr === 'stop') {
+            console.log(`Stopped at tile ${orderIdx.length}.`);
+            generateAndCopyResultImage(grid, tiles, orderIdx, k);
+            break;
+          }
+          
+          const choice = parseInt(answer, 10);
+          if (Number.isNaN(choice) || choice < 0 || choice >= adjacentCandidates.length) {
+            console.log('Invalid selection. Please select a valid tile.');
+            continue;
+          }
+          
+          const selectedTile = adjacentCandidates[choice];
+          console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+          
+          const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
+          const newAngle = angleDegCart(centers[cur], centers[nxt]);
+          
+          if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
+            console.log(`Warning: Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
+          }
+
+          cur = nxt;
+          
+          // 현재 그룹에 타일 추가
+          currentGroup.tiles.push(selectedTile);
+          if (currentGroup.tiles.length >= 2) {
+            currentGroup.angles.push(newAngle);
+            currentGroup.avgAngle = currentGroup.angles.reduce((sum, a) => sum + a, 0) / currentGroup.angles.length;
+          }
+          
+          if (orderIdx.length >= 2) {
+            prevAngle = newAngle;
+            if (orderIdx.length === 2 && currentGroup.tiles.length === 2) {
+              console.log(`Direction established: ${prevAngle.toFixed(1)}° ${arrowFromAngle(prevAngle)} (after 2 tiles selected)`);
+            }
+          }
+
+          const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
+          printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} --`);
+          
+          if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+            window.updateTilePath(updatedOrderedTiles);
+          }
+        }
+        
+        // 독립 그룹의 타일 선택 완료 후 끝점 선택
+        const newFinalOrderedTiles = orderIdx.map(i => tiles[i]);
+        console.log(`All ${orderIdx.length} tiles selected for independent group.`);
+        printPlacementAscii(grid, newFinalOrderedTiles, k, '-- Independent Group Final --');
+        
+        if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+          window.updateTilePath(newFinalOrderedTiles);
+        }
+        
+        // 다시 끝점 선택 및 새 그룹 확인 (기존 그룹 보존)
+        result = await handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, result.groups);
+      }
+      // 연결된 새 그룹 시작 (기존 로직)
+      else if (result.newGroupStart) {
+        console.log('\n새 그룹을 시작합니다.');
+        console.log('='.repeat(60));
       
       // 새 그룹 생성 (끝점을 첫 타일로)
       const newGroup = {
@@ -1230,8 +1448,9 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         window.updateTilePath(newFinalOrderedTiles);
       }
       
-      // 다시 끝점 선택 및 새 그룹 확인
-      result = await handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers);
+      // 다시 끝점 선택 및 새 그룹 확인 (기존 그룹 보존)
+      result = await handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, result.groups);
+      }
     }
 
     return {
