@@ -771,6 +771,15 @@
                         if (result?.orderedTiles) {
                             console.log("Tile selection completed. Final tiles:", result.orderedTiles.map(t => `(${t.r},${t.c})`).join(" "));
                             
+                            // 사이클 완성 여부 확인
+                            if (result.cycleCompleted) {
+                                console.log("\n🔄 사이클 완성!");
+                                console.log(`마지막 그룹이 이전 타일과 연결되어 사이클을 형성했습니다.`);
+                                if (result.cycleConnection) {
+                                    console.log(`연결된 타일: (${result.cycleConnection.r}, ${result.cycleConnection.c})`);
+                                }
+                            }
+                            
                             // TileResultManager에 결과 저장
                             TileResultManager.save(result);
                             

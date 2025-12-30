@@ -544,7 +544,7 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
  * @param {Array<Object>} existingTiles - 이미 선택(배치)된 타일들의 배열. 각 객체는 {r, c}를 가짐
  * @returns {Array<Object>} adjacent - 아직 선택되지 않았으면서 currentTile과 인접한 타일들의 배열. 각 객체는 {r, c}
  */
-function getAdjacentTileCandidates(currentTile, k, grid, existingTiles) {
+function getAdjacentTileCandidates(currentTile, k, grid, existingTiles, allowUsedTiles = false) {
   const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
   if (!allPlacements || allPlacements.length === 0) return [];
   
@@ -554,14 +554,17 @@ function getAdjacentTileCandidates(currentTile, k, grid, existingTiles) {
   
   // placements에서 현재 타일과 인접한 타일 찾기
   for (const p of allPlacements) {
-    // 이미 선택된 타일인지 확인
-    const alreadySelected = existingTiles.some(t => t.r === p.r && t.c === p.c);
-    if (alreadySelected) continue;
-    
-    // 기존에 선택된 타일들과 겹치는지 확인
-    const overlapsWithExisting = existingTiles.some(t => tilesOverlap(t, { r: p.r, c: p.c }, k));
-    if (overlapsWithExisting) {
-      continue;
+    // allowUsedTiles가 false인 경우에만 이미 선택된 타일 제외
+    if (!allowUsedTiles) {
+      // 이미 선택된 타일인지 확인
+      const alreadySelected = existingTiles.some(t => t.r === p.r && t.c === p.c);
+      if (alreadySelected) continue;
+      
+      // 기존에 선택된 타일들과 겹치는지 확인
+      const overlapsWithExisting = existingTiles.some(t => tilesOverlap(t, { r: p.r, c: p.c }, k));
+      if (overlapsWithExisting) {
+        continue;
+      }
     }
     
     // 인접성 체크
@@ -705,20 +708,66 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
     window.displayTileGroups(groupsForDisplay);
   }
   
-  // 끝점 주변에 더 추가할 만한 타일이 있는지 확인
+  // 끝점 주변에 더 추가할 만한 타일이 있는지 확인 (사이클 완성 가능)
   console.log('\n' + '='.repeat(60));
-  console.log('끝점 주변 미사용 타일 확인');
+  console.log('끝점 주변 인접 타일 확인 (사이클 감지)');
   console.log('='.repeat(60));
   
   // 현재까지 선택된 모든 타일 목록
   const currentOrderedTiles = orderIdx.map(i => tiles[i]);
   
-  // 끝점에서 인접한 미사용 타일 찾기
-  const adjacentFromEndpoint = getAdjacentTileCandidates(selectedEndpoint, k, grid, currentOrderedTiles);
+  // 끝점에서 인접한 타일 찾기 (이미 사용된 타일도 포함하여 사이클 감지)
+  const adjacentFromEndpoint = getAdjacentTileCandidates(selectedEndpoint, k, grid, currentOrderedTiles, true);
   
-  if (adjacentFromEndpoint.length > 0) {
-    console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 ${adjacentFromEndpoint.length}개의 미사용 인접 타일이 있습니다:`);
-    adjacentFromEndpoint.forEach((tile, idx) => {
+  // 인접 타일을 미사용 타일과 사용된 타일로 분리
+  const usedTiles = adjacentFromEndpoint.filter(tile => 
+    currentOrderedTiles.some(t => t.r === tile.r && t.c === tile.c)
+  );
+  const unusedTiles = adjacentFromEndpoint.filter(tile => 
+    !currentOrderedTiles.some(t => t.r === tile.r && t.c === tile.c)
+  );
+  
+  // 사이클 완성 가능한 경우 (이미 사용된 타일과 인접)
+  if (usedTiles.length > 0) {
+    console.log(`🔄 사이클 완성 가능!`);
+    console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 ${usedTiles.length}개의 이미 사용된 타일이 인접해 있습니다:`);
+    usedTiles.forEach((tile, idx) => {
+      const tileCenter_endpoint = tileCenter(selectedEndpoint, k);
+      const tileCenter_adjacent = tileCenter(tile, k);
+      const angle = angleDegCart(tileCenter_endpoint, tileCenter_adjacent);
+      const arrow = arrowFromAngle(angle);
+      
+      // 어느 그룹의 타일인지 찾기
+      let groupInfo = '';
+      for (let gIdx = 0; gIdx < groups.length; gIdx++) {
+        const foundInGroup = groups[gIdx].tiles.some(t => t.r === tile.r && t.c === tile.c);
+        if (foundInGroup) {
+          groupInfo = ` (그룹 ${gIdx + 1}의 타일)`;
+          break;
+        }
+      }
+      
+      console.log(`  ${idx}. (${tile.r}, ${tile.c}) - ${angle.toFixed(1)}° ${arrow}${groupInfo}`);
+    });
+    
+    // 사이클 완성으로 종료
+    console.log('\n✅ 사이클이 완성되었습니다!');
+    console.log(`마지막 그룹의 끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c})이(가) 이미 사용된 타일과 연결됩니다.`);
+    console.log('타일 선택이 완료되었습니다.');
+    console.log('='.repeat(60) + '\n');
+    
+    return {
+      groups,
+      shouldContinue: false,
+      cycleCompleted: true,
+      cycleConnection: usedTiles[0] // 첫 번째 연결 타일 정보
+    };
+  }
+  
+  // 미사용 타일만 있는 경우 (새 그룹 시작 가능)
+  if (unusedTiles.length > 0) {
+    console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 ${unusedTiles.length}개의 미사용 인접 타일이 있습니다:`);
+    unusedTiles.forEach((tile, idx) => {
       const tileCenter_endpoint = tileCenter(selectedEndpoint, k);
       const tileCenter_adjacent = tileCenter(tile, k);
       const angle = angleDegCart(tileCenter_endpoint, tileCenter_adjacent);
@@ -730,7 +779,7 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
     // 사용자에게 새 그룹 시작 여부 확인
     const continueAnswer = await new Promise((resolve) => {
       if (typeof window !== 'undefined' && typeof window.showNewGroupPrompt === 'function') {
-        window.showNewGroupPrompt(adjacentFromEndpoint.length, (answer) => {
+        window.showNewGroupPrompt(unusedTiles.length, (answer) => {
           resolve(answer);
         });
       } else {
@@ -744,7 +793,7 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
         groups,
         shouldContinue: true,
         newGroupStart: selectedEndpoint,
-        adjacentTiles: adjacentFromEndpoint
+        adjacentTiles: unusedTiles
       };
     } else {
       console.log('\n새 그룹 시작을 건너뜁니다. 타일 선택이 완료되었습니다.');
@@ -1188,6 +1237,8 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
     return {
       orderedTiles: orderIdx.map(i => tiles[i]),
       groups: result.groups,
+      cycleCompleted: result.cycleCompleted || false,
+      cycleConnection: result.cycleConnection || null,
       state: { orderIdx, cur, prevAngle, centers, tiles, k, nextRule, maxAngleDiff, grid }
     };
   }
