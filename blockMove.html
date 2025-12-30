@@ -66,9 +66,8 @@
     </style>
 </head>
 <body>
-    <h1>Block Move Solver Output</h1>
+    <h1>Block Move Solver Output <span style="font-size: 0.6em; color: #888;">(CTRL-V)</span></h1>
     <div id="inputCanvasContainer" style="margin-bottom: 20px;">
-        <p>이미지를 붙여넣으려면 아래 캔버스에 CTRL-V를 사용하세요:</p>
         <canvas id="inputCanvas" width="400" height="400" style="border: 1px solid #444;"></canvas>
         <div style="margin-top: 10px;">
             <label for="gridSizeSelect">표시 영역 크기:</label>
@@ -466,7 +465,10 @@
             
             // 인접 타일 추가
             if (adjacentCandidates?.length > 0) {
-                adjacentCandidates.forEach((adjTile, index) => {
+                const maxDisplay = 10; // textarea에 표시할 최대 개수
+                const displayCount = Math.min(adjacentCandidates.length, maxDisplay);
+                
+                adjacentCandidates.slice(0, displayCount).forEach((adjTile, index) => {
                     let text = `${index}. (${adjTile.r}, ${adjTile.c})`;
                     let angleInfo = '';
                     
@@ -489,6 +491,25 @@
                     
                     // textarea에 추가
                     textareaInfo += `  ${text}\n`;
+                });
+                
+                // 10개 이상이면 생략 표시
+                if (adjacentCandidates.length > maxDisplay) {
+                    textareaInfo += `  ... (${adjacentCandidates.length - maxDisplay}개 더 있음, 아래 선택창에서 확인)\n`;
+                }
+                
+                // select 옵션은 모두 생성 (생략 없이)
+                adjacentCandidates.forEach((adjTile, index) => {
+                    let angleInfo = '';
+                    
+                    // 각도 정보가 있으면 추가
+                    if (adjTile.angle !== undefined) {
+                        const arrow = getArrowFromAngle(adjTile.angle);
+                        angleInfo = ` - ${adjTile.angle.toFixed(1)}° ${arrow}`;
+                        if (adjTile.diff !== null && adjTile.diff !== undefined) {
+                            angleInfo += ` (Δ${adjTile.diff.toFixed(1)}°)`;
+                        }
+                    }
                     
                     // select 옵션 생성
                     const displayText = `${index}. (${adjTile.r}, ${adjTile.c})${angleInfo}`;
