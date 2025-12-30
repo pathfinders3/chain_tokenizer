@@ -1370,6 +1370,12 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
           if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
             window.updateTilePath(updatedOrderedTiles);
           }
+          
+          // 그룹 정보 실시간 갱신
+          if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+            const groupsForDisplay = formatGroupsForDisplay(result.groups);
+            window.displayTileGroups(groupsForDisplay);
+          }
         }
         
         // 독립 그룹의 타일 선택 완료 후 끝점 선택
@@ -1498,6 +1504,12 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         
         if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
           window.updateTilePath(updatedOrderedTiles);
+        }
+        
+        // 그룹 정보 실시간 갱신
+        if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+          const groupsForDisplay = formatGroupsForDisplay(result.groups);
+          window.displayTileGroups(groupsForDisplay);
         }
       }
       
