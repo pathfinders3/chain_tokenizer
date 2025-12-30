@@ -642,12 +642,15 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, exis
     return { groups, shouldContinue: false };
   }
 
-  // 모든 가능한 배치를 후보로 제시 (사용된 것도 포함)
-  const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
-  const allCandidates = allPlacements.map(p => ({ r: p.r, c: p.c }));
+  // 마지막 그룹의 마지막 타일과 인접한 타일들만 끝점 후보로 제시
+  const lastTileInGroup = lastGroup.tiles[lastGroup.tiles.length - 1];
+  const currentOrderedTiles = orderIdx.map(i => tiles[i]);
+  
+  // 인접한 타일 찾기 (사용된 타일도 포함하여 사이클 감지 가능)
+  const allCandidates = getAdjacentTileCandidates(lastTileInGroup, k, grid, currentOrderedTiles, true);
   
   console.log(`마지막 그룹의 현재 타일 수: ${lastGroup.tiles.length}`);
-  console.log(`끝점으로 추가할 타일을 선택하세요 (사용된 타일도 선택 가능).`);
+  console.log(`마지막 타일 (${lastTileInGroup.r}, ${lastTileInGroup.c})와 인접한 타일 ${allCandidates.length}개를 끝점 후보로 표시합니다.`);
   
   // 사용자에게 타일 선택 요청 (used 상태 무시)
   const endpointAnswer = await new Promise((resolve) => {
@@ -720,9 +723,6 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, exis
   console.log('\n' + '='.repeat(60));
   console.log('끝점 주변 인접 타일 확인 (사이클 감지)');
   console.log('='.repeat(60));
-  
-  // 현재까지 선택된 모든 타일 목록
-  const currentOrderedTiles = orderIdx.map(i => tiles[i]);
   
   // 끝점에서 인접한 타일 찾기 (이미 사용된 타일도 포함하여 사이클 감지)
   const adjacentFromEndpoint = getAdjacentTileCandidates(selectedEndpoint, k, grid, currentOrderedTiles, true);
