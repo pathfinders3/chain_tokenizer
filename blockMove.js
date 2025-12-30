@@ -577,6 +577,38 @@ function getAdjacentTileCandidates(currentTile, k, grid, existingTiles, allowUse
 }
 
 /**
+ * 모든 타일 중에서 동/서/남/북 가장 외곽에 있는 타일들을 찾는 함수
+ * @param {Array<Object>} allTiles - 모든 타일들의 배열. 각 객체는 {r, c}를 가짐
+ * @returns {Array<Object>} outermost - 가장 외곽의 타일들 (중복 제거됨)
+ */
+function getOutermostTiles(allTiles) {
+  if (!allTiles || allTiles.length === 0) return [];
+  
+  // 동/서/남/북 방향의 최대/최소값 찾기
+  let minR = Infinity, maxR = -Infinity;
+  let minC = Infinity, maxC = -Infinity;
+  
+  for (const tile of allTiles) {
+    if (tile.r < minR) minR = tile.r;
+    if (tile.r > maxR) maxR = tile.r;
+    if (tile.c < minC) minC = tile.c;
+    if (tile.c > maxC) maxC = tile.c;
+  }
+  
+  // 외곽 타일 수집 (중복 제거를 위해 Set 사용)
+  const outermostSet = new Set();
+  
+  for (const tile of allTiles) {
+    if (tile.r === minR || tile.r === maxR || tile.c === minC || tile.c === maxC) {
+      outermostSet.add(JSON.stringify({r: tile.r, c: tile.c}));
+    }
+  }
+  
+  // Set을 배열로 변환
+  return Array.from(outermostSet).map(str => JSON.parse(str));
+}
+
+/**
  * 사용자에게 다음 타일 선택을 요청하는 함수
  */
 function askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngle) {
@@ -1158,11 +1190,32 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         console.log('\n🆕 독립적인 새 그룹을 시작합니다.');
         console.log('='.repeat(60));
         
-        // 모든 타일(used 포함)을 후보로 제시
+        // 모든 타일 배치 가져오기
         const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
-        const allCandidates = allPlacements.map(p => ({ r: p.r, c: p.c }));
+        const allTiles = allPlacements.map(p => ({ r: p.r, c: p.c }));
         
-        console.log(`총 ${allCandidates.length}개의 타일 중에서 시작 타일을 선택하세요 (used 타일도 선택 가능).`);
+        // 현재까지 선택된 타일 목록
+        const currentOrderedTiles = orderIdx.map(i => tiles[i]);
+        
+        // used 타일만 필터링
+        const usedTiles = allTiles.filter(tile => 
+          currentOrderedTiles.some(t => t.r === tile.r && t.c === tile.c)
+        );
+        
+        // unused 타일 중에서 동/서/남/북 가장 외곽 타일 찾기
+        const unusedTiles = allTiles.filter(tile => 
+          !currentOrderedTiles.some(t => t.r === tile.r && t.c === tile.c)
+        );
+        const outermostTiles = getOutermostTiles(unusedTiles);
+        
+        // used 타일 + 외곽 타일을 후보로 제시 (중복 제거)
+        const candidateSet = new Set();
+        [...usedTiles, ...outermostTiles].forEach(tile => {
+          candidateSet.add(JSON.stringify({r: tile.r, c: tile.c}));
+        });
+        const allCandidates = Array.from(candidateSet).map(str => JSON.parse(str));
+        
+        console.log(`Used 타일 ${usedTiles.length}개 + 외곽 타일 ${outermostTiles.length}개 = 총 ${allCandidates.length}개 타일 중에서 시작 타일을 선택하세요.`);
         
         // 사용자에게 시작 타일 선택 요청
         const startTileAnswer = await new Promise((resolve) => {
@@ -1170,9 +1223,18 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
             window.showInputSection(true);
           }
           if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
-            // 모든 타일을 후보로 표시
+            // 타일별로 used/outermost 여부를 표시
             const candidatesWithAngles = allCandidates.map(cand => {
-              return { ...cand, angle: 0, diff: null, isPreferred: true };
+              const isUsed = usedTiles.some(t => t.r === cand.r && t.c === cand.c);
+              const isOutermost = outermostTiles.some(t => t.r === cand.r && t.c === cand.c);
+              return { 
+                ...cand, 
+                angle: 0, 
+                diff: null, 
+                isPreferred: true,
+                isUsed: isUsed,
+                isOutermost: isOutermost
+              };
             });
             window.updateTileOptions([], tiles, tiles.length - 1, centers, k, null, candidatesWithAngles, false);
           }

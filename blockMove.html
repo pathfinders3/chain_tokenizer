@@ -511,9 +511,19 @@
                         }
                     }
                     
-                    // select 옵션 생성
+                    // select 옵션 생성 시 색상 결정
+                    let color = null;
+                    if (isEndpointMode) {
+                        color = '#ff00ff';  // 끝점 선택 모드는 Magenta
+                    } else if (adjTile.isUsed) {
+                        color = '#808080';  // Used 타일은 회색
+                    } else if (adjTile.isOutermost) {
+                        color = '#ff00ff';  // 외곽 타일은 Magenta
+                    } else if (adjTile.isPreferred) {
+                        color = '#00ff00';  // 일반 선호 타일은 녹색
+                    }
+                    
                     const displayText = `${index}. (${adjTile.r}, ${adjTile.c})${angleInfo}`;
-                    const color = isEndpointMode ? '#ff00ff' : (adjTile.isPreferred ? '#00ff00' : null);
                     tileSelect.appendChild(createTileOption(index, displayText, color));
                 });
                 
