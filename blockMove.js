@@ -535,6 +535,303 @@ function getCandidateInfo(curIdx, candidateIdx, centers, tiles, k, prevAngle) {
     return !noOverlap;
   }
 
+/**
+ * 가능한 전체 배치 중에서 현재 타일과 인접해 있으면서 아직 사용되지 않은 타일 후보들을 반환한다.
+ *
+ * @param {Object} currentTile - 기준이 되는 현재 타일. {r: row index, c: column index}
+ * @param {number} k - 타일의 한 변의 크기(한 타일의 높이와 너비)
+ * @param {Array<Array<any>>} grid - 전체 퍼즐 그리드(2차원 배열, 높이 x 너비)
+ * @param {Array<Object>} existingTiles - 이미 선택(배치)된 타일들의 배열. 각 객체는 {r, c}를 가짐
+ * @returns {Array<Object>} adjacent - 아직 선택되지 않았으면서 currentTile과 인접한 타일들의 배열. 각 객체는 {r, c}
+ */
+function getAdjacentTileCandidates(currentTile, k, grid, existingTiles) {
+  const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+  if (!allPlacements || allPlacements.length === 0) return [];
+  
+  const adjacent = [];
+  const H = grid.length;
+  const W = grid[0].length;
+  
+  // placements에서 현재 타일과 인접한 타일 찾기
+  for (const p of allPlacements) {
+    // 이미 선택된 타일인지 확인
+    const alreadySelected = existingTiles.some(t => t.r === p.r && t.c === p.c);
+    if (alreadySelected) continue;
+    
+    // 기존에 선택된 타일들과 겹치는지 확인
+    const overlapsWithExisting = existingTiles.some(t => tilesOverlap(t, { r: p.r, c: p.c }, k));
+    if (overlapsWithExisting) {
+      continue;
+    }
+    
+    // 인접성 체크
+    if (areTilesAdjacent(currentTile, { r: p.r, c: p.c }, k)) {
+      adjacent.push({ r: p.r, c: p.c });
+    }
+  }
+  
+  return adjacent;
+}
+
+/**
+ * 사용자에게 다음 타일 선택을 요청하는 함수
+ */
+function askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngle) {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+      window.showInputSection(true);
+    }
+    if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
+      // 각 후보에 대한 각도 정보 계산
+      const candidatesWithAngles = adjacentCandidates.map(cand => {
+        const candCenter = tileCenter(cand, k);
+        const angle = angleDegCart(centers[cur], candCenter);
+        const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
+        const isPreferred = (prevAngle !== null) && (diff <= 45);
+        return { ...cand, angle, diff, isPreferred };
+      });
+      window.updateTileOptions([], tiles, cur, centers, k, prevAngle, candidatesWithAngles);
+    }
+    userInputResolver = (value) => { 
+      if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+        window.showInputSection(false);
+      }
+      resolve(value); 
+    };
+  });
+}
+
+
+/**
+ * 그룹핑 수행 및 끝점 선택 처리
+ * 끝점 주변에 미사용 타일이 있으면 새 그룹 시작 여부를 사용자에게 묻고 처리
+ */
+async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers) {
+  const finalOrderedTiles = orderIdx.map(i => tiles[i]);
+  
+  // 타일 선택 완료 후 자동으로 그룹핑 수행
+  const angleThreshold = (typeof window !== 'undefined' && window.groupingAngleThreshold) 
+    ? window.groupingAngleThreshold 
+    : 45;
+  
+  const groups = groupTilesByAngle(finalOrderedTiles, k, angleThreshold);
+  printTileGroups(groups, k);
+  
+  // HTML에 그룹 정보 전달
+  if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+    const groupsForDisplay = formatGroupsForDisplay(groups);
+    window.displayTileGroups(groupsForDisplay);
+  }
+
+  // 마지막 그룹에 끝점 추가하기 위한 사용자 입력
+  console.log('\n마지막 그룹에 끝점을 추가합니다.');
+  const lastGroup = groups.length > 0 ? groups[groups.length - 1] : null;
+  
+  if (!lastGroup) {
+    return { groups, shouldContinue: false };
+  }
+
+  // 모든 가능한 배치를 후보로 제시 (사용된 것도 포함)
+  const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+  const allCandidates = allPlacements.map(p => ({ r: p.r, c: p.c }));
+  
+  console.log(`마지막 그룹의 현재 타일 수: ${lastGroup.tiles.length}`);
+  console.log(`끝점으로 추가할 타일을 선택하세요 (사용된 타일도 선택 가능).`);
+  
+  // 사용자에게 타일 선택 요청 (used 상태 무시)
+  const endpointAnswer = await new Promise((resolve) => {
+    if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+      window.showInputSection(true);
+    }
+    if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
+      // 모든 배치를 후보로 표시 (used 무시하고 모두 표시)
+      const candidatesWithAngles = allCandidates.map(cand => {
+        const candCenter = tileCenter(cand, k);
+        const lastTile = lastGroup.tiles[lastGroup.tiles.length - 1];
+        const lastTileCenter = tileCenter(lastTile, k);
+        const angle = angleDegCart(lastTileCenter, candCenter);
+        return { ...cand, angle, diff: null, isPreferred: true }; // 모두 선택 가능하도록 표시
+      });
+      window.updateTileOptions([], tiles, tiles.length - 1, centers, k, null, candidatesWithAngles, true); // true: 끝점 선택 모드
+    }
+    userInputResolver = (value) => { 
+      if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
+        window.showInputSection(false);
+      }
+      resolve(value); 
+    };
+  });
+  
+  const endpointAnswerStr = String(endpointAnswer).toLowerCase();
+  if (endpointAnswerStr === 'stop') {
+    console.log('끝점 추가를 건너뜁니다.');
+    return { groups, shouldContinue: false };
+  }
+
+  const endpointChoice = parseInt(endpointAnswer, 10);
+  if (Number.isNaN(endpointChoice) || endpointChoice < 0 || endpointChoice >= allCandidates.length) {
+    console.log('잘못된 선택입니다. 끝점 추가를 건너뜁니다.');
+    return { groups, shouldContinue: false };
+  }
+
+  const selectedEndpoint = allCandidates[endpointChoice];
+  console.log(`끝점으로 (${selectedEndpoint.r}, ${selectedEndpoint.c})를 선택했습니다.`);
+  
+  // 마지막 그룹의 tiles 배열에 끝점 추가
+  lastGroup.tiles.push(selectedEndpoint);
+  lastGroup.endpoint = selectedEndpoint; // 참조용으로도 저장
+  
+  // 마지막 타일에서 끝점까지의 각도 계산 및 추가
+  const lastTile = lastGroup.tiles[lastGroup.tiles.length - 2]; // 끝점 바로 직전 타일
+  const lastTileCenter = tileCenter(lastTile, k);
+  const endpointCenter = tileCenter(selectedEndpoint, k);
+  const finalAngle = angleDegCart(lastTileCenter, endpointCenter);
+  lastGroup.angles.push(finalAngle);
+  
+  // 평균 각도 재계산
+  if (lastGroup.angles.length > 0) {
+    lastGroup.avgAngle = lastGroup.angles.reduce((sum, a) => sum + a, 0) / lastGroup.angles.length;
+  }
+  
+  console.log(`마지막 그룹의 tiles 배열에 끝점이 추가되었습니다: (${selectedEndpoint.r}, ${selectedEndpoint.c})`);
+  console.log(`마지막 그룹 타일 수: ${lastGroup.tiles.length}개`);
+  
+  // 그룹 정보 다시 표시
+  printTileGroups(groups, k);
+  
+  // HTML에 업데이트된 그룹 정보 전달
+  if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+    const groupsForDisplay = formatGroupsForDisplay(groups);
+    window.displayTileGroups(groupsForDisplay);
+  }
+  
+  // 끝점 주변에 더 추가할 만한 타일이 있는지 확인
+  console.log('\n' + '='.repeat(60));
+  console.log('끝점 주변 미사용 타일 확인');
+  console.log('='.repeat(60));
+  
+  // 현재까지 선택된 모든 타일 목록
+  const currentOrderedTiles = orderIdx.map(i => tiles[i]);
+  
+  // 끝점에서 인접한 미사용 타일 찾기
+  const adjacentFromEndpoint = getAdjacentTileCandidates(selectedEndpoint, k, grid, currentOrderedTiles);
+  
+  if (adjacentFromEndpoint.length > 0) {
+    console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 ${adjacentFromEndpoint.length}개의 미사용 인접 타일이 있습니다:`);
+    adjacentFromEndpoint.forEach((tile, idx) => {
+      const tileCenter_endpoint = tileCenter(selectedEndpoint, k);
+      const tileCenter_adjacent = tileCenter(tile, k);
+      const angle = angleDegCart(tileCenter_endpoint, tileCenter_adjacent);
+      const arrow = arrowFromAngle(angle);
+      console.log(`  ${idx}. (${tile.r}, ${tile.c}) - ${angle.toFixed(1)}° ${arrow}`);
+    });
+    console.log('\n새 그룹을 시작하여 계속 선택할 수 있습니다.');
+    
+    // 사용자에게 새 그룹 시작 여부 확인
+    const continueAnswer = await new Promise((resolve) => {
+      if (typeof window !== 'undefined' && typeof window.showNewGroupPrompt === 'function') {
+        window.showNewGroupPrompt(adjacentFromEndpoint.length, (answer) => {
+          resolve(answer);
+        });
+      } else {
+        // 콘솔 환경에서는 자동으로 종료
+        resolve('stop');
+      }
+    });
+    
+    if (continueAnswer === 'continue') {
+      return {
+        groups,
+        shouldContinue: true,
+        newGroupStart: selectedEndpoint,
+        adjacentTiles: adjacentFromEndpoint
+      };
+    } else {
+      console.log('\n새 그룹 시작을 건너뜁니다. 타일 선택이 완료되었습니다.');
+    }
+  } else {
+    console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 미사용 인접 타일이 없습니다.`);
+    console.log('타일 선택이 완료되었습니다.');
+  }
+  console.log('='.repeat(60) + '\n');
+  
+  return { groups, shouldContinue: false };
+}
+
+/**
+ * 타일 선택 처리 - 선택된 타일을 tiles 배열에 추가하고 상태 업데이트
+ */
+function handleTileSelection(selectedTile, tiles, centers, orderIdx, k) {
+  let nxt;
+  const existingIdx = tiles.findIndex(t => t.r === selectedTile.r && t.c === selectedTile.c);
+  if (existingIdx !== -1) {
+    nxt = existingIdx;
+  } else {
+    tiles.push(selectedTile);
+    centers.push(tileCenter(selectedTile, k));
+    nxt = tiles.length - 1;
+  }
+  orderIdx.push(nxt);
+  return nxt;
+}
+
+/**
+ * 자동 선택 로직 - 자동선택 모드이면 타일을 자동으로 선택하고, 아니면 null 반환
+ */
+async function tryAutoSelectTile(adjacentCandidates, tiles, cur, centers, k, prevAngle) {
+  // 자동선택 모드이고 선택 가능한 타일이 정확히 1개인 경우
+  if (typeof window !== 'undefined' && window.autoSelectMode && adjacentCandidates.length === 1) {
+    console.log(`자동선택 모드: 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동으로 선택합니다.`);
+    return '0'; // 첫 번째(유일한) 타일 자동 선택
+  }
+  
+  // 각도 기준 자동선택 모드
+  if (typeof window !== 'undefined' && window.autoSelectAngleMode && adjacentCandidates.length > 0) {
+    // 각 후보에 대한 각도 정보 계산
+    const candidatesWithAngles = adjacentCandidates.map(cand => {
+      const candCenter = tileCenter(cand, k);
+      const angle = angleDegCart(centers[cur], candCenter);
+      const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
+      const isPreferred = (prevAngle !== null) && (diff <= 45);
+      return { ...cand, angle, diff, isPreferred };
+    });
+    
+    // preferred 타일들만 필터링
+    const preferredTiles = candidatesWithAngles.filter(t => t.isPreferred);
+    
+    if (preferredTiles.length > 0) {
+      // preferred 타일이 있음 -> 그 중 각도차가 최소인 타일 선택
+      let bestTile = preferredTiles[0];
+      let minDiff = bestTile.diff !== null ? bestTile.diff : Infinity;
+      
+      for (let i = 1; i < preferredTiles.length; i++) {
+        const currentDiff = preferredTiles[i].diff !== null ? preferredTiles[i].diff : Infinity;
+        if (currentDiff < minDiff) {
+          minDiff = currentDiff;
+          bestTile = preferredTiles[i];
+        }
+      }
+      
+      // 원래 candidatesWithAngles 배열에서의 인덱스 찾기
+      const selectedIndex = candidatesWithAngles.findIndex(t => t.r === bestTile.r && t.c === bestTile.c);
+      console.log(`각도 기준 자동선택: 각도차가 최소인 타일 (${bestTile.r}, ${bestTile.c})를 선택합니다. (각도차: ${minDiff.toFixed(1)}°, preferred 타일 ${preferredTiles.length}개 중 선택)`);
+      return String(selectedIndex);
+    } else {
+      // preferred 타일이 없음 -> 자동선택 중지
+      console.log(`각도 기준 자동선택 종료: 각도가 비슷한 타일(Δ≤45°)이 없습니다. 수동 선택을 기다립니다.`);
+      window.autoSelectAngleMode = false;
+      return null; // 수동 선택으로 전환
+    }
+  }
+  
+  // 자동선택 모드가 아니거나, 선택 가능한 타일이 2개 이상인 경우
+  if (typeof window !== 'undefined' && window.autoSelectMode && adjacentCandidates.length > 1) {
+    console.log(`자동선택 모드 종료: 선택 가능한 타일이 ${adjacentCandidates.length}개입니다.`);
+    window.autoSelectMode = false; // 자동선택 모드 해제
+  }
+  
+  return null; // 수동 선택 필요
+}
 
 function selectStartTile(tiles, startRule, customStartTile) {
     let startIdx = 0;
@@ -669,101 +966,6 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
     console.log(`Resuming tile ordering with original max angle difference: ${maxAngleDiff}°`);
   }
 
-  function logCandidates(adjacentCandidates, cur, prevAngle, centers, k) {
-    console.log(`\nCurrent tile: (${tiles[cur].r}, ${tiles[cur].c})`);
-    console.log(`prevAngle (시작/이전 각도): ${prevAngle !== null ? prevAngle.toFixed(1) + '°' : 'null'}`);
-    
-    if (adjacentCandidates.length > 0) {
-      console.log('Available adjacent tiles:');
-      adjacentCandidates.forEach((cand, index) => {
-        // 후보 타일의 중심 좌표 계산
-        const candCenter = tileCenter(cand, k);
-        const angle = angleDegCart(centers[cur], candCenter);
-        const arrow = arrowFromAngle(angle);
-        
-        // prevAngle과의 차이 계산
-        let angleInfo = `${angle.toFixed(1)}° ${arrow}`;
-        if (prevAngle !== null) {
-          const diff = angleDiff(prevAngle, angle);
-          console.log(`  DEBUG: 후보 ${index} - prevAngle=${prevAngle.toFixed(1)}°, angle=${angle.toFixed(1)}°, diff=${diff.toFixed(1)}°`);
-          const isPreferred = diff <= 45;
-          // 콘솔에서 녹색 표시 (ANSI 색상 코드)
-          const color = isPreferred ? '\x1b[32m' : '\x1b[0m'; // 녹색 또는 기본색
-          const reset = '\x1b[0m';
-          angleInfo = `${color}${angle.toFixed(1)}° ${arrow} (Δ${diff.toFixed(1)}°)${reset}`;
-        }
-        
-        console.log(`  ${index}. (${cand.r}, ${cand.c}) - ${angleInfo}`);
-      });
-    } else {
-      console.log('No adjacent tiles available.');
-    }
-  }
-
-  function askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k) {
-    return new Promise((resolve) => {
-      // logCandidates(adjacentCandidates, cur, prevAngle, centers, k);
-      if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
-        window.showInputSection(true);
-      }
-      if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
-        // 각 후보에 대한 각도 정보 계산
-        const candidatesWithAngles = adjacentCandidates.map(cand => {
-          const candCenter = tileCenter(cand, k);
-          const angle = angleDegCart(centers[cur], candCenter);
-          const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
-          const isPreferred = (prevAngle !== null) && (diff <= 45);
-          return { ...cand, angle, diff, isPreferred };
-        });
-        window.updateTileOptions([], tiles, cur, centers, k, prevAngle, candidatesWithAngles);
-      }
-      userInputResolver = (value) => { 
-        if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
-          window.showInputSection(false);
-        }
-        resolve(value); 
-      };
-    });
-  }
-
- /**
- * 가능한 전체 배치 중에서 현재 타일과 인접해 있으면서 아직 사용되지 않은 타일 후보들을 반환한다.
- *
- * @param {Object} currentTile - 기준이 되는 현재 타일. {r: row index, c: column index}
- * @param {number} k - 타일의 한 변의 크기(한 타일의 높이와 너비)
- * @param {Array<Array<any>>} grid - 전체 퍼즐 그리드(2차원 배열, 높이 x 너비)
- * @param {Array<Object>} existingTiles - 이미 선택(배치)된 타일들의 배열. 각 객체는 {r, c}를 가짐
- * @returns {Array<Object>} adjacent - 아직 선택되지 않았으면서 currentTile과 인접한 타일들의 배열. 각 객체는 {r, c}
- */
-  function getAdjacentTileCandidates(currentTile, k, grid, existingTiles) {
-    const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
-    if (!allPlacements || allPlacements.length === 0) return [];
-    
-    const adjacent = [];
-    const H = grid.length;
-    const W = grid[0].length;
-    
-    // placements에서 현재 타일과 인접한 타일 찾기
-    for (const p of allPlacements) {
-      // 이미 선택된 타일인지 확인
-      const alreadySelected = existingTiles.some(t => t.r === p.r && t.c === p.c);
-      if (alreadySelected) continue;
-      
-      // 기존에 선택된 타일들과 겹치는지 확인
-      const overlapsWithExisting = existingTiles.some(t => tilesOverlap(t, { r: p.r, c: p.c }, k));
-      if (overlapsWithExisting) {
-        continue;
-      }
-      
-      // 인접성 체크
-      if (areTilesAdjacent(currentTile, { r: p.r, c: p.c }, k)) {
-        adjacent.push({ r: p.r, c: p.c });
-      }
-    }
-    
-    return adjacent;
-  }
-
   async function processNextTile() {
     while (true) {
       const currentOrderedTiles = orderIdx.map(i => tiles[i]);
@@ -780,58 +982,13 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       }
 
       let answer;
-      // 자동선택 모드이고 선택 가능한 타일이 정확히 1개인 경우 자동 선택
-      if (typeof window !== 'undefined' && window.autoSelectMode && adjacentCandidates.length === 1) {
-        answer = '0'; // 첫 번째(유일한) 타일 자동 선택
-        console.log(`자동선택 모드: 타일 (${adjacentCandidates[0].r}, ${adjacentCandidates[0].c})를 자동으로 선택합니다.`);
-      } 
-      // 각도 기준 자동선택 모드: preferred 타일 중 각도차가 최소인 타일을 자동 선택
-      else if (typeof window !== 'undefined' && window.autoSelectAngleMode && adjacentCandidates.length > 0) {
-        // 각 후보에 대한 각도 정보 계산
-        const candidatesWithAngles = adjacentCandidates.map(cand => {
-          const candCenter = tileCenter(cand, k);
-          const angle = angleDegCart(centers[cur], candCenter);
-          const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
-          const isPreferred = (prevAngle !== null) && (diff <= 45);
-          return { ...cand, angle, diff, isPreferred };
-        });
-        
-        // preferred 타일들만 필터링
-        const preferredTiles = candidatesWithAngles.filter(t => t.isPreferred);
-        
-        if (preferredTiles.length > 0) {
-          // preferred 타일이 있음 -> 그 중 각도차가 최소인 타일 선택
-          let bestTile = preferredTiles[0];
-          let minDiff = bestTile.diff !== null ? bestTile.diff : Infinity;
-          
-          for (let i = 1; i < preferredTiles.length; i++) {
-            const currentDiff = preferredTiles[i].diff !== null ? preferredTiles[i].diff : Infinity;
-            if (currentDiff < minDiff) {
-              minDiff = currentDiff;
-              bestTile = preferredTiles[i];
-            }
-          }
-          
-          // 원래 candidatesWithAngles 배열에서의 인덱스 찾기
-          const selectedIndex = candidatesWithAngles.findIndex(t => t.r === bestTile.r && t.c === bestTile.c);
-          answer = String(selectedIndex);
-          console.log(`각도 기준 자동선택: 각도차가 최소인 타일 (${bestTile.r}, ${bestTile.c})를 선택합니다. (각도차: ${minDiff.toFixed(1)}°, preferred 타일 ${preferredTiles.length}개 중 선택)`);
-        } else {
-          // preferred 타일이 없음 -> 자동선택 중지
-          console.log(`각도 기준 자동선택 종료: 각도가 비슷한 타일(Δ≤45°)이 없습니다. 수동 선택을 기다립니다.`);
-          window.autoSelectAngleMode = false;
-          answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
-        }
-      } 
-      else {
-        // 자동선택 모드가 아니거나, 선택 가능한 타일이 0개 또는 2개 이상인 경우 수동 선택
-        if (typeof window !== 'undefined' && window.autoSelectMode) {
-          console.log(`자동선택 모드 종료: 선택 가능한 타일이 ${adjacentCandidates.length}개입니다.`);
-          window.autoSelectMode = false; // 자동선택 모드 해제
-        }
-        answer = await askUserForNextTile(adjacentCandidates, cur, prevAngle, centers, k);
+      // 자동 선택 시도
+      answer = await tryAutoSelectTile(adjacentCandidates, tiles, cur, centers, k, prevAngle);
+      
+      // 자동 선택되지 않았으면 수동 선택
+      if (answer === null) {
+        answer = await askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngle);
       }
-      let nxt = null;
 
       const answerStr = String(answer).toLowerCase();
       // console.log(`User input received: "${answer}" (type: ${typeof answer})`);
@@ -859,22 +1016,14 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       const selectedTile = adjacentCandidates[choice];
       console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
       
-      // 선택된 타일을 tiles 배열에 추가하고 인덱스를 얻음
-      const existingIdx = tiles.findIndex(t => t.r === selectedTile.r && t.c === selectedTile.c);
-      if (existingIdx !== -1) {
-        nxt = existingIdx;
-      } else {
-        tiles.push(selectedTile);
-        centers.push(tileCenter(selectedTile, k));
-        nxt = tiles.length - 1;
-      }
+      // 타일 선택 처리
+      const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
 
       const newAngle = angleDegCart(centers[cur], centers[nxt]);
       if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
         console.log(`Warning: Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
       }
 
-      orderIdx.push(nxt);
       cur = nxt;
       
       // 2개 이상의 타일이 있을 때만 prevAngle 업데이트 (방향 결정)
@@ -903,128 +1052,142 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       window.updateTilePath(finalOrderedTiles);
     }
 
-    // 타일 선택 완료 후 자동으로 그룹핑 수행
-    const angleThreshold = (typeof window !== 'undefined' && window.groupingAngleThreshold) 
-      ? window.groupingAngleThreshold 
-      : 45;
+    // 그룹핑 및 끝점 처리 (새 그룹 시작 로직 포함)
+    let result = await handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers);
     
-    const groups = groupTilesByAngle(finalOrderedTiles, k, angleThreshold);
-    printTileGroups(groups, k);
-    
-    // HTML에 그룹 정보 전달
-    if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
-      const groupsForDisplay = formatGroupsForDisplay(groups);
-      window.displayTileGroups(groupsForDisplay);
-    }
-
-    // 마지막 그룹에 끝점 추가하기 위한 사용자 입력
-    console.log('\n마지막 그룹에 끝점을 추가합니다.');
-    const lastGroup = groups.length > 0 ? groups[groups.length - 1] : null;
-    
-    if (lastGroup) {
-      // 모든 가능한 배치를 후보로 제시 (사용된 것도 포함)
-      const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
-      const allCandidates = allPlacements.map(p => ({ r: p.r, c: p.c }));
+    // 새 그룹을 시작해야 하는 경우
+    while (result.shouldContinue && result.newGroupStart) {
+      console.log('\n새 그룹을 시작합니다.');
+      console.log('='.repeat(60));
       
-      console.log(`마지막 그룹의 현재 타일 수: ${lastGroup.tiles.length}`);
-      console.log(`끝점으로 추가할 타일을 선택하세요 (사용된 타일도 선택 가능).`);
+      // 새 그룹 생성 (끝점을 첫 타일로)
+      const newGroup = {
+        tiles: [result.newGroupStart],
+        angles: [],
+        avgAngle: null,
+        endpoint: null
+      };
+      result.groups.push(newGroup);
       
-      // 사용자에게 타일 선택 요청 (used 상태 무시)
-      const endpointAnswer = await new Promise((resolve) => {
-        if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
-          window.showInputSection(true);
-        }
-        if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
-          // 모든 배치를 후보로 표시 (used 무시하고 모두 표시)
-          const candidatesWithAngles = allCandidates.map(cand => {
-            const candCenter = tileCenter(cand, k);
-            const lastTile = lastGroup.tiles[lastGroup.tiles.length - 1];
-            const lastTileCenter = tileCenter(lastTile, k);
-            const angle = angleDegCart(lastTileCenter, candCenter);
-            return { ...cand, angle, diff: null, isPreferred: true }; // 모두 선택 가능하도록 표시
-          });
-          window.updateTileOptions([], tiles, cur, centers, k, null, candidatesWithAngles, true); // true: 끝점 선택 모드
-        }
-        userInputResolver = (value) => { 
-          if (typeof window !== 'undefined' && typeof window.showInputSection === 'function') {
-            window.showInputSection(false);
-          }
-          resolve(value); 
-        };
-      });
+      console.log(`새 그룹 ${result.groups.length}이(가) 생성되었습니다.`);
+      console.log(`시작 타일: (${result.newGroupStart.r}, ${result.newGroupStart.c})`);
       
-      const endpointAnswerStr = String(endpointAnswer).toLowerCase();
-      if (endpointAnswerStr !== 'stop') {
-        const endpointChoice = parseInt(endpointAnswer, 10);
-        if (!Number.isNaN(endpointChoice) && endpointChoice >= 0 && endpointChoice < allCandidates.length) {
-          const selectedEndpoint = allCandidates[endpointChoice];
-          console.log(`끝점으로 (${selectedEndpoint.r}, ${selectedEndpoint.c})를 선택했습니다.`);
-          
-          // 마지막 그룹의 tiles 배열에 끝점 추가
-          lastGroup.tiles.push(selectedEndpoint);
-          lastGroup.endpoint = selectedEndpoint; // 참조용으로도 저장
-          
-          // 마지막 타일에서 끝점까지의 각도 계산 및 추가
-          const lastTile = lastGroup.tiles[lastGroup.tiles.length - 2]; // 끝점 바로 직전 타일
-          const lastTileCenter = tileCenter(lastTile, k);
-          const endpointCenter = tileCenter(selectedEndpoint, k);
-          const finalAngle = angleDegCart(lastTileCenter, endpointCenter);
-          lastGroup.angles.push(finalAngle);
-          
-          // 평균 각도 재계산
-          if (lastGroup.angles.length > 0) {
-            lastGroup.avgAngle = lastGroup.angles.reduce((sum, a) => sum + a, 0) / lastGroup.angles.length;
-          }
-          
-          console.log(`마지막 그룹의 tiles 배열에 끝점이 추가되었습니다: (${selectedEndpoint.r}, ${selectedEndpoint.c})`);
-          console.log(`마지막 그룹 타일 수: ${lastGroup.tiles.length}개`);
-          
-          // 그룹 정보 다시 표시
-          printTileGroups(groups, k);
-          
-          // HTML에 업데이트된 그룹 정보 전달
-          if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
-            const groupsForDisplay = formatGroupsForDisplay(groups);
-            window.displayTileGroups(groupsForDisplay);
-          }
-          
-          // 끝점 주변에 더 추가할 만한 타일이 있는지 확인
-          console.log('\n' + '='.repeat(60));
-          console.log('끝점 주변 미사용 타일 확인');
-          console.log('='.repeat(60));
-          
-          // 현재까지 선택된 모든 타일 목록
-          const currentOrderedTiles = orderIdx.map(i => tiles[i]);
-          
-          // 끝점에서 인접한 미사용 타일 찾기
-          const adjacentFromEndpoint = getAdjacentTileCandidates(selectedEndpoint, k, grid, currentOrderedTiles);
-          
-          if (adjacentFromEndpoint.length > 0) {
-            console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 ${adjacentFromEndpoint.length}개의 미사용 인접 타일이 있습니다:`);
-            adjacentFromEndpoint.forEach((tile, idx) => {
-              const tileCenter_endpoint = tileCenter(selectedEndpoint, k);
-              const tileCenter_adjacent = tileCenter(tile, k);
-              const angle = angleDegCart(tileCenter_endpoint, tileCenter_adjacent);
-              const arrow = arrowFromAngle(angle);
-              console.log(`  ${idx}. (${tile.r}, ${tile.c}) - ${angle.toFixed(1)}° ${arrow}`);
-            });
-            console.log('\n이 타일들을 계속 선택하려면 추가 기능이 필요합니다.');
-          } else {
-            console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 미사용 인접 타일이 없습니다.`);
-            console.log('타일 선택이 완료되었습니다.');
-          }
-          console.log('='.repeat(60) + '\n');
-        } else {
-          console.log('잘못된 선택입니다. 끝점 추가를 건너뜁니다.');
-        }
+      // 끝점을 현재 타일로 설정 (이미 tiles 배열에 있으므로 인덱스 찾기)
+      const endpointIdx = tiles.findIndex(t => t.r === result.newGroupStart.r && t.c === result.newGroupStart.c);
+      if (endpointIdx !== -1) {
+        cur = endpointIdx;
       } else {
-        console.log('끝점 추가를 건너뜁니다.');
+        // 끝점이 tiles 배열에 없으면 추가
+        tiles.push(result.newGroupStart);
+        centers.push(tileCenter(result.newGroupStart, k));
+        orderIdx.push(tiles.length - 1);
+        cur = tiles.length - 1;
       }
+      
+      // prevAngle 초기화 (새 그룹 시작이므로)
+      prevAngle = null;
+      
+      // 그룹 정보 표시
+      printTileGroups(result.groups, k);
+      
+      // HTML에 업데이트된 그룹 정보 전달
+      if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+        const groupsForDisplay = formatGroupsForDisplay(result.groups);
+        window.displayTileGroups(groupsForDisplay);
+      }
+      
+      console.log('\n타일 선택을 계속합니다...');
+      console.log('='.repeat(60) + '\n');
+      
+      // 새 그룹에서 타일 선택 계속 (while 루프 재시작)
+      const currentGroup = result.groups[result.groups.length - 1];
+      
+      while (true) {
+        const currentOrderedTiles = orderIdx.map(i => tiles[i]);
+        const adjacentCandidates = getAdjacentTileCandidates(tiles[cur], k, grid, currentOrderedTiles);
+        
+        if (adjacentCandidates.length === 0) {
+          console.log(`No more adjacent tiles available. ${orderIdx.length} tiles selected.`);
+          if (typeof window !== 'undefined') {
+            window.autoSelectMode = false;
+            window.autoSelectAngleMode = false;
+          }
+          break;
+        }
+
+        let answer = await tryAutoSelectTile(adjacentCandidates, tiles, cur, centers, k, prevAngle);
+        if (answer === null) {
+          answer = await askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngle);
+        }
+
+        const answerStr = String(answer).toLowerCase();
+        if (answerStr === 'refresh') {
+          console.log(`Refreshing tile selection after removal...`);
+          continue;
+        }
+        
+        if (answerStr === 'stop') {
+          console.log(`Stopped at tile ${orderIdx.length}.`);
+          generateAndCopyResultImage(grid, tiles, orderIdx, k);
+          break;
+        }
+        
+        const choice = parseInt(answer, 10);
+        if (Number.isNaN(choice) || choice < 0 || choice >= adjacentCandidates.length) {
+          console.log('Invalid selection. Please select a valid tile.');
+          continue;
+        }
+        
+        const selectedTile = adjacentCandidates[choice];
+        console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+        
+        const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
+        const newAngle = angleDegCart(centers[cur], centers[nxt]);
+        
+        if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
+          console.log(`Warning: Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
+        }
+
+        cur = nxt;
+        
+        // 현재 그룹에 타일 추가
+        currentGroup.tiles.push(selectedTile);
+        if (currentGroup.tiles.length >= 2) {
+          currentGroup.angles.push(newAngle);
+          currentGroup.avgAngle = currentGroup.angles.reduce((sum, a) => sum + a, 0) / currentGroup.angles.length;
+        }
+        
+        if (orderIdx.length >= 2) {
+          prevAngle = newAngle;
+          if (orderIdx.length === 2 && currentGroup.tiles.length === 2) {
+            console.log(`Direction established: ${prevAngle.toFixed(1)}° ${arrowFromAngle(prevAngle)} (after 2 tiles selected)`);
+          }
+        }
+
+        const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
+        printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} --`);
+        
+        if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+          window.updateTilePath(updatedOrderedTiles);
+        }
+      }
+      
+      // 새 그룹의 타일 선택 완료 후 다시 끝점 선택
+      const newFinalOrderedTiles = orderIdx.map(i => tiles[i]);
+      console.log(`All ${orderIdx.length} tiles selected for new group.`);
+      printPlacementAscii(grid, newFinalOrderedTiles, k, '-- New Group Final --');
+      
+      if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+        window.updateTilePath(newFinalOrderedTiles);
+      }
+      
+      // 다시 끝점 선택 및 새 그룹 확인
+      result = await handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers);
     }
 
     return {
-      orderedTiles: finalOrderedTiles,
-      groups: groups,
+      orderedTiles: orderIdx.map(i => tiles[i]),
+      groups: result.groups,
       state: { orderIdx, cur, prevAngle, centers, tiles, k, nextRule, maxAngleDiff, grid }
     };
   }

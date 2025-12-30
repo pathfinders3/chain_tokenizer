@@ -130,6 +130,16 @@
         <button id="autoSelectAngle">각도 기준 자동선택</button>
         <button id="stopSelection">중지</button>
     </div>
+    
+    <!-- 새 그룹 시작 프롬프트 -->
+    <div id="newGroupPrompt" style="margin-top: 20px; padding: 15px; background-color: #2d4d2d; border: 2px solid #4a7c59; display: none;">
+        <p id="newGroupMessage" style="font-weight: bold; color: #ffff00; margin-bottom: 10px;"></p>
+        <div>
+            <button id="continueNewGroup" style="background-color: #4a7c59; color: #ffffff; padding: 10px 20px; font-weight: bold; margin-right: 10px;">새 그룹으로 계속</button>
+            <button id="stopNewGroup" style="background-color: #7c4a4a; color: #ffffff; padding: 10px 20px;">종료</button>
+        </div>
+    </div>
+    
     <div id="canvasContainer" style="margin-top: 20px; display: none;">
         <canvas id="resultCanvas" style="border: 1px solid #444;"></canvas>
         <p>결과 이미지가 생성되었습니다. 클립보드에 복사되었습니다.</p>
@@ -295,6 +305,41 @@
         // 전역으로 노출
         window.updateTilePath = updateTilePath;
         window.showInputSection = showInputSection;
+
+        // 새 그룹 시작 프롬프트 표시
+        function showNewGroupPrompt(adjacentTileCount, callback) {
+            const newGroupPrompt = document.getElementById('newGroupPrompt');
+            const newGroupMessage = document.getElementById('newGroupMessage');
+            const continueButton = document.getElementById('continueNewGroup');
+            const stopButton = document.getElementById('stopNewGroup');
+            
+            // 메시지 설정
+            newGroupMessage.textContent = `끝점 주변에 ${adjacentTileCount}개의 미사용 인접 타일이 있습니다. 새 그룹으로 계속하시겠습니까?`;
+            
+            // 프롬프트 표시
+            newGroupPrompt.style.display = 'block';
+            
+            // 이벤트 리스너 정리 (중복 방지)
+            const newContinueButton = continueButton.cloneNode(true);
+            const newStopButton = stopButton.cloneNode(true);
+            continueButton.parentNode.replaceChild(newContinueButton, continueButton);
+            stopButton.parentNode.replaceChild(newStopButton, stopButton);
+            
+            // 계속 버튼 클릭
+            newContinueButton.addEventListener('click', () => {
+                newGroupPrompt.style.display = 'none';
+                callback('continue');
+            });
+            
+            // 종료 버튼 클릭
+            newStopButton.addEventListener('click', () => {
+                newGroupPrompt.style.display = 'none';
+                callback('stop');
+            });
+        }
+        
+        // 전역으로 노출
+        window.showNewGroupPrompt = showNewGroupPrompt;
 
         // 각도를 화살표로 변환하는 함수
         function getArrowFromAngle(deg) {
