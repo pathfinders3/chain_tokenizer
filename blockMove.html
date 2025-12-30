@@ -254,9 +254,12 @@
                 return;
             }
             
+            // ASCII 2D Map과 동일한 라벨 사용
+            const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            
             tiles.forEach((tile, index) => {
                 const tileButton = document.createElement('button');
-                tileButton.textContent = String.fromCharCode(65 + (index % 26)); // A, B, C, ...
+                tileButton.textContent = labels[index % labels.length]; // A-Z, a-z, 0-9 사용
                 tileButton.title = `(${tile.r}, ${tile.c}) - 클릭하여 이 타일부터 삭제`;
                 tileButton.style.cssText = `
                     padding: 5px 10px;
