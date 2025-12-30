@@ -113,18 +113,24 @@ const DEMO_GRID = [
       limitedView.push(fullView[r].slice(startC, endC));
     }
     
-    if (title) console.log(title);
-    console.log(`Viewing area: rows ${startR}-${endR-1}, cols ${startC}-${endC-1} (Full grid: ${H}x${W})`);
-
-    // 열 헤더 (시작 열 번호부터)
-    const colHeader = "     " + [...Array(limitedView[0].length)].map((_, i) => ((startC + i) % 10)).join(" ");
-    console.log(colHeader);
-
-    for (let r = 0; r < limitedView.length; r++) {
-      const actualR = startR + r;
-      console.log(String(actualR).padStart(2, " ") + " | " + limitedView[r].join(" "));
+    // textarea에만 출력 (콘솔에는 출력하지 않음)
+    if (typeof window !== 'undefined' && typeof window.outputToTextarea === 'function') {
+      let output = '';
+      if (title) output += title + '\n';
+      output += `Viewing area: rows ${startR}-${endR-1}, cols ${startC}-${endC-1} (Full grid: ${H}x${W})\n`;
+      
+      // 열 헤더 (시작 열 번호부터)
+      const colHeader = "     " + [...Array(limitedView[0].length)].map((_, i) => ((startC + i) % 10)).join(" ");
+      output += colHeader + '\n';
+      
+      for (let r = 0; r < limitedView.length; r++) {
+        const actualR = startR + r;
+        output += String(actualR).padStart(2, " ") + " | " + limitedView[r].join(" ") + '\n';
+      }
+      output += "Legend: '.'=0(일반), 'o'=1(오렌지 미덮임), 문자=타일로 덮인 영역\n";
+      
+      window.outputToTextarea(output);
     }
-    console.log("Legend: '.'=0(일반), 'o'=1(오렌지 미덮임), 문자=타일로 덮인 영역");
   }
 
   function printPlacementAscii(grid, tiles, k, title = "") {
@@ -145,17 +151,23 @@ const DEMO_GRID = [
       return;
     }
     
-    // 작은 그리드는 전체 표시
+    // 작은 그리드는 전체 표시 (textarea에만 출력, 콘솔에는 출력하지 않음)
     const view = renderPlacementGrid(grid, tiles, k);
-    if (title) console.log(title);
-
-    const colHeader = "     " + [...Array(view[0].length)].map((_, i) => (i % 10)).join(" ");
-    console.log(colHeader);
-
-    for (let r = 0; r < view.length; r++) {
-      console.log(String(r).padStart(2, " ") + " | " + view[r].join(" "));
+    
+    if (typeof window !== 'undefined' && typeof window.outputToTextarea === 'function') {
+      let output = '';
+      if (title) output += title + '\n';
+      
+      const colHeader = "     " + [...Array(view[0].length)].map((_, i) => (i % 10)).join(" ");
+      output += colHeader + '\n';
+      
+      for (let r = 0; r < view.length; r++) {
+        output += String(r).padStart(2, " ") + " | " + view[r].join(" ") + '\n';
+      }
+      output += "Legend: '.'=0(일반), 'o'=1(오렌지 미덮임), 문자=타일로 덮인 영역\n";
+      
+      window.outputToTextarea(output);
     }
-    console.log("Legend: '.'=0(일반), 'o'=1(오렌지 미덮임), 문자=타일로 덮인 영역");
   }
 
   function printGridOnly(grid, title = "") {
@@ -1008,7 +1020,9 @@ async function tryAutoSelectTile(adjacentCandidates, tiles, cur, centers, k, pre
       
       // 원래 candidatesWithAngles 배열에서의 인덱스 찾기
       const selectedIndex = candidatesWithAngles.findIndex(t => t.r === bestTile.r && t.c === bestTile.c);
-      console.log(`각도 기준 자동선택: 각도차가 최소인 타일 (${bestTile.r}, ${bestTile.c})를 선택합니다. (각도차: ${minDiff.toFixed(1)}°, preferred 타일 ${preferredTiles.length}개 중 선택)`);
+      if (typeof window !== 'undefined' && typeof window.logToTextareaOnly === 'function') {
+        window.logToTextareaOnly(`각도 기준 자동선택: 각도차가 최소인 타일 (${bestTile.r}, ${bestTile.c})를 선택합니다. (각도차: ${minDiff.toFixed(1)}°, preferred 타일 ${preferredTiles.length}개 중 선택)`);
+      }
       return String(selectedIndex);
     } else {
       // preferred 타일이 없음 -> 자동선택 중지
@@ -1208,7 +1222,9 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       }
       
       const selectedTile = adjacentCandidates[choice];
-      console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+      if (typeof window !== 'undefined' && typeof window.logToTextareaOnly === 'function') {
+        window.logToTextareaOnly(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+      }
       
       // 타일 선택 처리
       const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
@@ -1406,7 +1422,9 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
           }
           
           const selectedTile = adjacentCandidates[choice];
-          console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+          if (typeof window !== 'undefined' && typeof window.logToTextareaOnly === 'function') {
+            window.logToTextareaOnly(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+          }
           
           const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
           const newAngle = angleDegCart(centers[cur], centers[nxt]);
@@ -1583,7 +1601,9 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         }
         
         const selectedTile = adjacentCandidates[choice];
-        console.log(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+        if (typeof window !== 'undefined' && typeof window.logToTextareaOnly === 'function') {
+          window.logToTextareaOnly(`☆☆ Selected tile at (${selectedTile.r}, ${selectedTile.c}).`);
+        }
         
         const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
         const newAngle = angleDegCart(centers[cur], centers[nxt]);

@@ -186,6 +186,24 @@
         redirectConsole('error', 'ERROR: ');
         redirectConsole('warn', 'WARN: ');
 
+        // textarea에 직접 출력하는 함수 (콘솔 리다이렉션 우회)
+        function outputToTextarea(text) {
+            outputText += text;
+            outputElement.value = outputText;
+            outputElement.scrollTop = outputElement.scrollHeight;
+        }
+        
+        // textarea에만 로그를 출력하는 함수 (브라우저 콘솔에는 출력 안 함)
+        function logToTextareaOnly(message) {
+            outputText += message + '\n';
+            outputElement.value = outputText;
+            outputElement.scrollTop = outputElement.scrollHeight;
+        }
+        
+        // 전역으로 노출
+        window.outputToTextarea = outputToTextarea;
+        window.logToTextareaOnly = logToTextareaOnly;
+
         // 타일 선택 결과를 관리하는 클로저 패턴
         const TileResultManager = (() => {
             let result = null;
