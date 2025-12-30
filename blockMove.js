@@ -711,12 +711,78 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, exis
   const endpointAnswerStr = String(endpointAnswer).toLowerCase();
   if (endpointAnswerStr === 'stop') {
     console.log('끝점 추가를 건너뜁니다.');
+    
+    // 끝점을 선택하지 않아도 남은 타일이 있는지 확인
+    const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+    const usedTileSet = new Set(currentOrderedTiles.map(t => `${t.r},${t.c}`));
+    const remainingUnusedTiles = allPlacements.filter(p => !usedTileSet.has(`${p.r},${p.c}`));
+    
+    if (remainingUnusedTiles.length > 0) {
+      console.log(`\n⚠️  아직 ${remainingUnusedTiles.length}개의 미사용 타일이 남아 있습니다.`);
+      console.log('독립적인 새 그룹을 시작할 수 있습니다.');
+      console.log('='.repeat(60) + '\n');
+      
+      // 사용자에게 독립 그룹 시작 여부 확인
+      const continueAnswer = await new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.showCycleCompletePrompt === 'function') {
+          window.showCycleCompletePrompt(remainingUnusedTiles.length, (answer) => {
+            resolve(answer);
+          });
+        } else {
+          resolve('stop');
+        }
+      });
+      
+      if (continueAnswer === 'start-new') {
+        return {
+          groups,
+          shouldContinue: true,
+          isIndependentGroup: true,
+          remainingUnusedTiles: remainingUnusedTiles,
+          cycleCompleted: false
+        };
+      }
+    }
+    
     return { groups, shouldContinue: false };
   }
 
   const endpointChoice = parseInt(endpointAnswer, 10);
   if (Number.isNaN(endpointChoice) || endpointChoice < 0 || endpointChoice >= allCandidates.length) {
     console.log('잘못된 선택입니다. 끝점 추가를 건너뜁니다.');
+    
+    // 잘못된 선택이어도 남은 타일이 있는지 확인
+    const allPlacements = (typeof window !== 'undefined' && window.savedPlacements) ? window.savedPlacements : [];
+    const usedTileSet = new Set(currentOrderedTiles.map(t => `${t.r},${t.c}`));
+    const remainingUnusedTiles = allPlacements.filter(p => !usedTileSet.has(`${p.r},${p.c}`));
+    
+    if (remainingUnusedTiles.length > 0) {
+      console.log(`\n⚠️  아직 ${remainingUnusedTiles.length}개의 미사용 타일이 남아 있습니다.`);
+      console.log('독립적인 새 그룹을 시작할 수 있습니다.');
+      console.log('='.repeat(60) + '\n');
+      
+      // 사용자에게 독립 그룹 시작 여부 확인
+      const continueAnswer = await new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.showCycleCompletePrompt === 'function') {
+          window.showCycleCompletePrompt(remainingUnusedTiles.length, (answer) => {
+            resolve(answer);
+          });
+        } else {
+          resolve('stop');
+        }
+      });
+      
+      if (continueAnswer === 'start-new') {
+        return {
+          groups,
+          shouldContinue: true,
+          isIndependentGroup: true,
+          remainingUnusedTiles: remainingUnusedTiles,
+          cycleCompleted: false
+        };
+      }
+    }
+    
     return { groups, shouldContinue: false };
   }
 
@@ -1300,9 +1366,10 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         console.log('='.repeat(60) + '\n');
         
         // 새 독립 그룹에서 타일 선택 시작
-        const currentGroup = result.groups[result.groups.length - 1];
-        
         while (true) {
+          // 항상 최신 그룹 참조
+          const currentGroup = result.groups[result.groups.length - 1];
+          
           const currentOrderedTiles = orderIdx.map(i => tiles[i]);
           const adjacentCandidates = getAdjacentTileCandidates(tiles[cur], k, grid, currentOrderedTiles);
           
@@ -1344,8 +1411,49 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
           const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
           const newAngle = angleDegCart(centers[cur], centers[nxt]);
           
-          if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
-            console.log(`Warning: Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
+          // 각도 임계값 가져오기
+          const angleThreshold = (typeof window !== 'undefined' && window.groupingAngleThreshold) 
+            ? window.groupingAngleThreshold 
+            : 45;
+          
+          // 각도 차이가 임계값을 초과하면 새 그룹 생성
+          if (prevAngle !== null && angleDiff(prevAngle, newAngle) > angleThreshold) {
+            console.log(`⚠️ 각도 차이 ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${angleThreshold}° 감지!`);
+            console.log(`새 그룹 ${result.groups.length + 1}을(를) 자동으로 시작합니다.`);
+            
+            // 새 그룹 생성
+            const newGroup = {
+              tiles: [selectedTile],
+              angles: [],
+              avgAngle: null,
+              endpoint: null
+            };
+            result.groups.push(newGroup);
+            
+            // currentGroup을 새 그룹으로 변경
+            const currentGroupRef = result.groups[result.groups.length - 1];
+            
+            // prevAngle 초기화 (새 그룹 시작)
+            prevAngle = null;
+            cur = nxt;
+            
+            // 그룹 정보 표시
+            printTileGroups(result.groups, k);
+            
+            // HTML에 업데이트된 그룹 정보 전달
+            if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+              const groupsForDisplay = formatGroupsForDisplay(result.groups);
+              window.displayTileGroups(groupsForDisplay);
+            }
+            
+            const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
+            printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} (New Group ${result.groups.length}) --`);
+            
+            if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+              window.updateTilePath(updatedOrderedTiles);
+            }
+            
+            continue; // 다음 타일 선택으로 이동
           }
 
           cur = nxt;
@@ -1435,9 +1543,10 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
       console.log('='.repeat(60) + '\n');
       
       // 새 그룹에서 타일 선택 계속 (while 루프 재시작)
-      const currentGroup = result.groups[result.groups.length - 1];
-      
       while (true) {
+        // 항상 최신 그룹 참조
+        const currentGroup = result.groups[result.groups.length - 1];
+        
         const currentOrderedTiles = orderIdx.map(i => tiles[i]);
         const adjacentCandidates = getAdjacentTileCandidates(tiles[cur], k, grid, currentOrderedTiles);
         
@@ -1479,8 +1588,46 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
         const nxt = handleTileSelection(selectedTile, tiles, centers, orderIdx, k);
         const newAngle = angleDegCart(centers[cur], centers[nxt]);
         
-        if (prevAngle !== null && angleDiff(prevAngle, newAngle) > maxAngleDiff) {
-          console.log(`Warning: Angle diff ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${maxAngleDiff}°.`);
+        // 각도 임계값 가져오기
+        const angleThreshold = (typeof window !== 'undefined' && window.groupingAngleThreshold) 
+          ? window.groupingAngleThreshold 
+          : 45;
+        
+        // 각도 차이가 임계값을 초과하면 새 그룹 생성
+        if (prevAngle !== null && angleDiff(prevAngle, newAngle) > angleThreshold) {
+          console.log(`⚠️ 각도 차이 ${angleDiff(prevAngle, newAngle).toFixed(1)}° > ${angleThreshold}° 감지!`);
+          console.log(`새 그룹 ${result.groups.length + 1}을(를) 자동으로 시작합니다.`);
+          
+          // 새 그룹 생성
+          const newGroup = {
+            tiles: [selectedTile],
+            angles: [],
+            avgAngle: null,
+            endpoint: null
+          };
+          result.groups.push(newGroup);
+          
+          // prevAngle 초기화 (새 그룹 시작)
+          prevAngle = null;
+          cur = nxt;
+          
+          // 그룹 정보 표시
+          printTileGroups(result.groups, k);
+          
+          // HTML에 업데이트된 그룹 정보 전달
+          if (typeof window !== 'undefined' && typeof window.displayTileGroups === 'function') {
+            const groupsForDisplay = formatGroupsForDisplay(result.groups);
+            window.displayTileGroups(groupsForDisplay);
+          }
+          
+          const updatedOrderedTiles = orderIdx.map(i => tiles[i]);
+          printPlacementAscii(grid, updatedOrderedTiles, k, `-- Tile ${orderIdx.length} (New Group ${result.groups.length}) --`);
+          
+          if (typeof window !== 'undefined' && typeof window.updateTilePath === 'function') {
+            window.updateTilePath(updatedOrderedTiles);
+          }
+          
+          continue; // 다음 타일 선택으로 이동
         }
 
         cur = nxt;
