@@ -987,6 +987,33 @@ function resumeTileOrdering(state, newMaxAngleDiff = null, allPlacements = null,
             const groupsForDisplay = formatGroupsForDisplay(groups);
             window.displayTileGroups(groupsForDisplay);
           }
+          
+          // 끝점 주변에 더 추가할 만한 타일이 있는지 확인
+          console.log('\n' + '='.repeat(60));
+          console.log('끝점 주변 미사용 타일 확인');
+          console.log('='.repeat(60));
+          
+          // 현재까지 선택된 모든 타일 목록
+          const currentOrderedTiles = orderIdx.map(i => tiles[i]);
+          
+          // 끝점에서 인접한 미사용 타일 찾기
+          const adjacentFromEndpoint = getAdjacentTileCandidates(selectedEndpoint, k, grid, currentOrderedTiles);
+          
+          if (adjacentFromEndpoint.length > 0) {
+            console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 ${adjacentFromEndpoint.length}개의 미사용 인접 타일이 있습니다:`);
+            adjacentFromEndpoint.forEach((tile, idx) => {
+              const tileCenter_endpoint = tileCenter(selectedEndpoint, k);
+              const tileCenter_adjacent = tileCenter(tile, k);
+              const angle = angleDegCart(tileCenter_endpoint, tileCenter_adjacent);
+              const arrow = arrowFromAngle(angle);
+              console.log(`  ${idx}. (${tile.r}, ${tile.c}) - ${angle.toFixed(1)}° ${arrow}`);
+            });
+            console.log('\n이 타일들을 계속 선택하려면 추가 기능이 필요합니다.');
+          } else {
+            console.log(`끝점 (${selectedEndpoint.r}, ${selectedEndpoint.c}) 주변에 미사용 인접 타일이 없습니다.`);
+            console.log('타일 선택이 완료되었습니다.');
+          }
+          console.log('='.repeat(60) + '\n');
         } else {
           console.log('잘못된 선택입니다. 끝점 추가를 건너뜁니다.');
         }
