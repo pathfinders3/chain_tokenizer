@@ -140,7 +140,14 @@
     </div>
     
     <div id="canvasContainer" style="margin-top: 20px; display: none;">
-        <div style="max-height: 600px; overflow: auto; border: 1px solid #444; background-color: #1e1e1e;">
+        <div style="margin-bottom: 10px;">
+            <button id="zoomOutBtn" style="padding: 5px 15px; background-color: #2d2d2d; color: #ffffff; border: 1px solid #444; cursor: pointer;">🔍-</button>
+            <span id="zoomLevel" style="display: inline-block; width: 60px; text-align: center; margin: 0 5px; color: #ffffff; font-weight: bold;">100%</span>
+            <button id="zoomInBtn" style="padding: 5px 15px; background-color: #2d2d2d; color: #ffffff; border: 1px solid #444; cursor: pointer;">🔍+</button>
+            <button id="zoomResetBtn" style="padding: 5px 15px; margin-left: 10px; background-color: #2d2d2d; color: #ffffff; border: 1px solid #444; cursor: pointer;">초기화</button>
+            <span style="margin-left: 15px; color: #888; font-size: 12px;">※ 마우스 휠로도 확대/축소 가능</span>
+        </div>
+        <div id="canvasScrollContainer" style="max-height: 600px; overflow: auto; border: 1px solid #444; background-color: #1e1e1e;">
             <canvas id="resultCanvas"></canvas>
         </div>
         <p>결과 이미지가 생성되었습니다. 클립보드에 복사되었습니다.</p>
@@ -255,6 +262,10 @@
         const stopSelectionButton = document.getElementById('stopSelection');
         const inputSection = document.getElementById('inputSection');
         const tilePathItems = document.getElementById('tilePathItems');
+        
+        // 캔버스 확대/축소 관련 변수
+        let canvasZoomLevel = 1.0; // 100%
+        window.originalCanvasData = null; // 원본 캔버스 데이터 저장
         
         // 타일 경로를 저장하는 배열
         let currentTilePath = [];
@@ -1118,6 +1129,92 @@
                 currentTileSize = parseInt(tileSizeSelect.value, 10) || 2;
             }
         };
+        
+        // 캔버스 확대/축소 설정 함수
+        function setCanvasZoom(newZoom) {
+            // 최소 5%, 최대 150%로 제한
+            canvasZoomLevel = Math.max(0.05, Math.min(1.5, newZoom));
+            
+            // 퍼센트 표시 업데이트
+            const zoomLevelSpan = document.getElementById('zoomLevel');
+            if (zoomLevelSpan) {
+                zoomLevelSpan.textContent = Math.round(canvasZoomLevel * 100) + '%';
+            }
+            
+            // 원본 데이터가 있으면 캔버스 다시 그리기
+            if (window.originalCanvasData) {
+                redrawCanvasWithZoom();
+            }
+        }
+        
+        // 확대/축소된 캔버스 다시 그리기
+        function redrawCanvasWithZoom() {
+            if (!window.originalCanvasData) return;
+            
+            const { grid, tiles, orderIdx, k } = window.originalCanvasData;
+            const H = grid.length;
+            const W = grid[0].length;
+            const cellSize = Math.round(20 * canvasZoomLevel); // 기본 20px에 줍 비율 적용
+            
+            const canvas = document.getElementById('resultCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 캔버스 크기 설정
+            canvas.width = W * cellSize;
+            canvas.height = H * cellSize;
+            
+            // 배경을 녹색으로 설정 (아무 영역도 아닌 곳)
+            ctx.fillStyle = 'green';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 오렌지 타일 중 미지정된 곳을 마젠타로 표시
+            for (let r = 0; r < H; r++) {
+                for (let c = 0; c < W; c++) {
+                    if (grid[r][c] === 1) {
+                        ctx.fillStyle = 'magenta';
+                        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+            
+            // 지정된 타일을 빨간색으로 표시
+            const orderedTiles = orderIdx.map(i => tiles[i]);
+            for (const tile of orderedTiles) {
+                ctx.fillStyle = 'red';
+                for (let dr = 0; dr < k; dr++) {
+                    for (let dc = 0; dc < k; dc++) {
+                        const x = (tile.c + dc) * cellSize;
+                        const y = (tile.r + dr) * cellSize;
+                        ctx.fillRect(x, y, cellSize, cellSize);
+                    }
+                }
+            }
+        }
+        
+        // 캔버스 확대/축소 버튼 이벤트
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            setCanvasZoom(canvasZoomLevel + 0.25);
+        });
+        
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            setCanvasZoom(canvasZoomLevel - 0.25);
+        });
+        
+        document.getElementById('zoomResetBtn').addEventListener('click', () => {
+            setCanvasZoom(1.0);
+        });
+        
+        // 마우스 휠 확대/축소 (Ctrl + 휠)
+        const canvasScrollContainer = document.getElementById('canvasScrollContainer');
+        if (canvasScrollContainer) {
+            canvasScrollContainer.addEventListener('wheel', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    setCanvasZoom(canvasZoomLevel + delta);
+                }
+            }, { passive: false });
+        }
     </script>
     <script src="blockMove.js"></script>
 </body>

@@ -1757,6 +1757,11 @@ function generateAndCopyResultImage(grid, tiles, orderIdx, k) {
   const canvas = document.getElementById('resultCanvas');
   const ctx = canvas.getContext('2d');
   
+  // 원본 데이터 저장 (HTML에서 확대/축소 기능에 사용)
+  if (typeof window !== 'undefined') {
+    window.originalCanvasData = { grid, tiles, orderIdx, k };
+  }
+  
   // 캔버스 크기 설정
   canvas.width = W * cellSize;
   canvas.height = H * cellSize;
