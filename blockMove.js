@@ -753,7 +753,14 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, exis
           remainingUnusedTiles: remainingUnusedTiles,
           cycleCompleted: false
         };
+      } else {
+        // 독립 그룹을 시작하지 않으므로 캔버스 생성
+        console.log('\n독립 그룹 시작을 건너뜁니다. 타일 선택이 완료되었습니다.');
+        generateAndCopyResultImage(grid, tiles, orderIdx, k);
       }
+    } else {
+      // 남은 타일이 없으므로 캔버스 생성
+      generateAndCopyResultImage(grid, tiles, orderIdx, k);
     }
     
     return { groups, shouldContinue: false };
@@ -792,7 +799,14 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, exis
           remainingUnusedTiles: remainingUnusedTiles,
           cycleCompleted: false
         };
+      } else {
+        // 독립 그룹을 시작하지 않으므로 캔버스 생성
+        console.log('\n독립 그룹 시작을 건너뜁니다. 타일 선택이 완료되었습니다.');
+        generateAndCopyResultImage(grid, tiles, orderIdx, k);
       }
+    } else {
+      // 남은 타일이 없으므로 캔버스 생성
+      generateAndCopyResultImage(grid, tiles, orderIdx, k);
     }
     
     return { groups, shouldContinue: false };
@@ -905,9 +919,13 @@ async function handleGroupingAndEndpoint(orderIdx, tiles, k, grid, centers, exis
         };
       } else {
         console.log('\n독립 그룹 시작을 건너뜁니다. 타일 선택이 완료되었습니다.');
+        // 캔버스 이미지 생성
+        generateAndCopyResultImage(grid, tiles, orderIdx, k);
       }
     } else {
       console.log('모든 타일이 사용되었습니다.');
+      // 캔버스 이미지 생성
+      generateAndCopyResultImage(grid, tiles, orderIdx, k);
     }
     
     console.log('타일 선택이 완료되었습니다.');
@@ -1770,11 +1788,11 @@ function generateAndCopyResultImage(grid, tiles, orderIdx, k) {
   ctx.fillStyle = 'green';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // 오렌지 타일 중 미지정된 곳을 마젠타로 표시
+  // 오렌지 타일 중 미지정된 곳을 dark brown으로 표시
   for (let r = 0; r < H; r++) {
     for (let c = 0; c < W; c++) {
       if (grid[r][c] === 1) {
-        ctx.fillStyle = 'magenta';
+        ctx.fillStyle = '#654321';
         ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
       }
     }
