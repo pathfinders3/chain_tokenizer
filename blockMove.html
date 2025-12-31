@@ -1132,8 +1132,8 @@
         
         // 캔버스 확대/축소 설정 함수
         function setCanvasZoom(newZoom) {
-            // 최소 5%, 최대 150%로 제한
-            canvasZoomLevel = Math.max(0.05, Math.min(1.5, newZoom));
+            // 최소 2%, 최대 150%로 제한
+            canvasZoomLevel = Math.max(0.02, Math.min(1.5, newZoom));
             
             // 퍼센트 표시 업데이트
             const zoomLevelSpan = document.getElementById('zoomLevel');
@@ -1193,11 +1193,15 @@
         
         // 캔버스 확대/축소 버튼 이벤트
         document.getElementById('zoomInBtn').addEventListener('click', () => {
-            setCanvasZoom(canvasZoomLevel + 0.25);
+            // 10% 미만일 때 3%씩, 10% 이상일 때 20%씩 확대
+            const increment = canvasZoomLevel < 0.1 ? 0.03 : 0.2;
+            setCanvasZoom(canvasZoomLevel + increment);
         });
         
         document.getElementById('zoomOutBtn').addEventListener('click', () => {
-            setCanvasZoom(canvasZoomLevel - 0.25);
+            // 10% 미만일 때 3%씩, 10% 이상일 때 20%씩 쵙5c
+            const decrement = canvasZoomLevel < 0.1 ? 0.03 : 0.2;
+            setCanvasZoom(canvasZoomLevel - decrement);
         });
         
         document.getElementById('zoomResetBtn').addEventListener('click', () => {
@@ -1210,7 +1214,9 @@
             canvasScrollContainer.addEventListener('wheel', (e) => {
                 if (e.ctrlKey || e.metaKey) {
                     e.preventDefault();
-                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    // 10% 미만일 때 3%씩, 10% 이상일 때 20%씩
+                    const step = canvasZoomLevel < 0.1 ? 0.03 : 0.2;
+                    const delta = e.deltaY > 0 ? -step : step;
                     setCanvasZoom(canvasZoomLevel + delta);
                 }
             }, { passive: false });
