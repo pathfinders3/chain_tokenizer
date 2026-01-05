@@ -106,6 +106,10 @@
                 <option value="2">2x2</option>
                 <option value="3">3x3</option>
             </select>
+            <label for="angleThresholdInput" style="margin-left: 15px;">각도 임계값:</label>
+            <input type="number" id="angleThresholdInput" min="5" max="180" step="5" value="45" 
+                   style="width: 60px; background-color: #2d2d2d; color: #ffffff; border: 1px solid #444; padding: 5px; margin-left: 5px;">
+            <span style="color: #aaaaaa; font-size: 12px;">도</span>
         </div>
         <p id="gridLoadStatus"></p>
         <p id="calculationStatus" style="font-weight: bold; color: #ffff00; display: none;">계산 진행 중입니다. 잠시만 기다려 주세요...</p>
@@ -157,10 +161,9 @@
     <div id="groupingSection" style="margin-top: 30px; display: none;">
         <h2 style="color: #ffffff; border-bottom: 2px solid #444; padding-bottom: 10px;">타일 그룹핑 결과</h2>
         <div style="margin-bottom: 15px;">
-            <label for="angleThresholdInput">각도 임계값 (도):</label>
-            <input type="number" id="angleThresholdInput" min="5" max="180" step="5" value="45" 
-                   style="width: 80px; background-color: #2d2d2d; color: #ffffff; border: 1px solid #444; padding: 5px; margin-left: 10px;">
-            <button id="regroupButton" style="margin-left: 10px; padding: 5px 15px; background-color: #4a4a4a; color: #ffffff; border: 1px solid #666; cursor: pointer;">
+            <span style="color: #aaaaaa;">현재 각도 임계값: </span>
+            <span id="currentAngleThreshold" style="color: #ffff00; font-weight: bold;">45도</span>
+            <button id="regroupButton" style="margin-left: 15px; padding: 5px 15px; background-color: #4a4a4a; color: #ffffff; border: 1px solid #666; cursor: pointer;">
                 다시 그룹핑
             </button>
             <button id="copyToClipboard" style="margin-left: 10px; padding: 5px 15px; background-color: #0066cc; color: #ffffff; border: 1px solid #0055aa; cursor: pointer; font-weight: bold;">
@@ -977,6 +980,13 @@
             
             groupingSection.style.display = 'block';
             
+            // 현재 각도 임계값 표시 업데이트
+            const angleThreshold = parseFloat(document.getElementById('angleThresholdInput').value) || 45;
+            const currentAngleThresholdSpan = document.getElementById('currentAngleThreshold');
+            if (currentAngleThresholdSpan) {
+                currentAngleThresholdSpan.textContent = angleThreshold + '도';
+            }
+            
             let html = '<div style="color: #ffffff;">';
             groupsForDisplay.forEach(group => {
                 html += `
@@ -1097,6 +1107,12 @@
         document.getElementById('regroupButton').addEventListener('click', () => {
             const angleThreshold = parseFloat(document.getElementById('angleThresholdInput').value) || 45;
             window.groupingAngleThreshold = angleThreshold;
+            
+            // 하단 표시 업데이트
+            const currentAngleThresholdSpan = document.getElementById('currentAngleThreshold');
+            if (currentAngleThresholdSpan) {
+                currentAngleThresholdSpan.textContent = angleThreshold + '도';
+            }
             
             // 현재 선택된 타일 경로를 가져옴
             if (currentTilePath && currentTilePath.length > 0 && typeof window.groupTilesByAngle === 'function') {
