@@ -263,8 +263,8 @@
         const inputSection = document.getElementById('inputSection');
         const tilePathItems = document.getElementById('tilePathItems');
         
-        // 캔버스 확대/축소 관련 변수
-        let canvasZoomLevel = 0.2; // 20%
+        // 캔버스 확대/축소 관련 변수 (정수 퍼센트: 20 = 20%)
+        let canvasZoomLevel = 20; // 20%
         window.originalCanvasData = null; // 원본 캔버스 데이터 저장
         
         // 타일 경로를 저장하는 배열
@@ -1130,15 +1130,15 @@
             }
         };
         
-        // 캔버스 확대/축소 설정 함수
-        function setCanvasZoom(newZoom) {
-            // 최소 2%, 최대 150%로 제한
-            canvasZoomLevel = Math.max(0.02, Math.min(1.5, newZoom));
+        // 캔버스 확대/축소 설정 함수 (정수 퍼센트로 받음)
+        function setCanvasZoom(newZoomPercent) {
+            // 최소 2%, 최대 150%로 제한 (정수 연산)
+            canvasZoomLevel = Math.max(2, Math.min(150, Math.round(newZoomPercent)));
             
             // 퍼센트 표시 업데이트
             const zoomLevelSpan = document.getElementById('zoomLevel');
             if (zoomLevelSpan) {
-                zoomLevelSpan.textContent = Math.round(canvasZoomLevel * 100) + '%';
+                zoomLevelSpan.textContent = canvasZoomLevel + '%';
             }
             
             // 원본 데이터가 있으면 캔버스 다시 그리기
@@ -1147,6 +1147,9 @@
             }
         }
         
+        // 전역으로 노출
+        window.setCanvasZoom = setCanvasZoom;
+        
         // 확대/축소된 캔버스 다시 그리기
         function redrawCanvasWithZoom() {
             if (!window.originalCanvasData) return;
@@ -1154,7 +1157,7 @@
             const { grid, tiles, orderIdx, k } = window.originalCanvasData;
             const H = grid.length;
             const W = grid[0].length;
-            const cellSize = Math.round(20 * canvasZoomLevel); // 기본 20px에 줍 비율 적용
+            const cellSize = Math.round(20 * canvasZoomLevel / 100); // 기본 20px에 정수 퍼센트 적용
             
             const canvas = document.getElementById('resultCanvas');
             const ctx = canvas.getContext('2d');
@@ -1189,23 +1192,35 @@
                     }
                 }
             }
+            
+            // 실제 렌더링된 cellSize를 기반으로 실제 zoom 비율 역계산
+            const actualZoomPercent = Math.round((cellSize / 20) * 100);
+            const zoomLevelSpan = document.getElementById('zoomLevel');
+            if (zoomLevelSpan) {
+                if (actualZoomPercent !== canvasZoomLevel) {
+                    // 의도한 값과 실제 값이 다르면 둘 다 표시
+                    zoomLevelSpan.textContent = actualZoomPercent + '% (설정: ' + canvasZoomLevel + '%)';
+                    zoomLevelSpan.style.color = '#ffaa00'; // 주황색으로 표시
+                } else {
+                    zoomLevelSpan.textContent = actualZoomPercent + '%';
+                    zoomLevelSpan.style.color = '#ffffff'; // 흰색으로 복원
+                }
+            }
         }
         
         // 캔버스 확대/축소 버튼 이벤트
         document.getElementById('zoomInBtn').addEventListener('click', () => {
-            // 10% 미만일 때 3%씩, 10% 이상일 때 20%씩 확대
-            const increment = canvasZoomLevel < 0.1 ? 0.03 : 0.2;
-            setCanvasZoom(canvasZoomLevel + increment);
+            // 항상 5%씩 확대 (정수 연산)
+            setCanvasZoom(canvasZoomLevel + 5);
         });
         
         document.getElementById('zoomOutBtn').addEventListener('click', () => {
-            // 10% 미만일 때 3%씩, 10% 이상일 때 20%씩 쵙5c
-            const decrement = canvasZoomLevel < 0.1 ? 0.03 : 0.2;
-            setCanvasZoom(canvasZoomLevel - decrement);
+            // 항상 5%씩 축소 (정수 연산)
+            setCanvasZoom(canvasZoomLevel - 5);
         });
         
         document.getElementById('zoomResetBtn').addEventListener('click', () => {
-            setCanvasZoom(1.0);
+            setCanvasZoom(100);
         });
         
         // 마우스 휠 확대/축소 (Ctrl + 휠)
@@ -1214,9 +1229,8 @@
             canvasScrollContainer.addEventListener('wheel', (e) => {
                 if (e.ctrlKey || e.metaKey) {
                     e.preventDefault();
-                    // 10% 미만일 때 3%씩, 10% 이상일 때 20%씩
-                    const step = canvasZoomLevel < 0.1 ? 0.03 : 0.2;
-                    const delta = e.deltaY > 0 ? -step : step;
+                    // 항상 5%씩 (정수 연산)
+                    const delta = e.deltaY > 0 ? -5 : 5;
                     setCanvasZoom(canvasZoomLevel + delta);
                 }
             }, { passive: false });

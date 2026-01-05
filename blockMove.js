@@ -1823,6 +1823,11 @@ function generateAndCopyResultImage(grid, tiles, orderIdx, k) {
   
   // 캔버스 컨테이너 표시
   document.getElementById('canvasContainer').style.display = 'block';
+  
+  // 초기 zoom을 20%로 설정 (정수 기반)
+  if (typeof window !== 'undefined' && typeof window.setCanvasZoom === 'function') {
+    window.setCanvasZoom(20);
+  }
 }
   
   /* ------------------ 모든 가능한 타일 배치 찾기 (DFS 없이) ------------ */
