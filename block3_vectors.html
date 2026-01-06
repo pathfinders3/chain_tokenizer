@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Douglas-Peucker 알고리즘 시각화</title>
+    <link rel="icon" type="image/png" href="block3.png">
+
+    <!-- 같은 이름의 CSS -->
+    <link rel="stylesheet" href="block3_vectors.css">
+<style>
+.zoom-controls button,
+.zoom-controls input[type=range] {
+  height: 32px;
+  min-width: 34px;
+  font-size: 20px;
+  padding: 0 6px;
+  vertical-align: middle;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid #444;
+  margin: 0 1px;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.zoom-controls button:active {
+  background: #111;
+}
+.zoom-controls button:focus {
+  outline: 2px solid #6cf;
+}
+.zoom-controls #zoomPercent {
+  min-width: 48px;
+  font-size: 15px;
+  text-align: center;
+  display: inline-block;
+  vertical-align: middle;
+  color: #fff;
+}
+</style>
+<style>
+.canvas-wrapper {
+  width: 700px;
+  height: 600px;
+  overflow: auto;
+  border: 1px solid #ccc;
+  margin: 0;
+  background: #222;
+}
+</style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Douglas-Peucker 알고리즘 시각화</h1>
+            <p class="subtitle">경로 단순화 알고리즘으로 타일 경로를 최적화합니다</p>
+        </div>
+        
+        <div class="content">
+            <div class="controls">
+                <div class="control-group">
+                    <label>JSON 데이터 입력</label>
+<textarea id="jsonInput">{
+  "_schema": {
+    "tiles": "전체 타일 배열 - 각 타일은 {r: 행, c: 열, angle: 각도, direction: 방향}",
+    "groups": "같은 방향의 타일 그룹 배열 - 각 그룹은 유사한 각도를 가진 타일들의 모음",
+    "groups[].tiles": "그룹 내 타일 인덱스 배열",
+    "groups[].avgAngle": "그룹의 평균 각도 (도 단위, 0=동쪽, 90=북쪽, 180=서쪽, 270=남쪽)",
+    "groups[].direction": "그룹의 방향을 나타내는 텍스트",
+    "groups[].angles": "그룹 내 각 타일의 개별 각도 배열",
+    "metadata": "데이터 메타정보 (타일 수, 그룹 수, 생성 시간 등)"
+  },
+  "tiles": [
+    {
+      "r": 0,
+      "c": 1
+    },
+    {
+      "r": 2,
+      "c": 3
+    },
+    {
+      "r": 4,
+      "c": 5
+    },
+    {
+      "r": 6,
+      "c": 7
+    },
+    {
+      "r": 8,
+      "c": 9
+    },
+    {
+      "r": 10,
+      "c": 11
+    },
+    {
+      "r": 12,
+      "c": 13
+    },
+    {
+      "r": 14,
+      "c": 14
+    },
+    {
+      "r": 16,
+      "c": 15
+    },
+    {
+      "r": 18,
+      "c": 16
+    },
+    {
+      "r": 20,
+      "c": 18
+    },
+    {
+      "r": 22,
+      "c": 20
+    },
+    {
+      "r": 24,
+      "c": 22
+    },
+    {
+      "r": 26,
+      "c": 24
+    },
+    {
+      "r": 28,
+      "c": 26
+    },
+    {
+      "r": 30,
+      "c": 24
+    },
+    {
+      "r": 32,
+      "c": 22
+    },
+    {
+      "r": 34,
+      "c": 20
+    },
+    {
+      "r": 35,
+      "c": 18
+    },
+    {
+      "r": 36,
+      "c": 16
+    },
+    {
+      "r": 37,
+      "c": 14
+    },
+    {
+      "r": 38,
+      "c": 12
+    },
+    {
+      "r": 40,
+      "c": 10
+    },
+    {
+      "r": 41,
+      "c": 12
+    },
+    {
+      "r": 43,
+      "c": 12
+    },
+    {
+      "r": 45,
+      "c": 12
+    },
+    {
+      "r": 47,
+      "c": 12
+    },
+    {
+      "r": 49,
+      "c": 12
+    },
+    {
+      "r": 51,
+      "c": 12
+    },
+    {
+      "r": 53,
+      "c": 11
+    },
+    {
+      "r": 55,
+      "c": 10
+    }
+  ],
+  "groups": [
+    {
+      "tiles": [
+        {
+          "r": 0,
+          "c": 1
+        },
+        {
+          "r": 2,
+          "c": 3
+        },
+        {
+          "r": 4,
+          "c": 5
+        },
+        {
+          "r": 6,
+          "c": 7
+        },
+        {
+          "r": 8,
+          "c": 9
+        },
+        {
+          "r": 10,
+          "c": 11
+        },
+        {
+          "r": 12,
+          "c": 13
+        },
+        {
+          "r": 14,
+          "c": 14
+        },
+        {
+          "r": 16,
+          "c": 15
+        },
+        {
+          "r": 18,
+          "c": 16
+        },
+        {
+          "r": 20,
+          "c": 18
+        },
+        {
+          "r": 22,
+          "c": 20
+        },
+        {
+          "r": 24,
+          "c": 22
+        },
+        {
+          "r": 26,
+          "c": 24
+        },
+        {
+          "r": 28,
+          "c": 26
+        }
+      ],
+      "avgAngle": 311.04965382365964,
+      "direction": "남동쪽 (Southeast, ↘)",
+      "angles": [
+        315,
+        315,
+        315,
+        315,
+        315,
+        315,
+        296.565051177078,
+        296.565051177078,
+        296.565051177078,
+        315,
+        315,
+        315,
+        315,
+        315
+      ],
+      "tileCount": 15
+    },
+    {
+      "tiles": [
+        {
+          "r": 28,
+          "c": 26
+        },
+        {
+          "r": 30,
+          "c": 24
+        },
+        {
+          "r": 32,
+          "c": 22
+        },
+        {
+          "r": 34,
+          "c": 20
+        },
+        {
+          "r": 35,
+          "c": 18
+        },
+        {
+          "r": 36,
+          "c": 16
+        },
+        {
+          "r": 37,
+          "c": 14
+        },
+        {
+          "r": 38,
+          "c": 12
+        },
+        {
+          "r": 40,
+          "c": 10
+        }
+      ],
+      "avgAngle": 215.782525588539,
+      "direction": "남서쪽 (Southwest, ↙)",
+      "angles": [
+        225,
+        225,
+        225,
+        206.56505117707798,
+        206.56505117707798,
+        206.56505117707798,
+        206.56505117707798,
+        225
+      ],
+      "tileCount": 9
+    },
+    {
+      "tiles": [
+        {
+          "r": 40,
+          "c": 10
+        },
+        {
+          "r": 41,
+          "c": 12
+        }
+      ],
+      "avgAngle": 333.434948822922,
+      "direction": "남동쪽 (Southeast, ↘)",
+      "angles": [
+        333.434948822922
+      ],
+      "tileCount": 2
+    },
+    {
+      "tiles": [
+        {
+          "r": 41,
+          "c": 12
+        },
+        {
+          "r": 43,
+          "c": 12
+        },
+        {
+          "r": 45,
+          "c": 12
+        },
+        {
+          "r": 47,
+          "c": 12
+        },
+        {
+          "r": 49,
+          "c": 12
+        },
+        {
+          "r": 51,
+          "c": 12
+        },
+        {
+          "r": 53,
+          "c": 11
+        },
+        {
+          "r": 55,
+          "c": 10
+        }
+      ],
+      "avgAngle": 262.4099853779777,
+      "direction": "남쪽 (South, ↓)",
+      "angles": [
+        270,
+        270,
+        270,
+        270,
+        270,
+        243.43494882292202,
+        243.43494882292202
+      ],
+      "tileCount": 8
+    }
+  ],
+  "metadata": {
+    "totalTiles": 31,
+    "totalGroups": 4,
+    "timestamp": "2025-12-26T02:52:09.432Z",
+    "source": "Block Move Solver"
+  }
+}
+</textarea>
+                    <div id="error" class="error" style="display: none;"></div>
+                </div>
+                
+                <div class="control-group" style="display: flex; align-items: center; gap: 10px;">
+                    <div class="slider-container" style="margin-bottom:0;">
+                        <div class="slider-label">
+                            <label style="margin: 0;">Tolerance (허용 오차)</label>
+                            <span class="slider-value" id="toleranceValue">2.0</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:2px;">
+                            <button id="bigTolDownBtn" type="button" style="min-width:28px;">––</button>
+                            <button id="tolDownBtn" type="button" style="min-width:28px;">－</button>
+                            <input type="range" id="tolerance" min="0" max="10" step="0.1" value="2" style="vertical-align:middle;">
+                            <button id="tolUpBtn" type="button" style="min-width:28px;">＋</button>
+                            <button id="bigTolUpBtn" type="button" style="min-width:28px;">++</button>
+                        </div>
+                    </div>
+                    <div class="zoom-controls" style="display:flex;align-items:center;gap:4px;margin-bottom:0;">
+                        <button id="bigZoomOutBtn" type="button">––</button>
+                        <button id="zoomOutBtn" type="button">－</button>
+<input type="range" id="zoomRange" min="5" max="100" step="5" value="60" style="width:110px;">
+                        <span id="zoomPercent">100%</span>
+                        <button id="zoomInBtn" type="button">＋</button>
+                        <button id="bigZoomInBtn" type="button">++</button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <button onclick="visualize()">시각화 생성</button>
+                    <button id="copyDP" type="button">DP 결과 복사</button>
+                </div>
+                
+                <div class="stats" id="stats" style="display: none;">
+                    <div class="stat-row">
+                        <span class="stat-label">원본 포인트</span>
+                        <span class="stat-value" id="originalPoints">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">단순화된 포인트</span>
+                        <span class="stat-value" id="simplifiedPoints">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">감소율</span>
+                        <span class="stat-value" id="reduction">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <canvas id="canvas" width="800" height="600"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 같은 이름의 JS (body 끝에 두는 것을 권장) -->
+    <script src="block3_vectors.js"></script>
+</body>
+</html>
