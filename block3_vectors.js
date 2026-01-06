@@ -8,6 +8,7 @@ const canvas = document.getElementById('canvas');
         
         let currentData = null;
         let scalePercent = 60;
+        let savedGroups = []; // 저장된 그룹들의 배열
         
         // 슬라이더 값 업데이트
         toleranceSlider.addEventListener('input', (e) => {
@@ -114,6 +115,46 @@ const canvas = document.getElementById('canvas');
             }
         }
         
+        // 저장된 그룹 목록 업데이트
+        function updateGroupList() {
+            const groupListDiv = document.getElementById('groupList');
+            if (savedGroups.length === 0) {
+                groupListDiv.innerHTML = '<p style="color: #888;">저장된 그룹이 없습니다.</p>';
+                return;
+            }
+            
+            let html = '<div style="margin-top: 10px;">';
+            savedGroups.forEach((group, index) => {
+                const color = group.color;
+                html += `
+                    <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                        <input type="checkbox" id="group${index}" ${group.visible ? 'checked' : ''} 
+                               onchange="toggleGroup(${index})" style="margin-right: 10px;">
+                        <div style="width: 20px; height: 20px; background: ${color}; border: 2px solid #333; margin-right: 10px;"></div>
+                        <label for="group${index}" style="flex: 1; cursor: pointer;">그룹 ${index + 1} (${group.points.length}개 점)</label>
+                        <button onclick="deleteGroup(${index})" style="padding: 4px 8px; font-size: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            groupListDiv.innerHTML = html;
+        }
+        
+        // 그룹 표시/숨김 토글
+        window.toggleGroup = function(index) {
+            savedGroups[index].visible = !savedGroups[index].visible;
+            drawAllGroups();
+        };
+        
+        // 그룹 삭제
+        window.deleteGroup = function(index) {
+            if (confirm(`그룹 ${index + 1}을(를) 삭제하시겠습니까?`)) {
+                savedGroups.splice(index, 1);
+                updateGroupList();
+                drawAllGroups();
+            }
+        };
+        
         // 시각화 함수
         function visualize() {
             const data = jsonInput.value ? parseJSON() : null;
@@ -141,8 +182,111 @@ const canvas = document.getElementById('canvas');
             // 클립보드 복사용 DP 결과 저장
             window.dpResult = simplifiedPoints;
             
-            // 캔버스 그리기
+            // 현재 데이터만 임시로 그리기 (저장되지 않은 상태)
             drawVisualization(points, simplifiedPoints);
+        }
+        
+        // 저장 버튼 클릭
+        window.saveCurrentGroup = function() {
+            if (!window.dpResult || !Array.isArray(window.dpResult) || window.dpResult.length === 0) {
+                alert('저장할 데이터가 없습니다. 먼저 "시각화 생성"을 해 주세요.');
+                return;
+            }
+            
+            // 색상 배열 (그룹마다 다른 색상)
+            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6348', '#00d2d3'];
+            const color = colors[savedGroups.length % colors.length];
+            
+            savedGroups.push({
+                points: JSON.parse(JSON.stringify(window.dpResult)), // 깊은 복사
+                color: color,
+                visible: true,
+                originalCount: currentData ? currentData.tiles.length : 0
+            });
+            
+            // UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+            
+            // textarea 초기화
+            jsonInput.value = '';
+            currentData = null;
+            window.dpResult = null;
+            
+            // 통계 숨기기
+            statsDiv.style.display = 'none';
+            
+            alert(`그룹 ${savedGroups.length}이(가) 저장되었습니다. 다음 데이터를 입력해주세요.`);
+        };
+        
+        // 저장된 모든 그룹 그리기
+        function drawAllGroups() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 표시할 그룹들만 필터링
+            const visibleGroups = savedGroups.filter(g => g.visible);
+            if (visibleGroups.length === 0) return;
+            
+            // 모든 표시할 그룹의 점들을 합쳐서 범위 계산
+            let allPoints = [];
+            visibleGroups.forEach(group => {
+                allPoints = allPoints.concat(group.points);
+            });
+            
+            if (allPoints.length === 0) return;
+            
+            const minX = Math.min(...allPoints.map(p => p.x));
+            const maxX = Math.max(...allPoints.map(p => p.x));
+            const minY = Math.min(...allPoints.map(p => p.y));
+            const maxY = Math.max(...allPoints.map(p => p.y));
+            
+            const padding = 40;
+            const baseScaleX = (canvas.width - padding * 2) / (maxX - minX || 1);
+            const baseScaleY = (canvas.height - padding * 2) / (maxY - minY || 1);
+            const scale = Math.min(baseScaleX, baseScaleY) * (scalePercent / 100);
+            
+            const offsetX = padding + (canvas.width - padding * 2 - (maxX - minX) * scale) / 2;
+            const offsetY = padding + (canvas.height - padding * 2 - (maxY - minY) * scale) / 2;
+            
+            const transform = (p) => ({
+                x: (p.x - minX) * scale + offsetX,
+                y: (p.y - minY) * scale + offsetY
+            });
+            
+            // 각 그룹 그리기
+            visibleGroups.forEach((group, idx) => {
+                const points = group.points;
+                const color = group.color;
+                
+                // 경로 그리기
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                points.forEach((p, i) => {
+                    const tp = transform(p);
+                    if (i === 0) ctx.moveTo(tp.x, tp.y);
+                    else ctx.lineTo(tp.x, tp.y);
+                });
+                ctx.stroke();
+                
+                // 포인트 그리기
+                points.forEach((p, i) => {
+                    const tp = transform(p);
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(tp.x, tp.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // 포인트 번호
+                    ctx.fillStyle = '#333';
+                    ctx.font = '11px sans-serif';
+                    ctx.fillText(i, tp.x + 10, tp.y - 10);
+                });
+            });
         }
         
         // 캔버스 그리기

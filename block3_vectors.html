@@ -439,7 +439,15 @@
                 
                 <div class="control-group">
                     <button onclick="visualize()">시각화 생성</button>
+                    <button onclick="saveCurrentGroup()" type="button" style="background: #27ae60;">현재 그룹 저장</button>
                     <button id="copyDP" type="button">DP 결과 복사</button>
+                </div>
+                
+                <div class="control-group">
+                    <label>저장된 그룹 목록</label>
+                    <div id="groupList" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: white;">
+                        <p style="color: #888;">저장된 그룹이 없습니다.</p>
+                    </div>
                 </div>
                 
                 <div class="stats" id="stats" style="display: none;">
