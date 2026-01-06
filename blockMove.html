@@ -107,7 +107,7 @@
                 <option value="3">3x3</option>
             </select>
             <label for="angleThresholdInput" style="margin-left: 15px;">각도 임계값:</label>
-            <input type="number" id="angleThresholdInput" min="5" max="180" step="5" value="45" 
+            <input type="number" id="angleThresholdInput" min="5" max="180" step="5" value="30" 
                    style="width: 60px; background-color: #2d2d2d; color: #ffffff; border: 1px solid #444; padding: 5px; margin-left: 5px;">
             <span style="color: #aaaaaa; font-size: 12px;">도</span>
         </div>
@@ -162,11 +162,8 @@
         <h2 style="color: #ffffff; border-bottom: 2px solid #444; padding-bottom: 10px;">타일 그룹핑 결과</h2>
         <div style="margin-bottom: 15px;">
             <span style="color: #aaaaaa;">현재 각도 임계값: </span>
-            <span id="currentAngleThreshold" style="color: #ffff00; font-weight: bold;">45도</span>
-            <button id="regroupButton" style="margin-left: 15px; padding: 5px 15px; background-color: #4a4a4a; color: #ffffff; border: 1px solid #666; cursor: pointer;">
-                다시 그룹핑
-            </button>
-            <button id="copyToClipboard" style="margin-left: 10px; padding: 5px 15px; background-color: #0066cc; color: #ffffff; border: 1px solid #0055aa; cursor: pointer; font-weight: bold;">
+            <span id="currentAngleThreshold" style="color: #ffff00; font-weight: bold;">30도</span>
+            <button id="copyToClipboard" style="margin-left: 15px; padding: 5px 15px; background-color: #0066cc; color: #ffffff; border: 1px solid #0055aa; cursor: pointer; font-weight: bold;">
                 📋 클립보드에 복사
             </button>
             <span style="margin-left: 15px; color: #aaaaaa; font-size: 12px;">
@@ -1101,36 +1098,6 @@
                     console.error('클립보드 복사 실패:', err);
                     alert('클립보드 복사에 실패했습니다.\n' + err.message);
                 });
-        });
-
-        // 다시 그룹핑 버튼 이벤트
-        document.getElementById('regroupButton').addEventListener('click', () => {
-            const angleThreshold = parseFloat(document.getElementById('angleThresholdInput').value) || 45;
-            window.groupingAngleThreshold = angleThreshold;
-            
-            // 하단 표시 업데이트
-            const currentAngleThresholdSpan = document.getElementById('currentAngleThreshold');
-            if (currentAngleThresholdSpan) {
-                currentAngleThresholdSpan.textContent = angleThreshold + '도';
-            }
-            
-            // 현재 선택된 타일 경로를 가져옴
-            if (currentTilePath && currentTilePath.length > 0 && typeof window.groupTilesByAngle === 'function') {
-                console.log(`다시 그룹핑 중... (각도 임계값: ${angleThreshold}°)`);
-                
-                const groups = window.groupTilesByAngle(currentTilePath, currentTileSize, angleThreshold);
-                
-                if (typeof window.printTileGroups === 'function') {
-                    window.printTileGroups(groups, currentTileSize);
-                }
-                
-                if (typeof window.formatGroupsForDisplay === 'function') {
-                    const groupsForDisplay = window.formatGroupsForDisplay(groups);
-                    window.displayTileGroups(groupsForDisplay);
-                }
-            } else {
-                console.log('다시 그룹핑할 타일이 없습니다. 먼저 타일을 선택해주세요.');
-            }
         });
 
         // 타일 경로 업데이트 시 타일 크기도 저장

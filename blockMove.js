@@ -629,12 +629,17 @@ function askUserForNextTile(adjacentCandidates, tiles, cur, centers, k, prevAngl
       window.showInputSection(true);
     }
     if (typeof window !== 'undefined' && typeof window.updateTileOptions === 'function') {
+      // 각도 임계값 가져오기 (기본값: 30)
+      const angleThreshold = (typeof window !== 'undefined' && typeof document !== 'undefined') 
+        ? (parseFloat(document.getElementById('angleThresholdInput')?.value) || 30) 
+        : 30;
+      
       // 각 후보에 대한 각도 정보 계산
       const candidatesWithAngles = adjacentCandidates.map(cand => {
         const candCenter = tileCenter(cand, k);
         const angle = angleDegCart(centers[cur], candCenter);
         const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
-        const isPreferred = (prevAngle !== null) && (diff <= 45);
+        const isPreferred = (prevAngle !== null) && (diff <= angleThreshold);
         return { ...cand, angle, diff, isPreferred };
       });
       window.updateTileOptions([], tiles, cur, centers, k, prevAngle, candidatesWithAngles);
@@ -1011,12 +1016,17 @@ async function tryAutoSelectTile(adjacentCandidates, tiles, cur, centers, k, pre
   
   // 각도 기준 자동선택 모드
   if (typeof window !== 'undefined' && window.autoSelectAngleMode && adjacentCandidates.length > 0) {
+    // 각도 임계값 가져오기 (기본값: 30)
+    const angleThreshold = (typeof window !== 'undefined' && typeof document !== 'undefined') 
+      ? (parseFloat(document.getElementById('angleThresholdInput')?.value) || 30) 
+      : 30;
+    
     // 각 후보에 대한 각도 정보 계산
     const candidatesWithAngles = adjacentCandidates.map(cand => {
       const candCenter = tileCenter(cand, k);
       const angle = angleDegCart(centers[cur], candCenter);
       const diff = (prevAngle !== null) ? angleDiff(prevAngle, angle) : null;
-      const isPreferred = (prevAngle !== null) && (diff <= 45);
+      const isPreferred = (prevAngle !== null) && (diff <= angleThreshold);
       return { ...cand, angle, diff, isPreferred };
     });
     
