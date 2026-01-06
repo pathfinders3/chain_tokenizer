@@ -119,7 +119,7 @@ const canvas = document.getElementById('canvas');
         function updateGroupList() {
             const groupListDiv = document.getElementById('groupList');
             if (savedGroups.length === 0) {
-                groupListDiv.innerHTML = '<p style="color: #888;">저장된 그룹이 없습니다.</p>';
+                groupListDiv.innerHTML = '<p style="color: #aaa;">저장된 그룹이 없습니다.</p>';
                 return;
             }
             
@@ -127,11 +127,11 @@ const canvas = document.getElementById('canvas');
             savedGroups.forEach((group, index) => {
                 const color = group.color;
                 html += `
-                    <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: #3a3a3a; border-radius: 4px;">
                         <input type="checkbox" id="group${index}" ${group.visible ? 'checked' : ''} 
                                onchange="toggleGroup(${index})" style="margin-right: 10px;">
-                        <div style="width: 20px; height: 20px; background: ${color}; border: 2px solid #333; margin-right: 10px;"></div>
-                        <label for="group${index}" style="flex: 1; cursor: pointer;">그룹 ${index + 1} (${group.points.length}개 점)</label>
+                        <div style="width: 20px; height: 20px; background: ${color}; border: 2px solid #fff; margin-right: 10px;"></div>
+                        <label for="group${index}" style="flex: 1; cursor: pointer; color: #eee;">그룹 ${index + 1} (${group.points.length}개 점)</label>
                         <button onclick="deleteGroup(${index})" style="padding: 4px 8px; font-size: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
                     </div>
                 `;
@@ -215,8 +215,6 @@ const canvas = document.getElementById('canvas');
             
             // 통계 숨기기
             statsDiv.style.display = 'none';
-            
-            alert(`그룹 ${savedGroups.length}이(가) 저장되었습니다. 다음 데이터를 입력해주세요.`);
         };
         
         // 저장된 모든 그룹 그리기
