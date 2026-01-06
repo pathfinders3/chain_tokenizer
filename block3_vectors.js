@@ -123,16 +123,16 @@ const canvas = document.getElementById('canvas');
                 return;
             }
             
-            let html = '<div style="margin-top: 10px;">';
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">';
             savedGroups.forEach((group, index) => {
                 const color = group.color;
                 html += `
-                    <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: #3a3a3a; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; padding: 8px; background: #3a3a3a; border-radius: 4px; min-width: 180px;">
                         <input type="checkbox" id="group${index}" ${group.visible ? 'checked' : ''} 
-                               onchange="toggleGroup(${index})" style="margin-right: 10px;">
-                        <div style="width: 20px; height: 20px; background: ${color}; border: 2px solid #fff; margin-right: 10px;"></div>
-                        <label for="group${index}" style="flex: 1; cursor: pointer; color: #eee;">그룹 ${index + 1} (${group.points.length}개 점)</label>
-                        <button onclick="deleteGroup(${index})" style="padding: 4px 8px; font-size: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
+                               onchange="toggleGroup(${index})" style="margin-right: 8px;">
+                        <div style="width: 18px; height: 18px; background: ${color}; border: 2px solid #fff; margin-right: 8px; flex-shrink: 0;"></div>
+                        <label for="group${index}" style="cursor: pointer; color: #eee; font-size: 13px; white-space: nowrap; margin-right: 8px;">그룹 ${index + 1} (${group.points.length})</label>
+                        <button onclick="deleteGroup(${index})" style="padding: 3px 6px; font-size: 11px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">×</button>
                     </div>
                 `;
             });
@@ -182,41 +182,37 @@ const canvas = document.getElementById('canvas');
             // 클립보드 복사용 DP 결과 저장
             window.dpResult = simplifiedPoints;
             
-            // 현재 데이터만 임시로 그리기 (저장되지 않은 상태)
-            drawVisualization(points, simplifiedPoints);
+            // 자동으로 그룹 저장
+            if (window.dpResult && Array.isArray(window.dpResult) && window.dpResult.length > 0) {
+                // 색상 배열 (그룹마다 다른 색상)
+                const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6348', '#00d2d3'];
+                const color = colors[savedGroups.length % colors.length];
+                
+                savedGroups.push({
+                    points: JSON.parse(JSON.stringify(window.dpResult)), // 깊은 복사
+                    color: color,
+                    visible: true,
+                    originalCount: currentData ? currentData.tiles.length : 0
+                });
+                
+                // UI 업데이트
+                updateGroupList();
+                drawAllGroups();
+                
+                // textarea 초기화
+                jsonInput.value = '';
+                currentData = null;
+                window.dpResult = null;
+                
+                // 통계 숨기기
+                statsDiv.style.display = 'none';
+            } else {
+                // DP 결과가 없으면 현재 데이터만 임시로 그리기
+                drawVisualization(points, simplifiedPoints);
+            }
         }
         
-        // 저장 버튼 클릭
-        window.saveCurrentGroup = function() {
-            if (!window.dpResult || !Array.isArray(window.dpResult) || window.dpResult.length === 0) {
-                alert('저장할 데이터가 없습니다. 먼저 "시각화 생성"을 해 주세요.');
-                return;
-            }
-            
-            // 색상 배열 (그룹마다 다른 색상)
-            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6348', '#00d2d3'];
-            const color = colors[savedGroups.length % colors.length];
-            
-            savedGroups.push({
-                points: JSON.parse(JSON.stringify(window.dpResult)), // 깊은 복사
-                color: color,
-                visible: true,
-                originalCount: currentData ? currentData.tiles.length : 0
-            });
-            
-            // UI 업데이트
-            updateGroupList();
-            drawAllGroups();
-            
-            // textarea 초기화
-            jsonInput.value = '';
-            currentData = null;
-            window.dpResult = null;
-            
-            // 통계 숨기기
-            statsDiv.style.display = 'none';
-        };
-        
+
         // 저장된 모든 그룹 그리기
         function drawAllGroups() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
