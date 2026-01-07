@@ -293,19 +293,55 @@ const canvas = document.getElementById('canvas');
                 points.forEach((p, i) => {
                     const tp = transform(p);
                     const groupIndex = savedGroups.findIndex(g => g === group);
-                    const isSelected = selectedPoints.some(sp => sp.groupIndex === groupIndex && sp.pointIndex === i);
+                    const selectedIndex = selectedPoints.findIndex(sp => sp.groupIndex === groupIndex && sp.pointIndex === i);
+                    const isSelected = selectedIndex !== -1;
                     
-                    ctx.fillStyle = color;
+                    // 선택된 점들을 timestamp 기준으로 정렬하여 최근 2개 찾기
+                    const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+                    let pointColor = color;
+                    let strokeColor = 'white';
+                    let pointSize = 6;
+                    let strokeWidth = 2;
+                    let fontWeight = '11px sans-serif';
+                    let fontColor = '#333';
+                    
+                    if (isSelected) {
+                        pointSize = 10;
+                        strokeWidth = 3;
+                        fontWeight = 'bold 13px sans-serif';
+                        fontColor = '#000';
+                        
+                        // 가장 최근 점(1번): 파란색
+                        if (sortedSelected.length > 0 && 
+                            sortedSelected[0].groupIndex === groupIndex && 
+                            sortedSelected[0].pointIndex === i) {
+                            strokeColor = '#0000ff';
+                            console.log('1번(파란색)');
+                        }
+                        // 두 번째 최근 점(0번): 빨간색
+                        else if (sortedSelected.length > 1 && 
+                                 sortedSelected[1].groupIndex === groupIndex && 
+                                 sortedSelected[1].pointIndex === i) {
+                            strokeColor = '#ff0000';
+                            console.log('0번(빨간색)');
+                        }
+                        // 나머지 선택된 점: 노란색
+                        else {
+                            strokeColor = '#ffff00';
+                        }
+                    }
+                    
+                    ctx.fillStyle = pointColor;
                     ctx.beginPath();
-                    ctx.arc(tp.x, tp.y, isSelected ? 10 : 6, 0, Math.PI * 2);
+                    ctx.arc(tp.x, tp.y, pointSize, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.strokeStyle = isSelected ? '#ffff00' : 'white';
-                    ctx.lineWidth = isSelected ? 3 : 2;
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = strokeWidth;
                     ctx.stroke();
                     
                     // 포인트 번호
-                    ctx.fillStyle = isSelected ? '#000' : '#333';
-                    ctx.font = isSelected ? 'bold 13px sans-serif' : '11px sans-serif';
+                    ctx.fillStyle = fontColor;
+                    ctx.font = fontWeight;
                     ctx.fillText(i, tp.x + 10, tp.y - 10);
                 });
             });
@@ -430,12 +466,12 @@ const canvas = document.getElementById('canvas');
                         console.log(`선택 해제: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}`);
                     } else {
                         // 다른 점을 클릭하면 해당 그룹의 선택을 교체
-                        selectedPoints[existingIndex] = { groupIndex, pointIndex };
+                        selectedPoints[existingIndex] = { groupIndex, pointIndex, timestamp: Date.now() };
                         console.log(`선택 교체: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
                     }
                 } else {
                     // 새로운 그룹의 점 선택
-                    selectedPoints.push({ groupIndex, pointIndex });
+                    selectedPoints.push({ groupIndex, pointIndex, timestamp: Date.now() });
                     console.log(`선택 추가: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
                 }
             } else {
@@ -468,6 +504,39 @@ const canvas = document.getElementById('canvas');
             } else {
                 alert('DP 결과가 없습니다. 먼저 "시각화 생성"을 해 주세요.');
             }
+        });
+
+        // 1번 점을 0번 점 위치로 이동시키는 버튼 이벤트
+        document.getElementById('alignPoints').addEventListener('click', function () {
+            // 최근 2개 점 찾기
+            const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (sortedSelected.length < 2) {
+                alert('최소 2개의 점을 선택해야 합니다. (현재: ' + sortedSelected.length + '개)');
+                return;
+            }
+            
+            const point1 = sortedSelected[0]; // 1번 (파란색, 가장 최근)
+            const point0 = sortedSelected[1]; // 0번 (빨간색, 두 번째 최근)
+            
+            // 0번 점의 좌표 가져오기
+            const targetPoint = savedGroups[point0.groupIndex].points[point0.pointIndex];
+            
+            // 1번 점의 좌표를 0번 점의 좌표로 변경
+            const beforePoint = savedGroups[point1.groupIndex].points[point1.pointIndex];
+            savedGroups[point1.groupIndex].points[point1.pointIndex] = {
+                x: targetPoint.x,
+                y: targetPoint.y
+            };
+            
+            console.log(`이동 완료: 그룹 ${point1.groupIndex + 1}, 포인트 ${point1.pointIndex}`);
+            console.log(`  이전: (${beforePoint.x}, ${beforePoint.y})`);
+            console.log(`  이후: (${targetPoint.x}, ${targetPoint.y})`);
+            
+            // 화면 재렌더링
+            drawAllGroups();
+            
+            alert(`1번 점을 0번 점의 위치로 이동했습니다.\n그룹 ${point1.groupIndex + 1}, 포인트 ${point1.pointIndex} → (${targetPoint.x}, ${targetPoint.y})`);
         });
 
         // 확대/축소 및 배율 Range Bar 이벤트
