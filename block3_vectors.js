@@ -522,21 +522,29 @@ const canvas = document.getElementById('canvas');
             // 0번 점의 좌표 가져오기
             const targetPoint = savedGroups[point0.groupIndex].points[point0.pointIndex];
             
-            // 1번 점의 좌표를 0번 점의 좌표로 변경
+            // 1번 점의 원래 좌표
             const beforePoint = savedGroups[point1.groupIndex].points[point1.pointIndex];
-            savedGroups[point1.groupIndex].points[point1.pointIndex] = {
-                x: targetPoint.x,
-                y: targetPoint.y
-            };
             
-            console.log(`이동 완료: 그룹 ${point1.groupIndex + 1}, 포인트 ${point1.pointIndex}`);
-            console.log(`  이전: (${beforePoint.x}, ${beforePoint.y})`);
-            console.log(`  이후: (${targetPoint.x}, ${targetPoint.y})`);
+            // 이동 벡터 계산 (dx, dy)
+            const dx = targetPoint.x - beforePoint.x;
+            const dy = targetPoint.y - beforePoint.y;
+            
+            // 1번 점이 속한 그룹의 모든 점들을 같은 벡터만큼 평행이동
+            const group1 = savedGroups[point1.groupIndex];
+            group1.points = group1.points.map(p => ({
+                x: p.x + dx,
+                y: p.y + dy
+            }));
+            
+            console.log(`그룹 ${point1.groupIndex + 1} 전체 이동 완료`);
+            console.log(`  이동 벡터: (${dx}, ${dy})`);
+            console.log(`  1번 점 이동: (${beforePoint.x}, ${beforePoint.y}) → (${beforePoint.x + dx}, ${beforePoint.y + dy})`);
+            console.log(`  총 ${group1.points.length}개 점 이동`);
             
             // 화면 재렌더링
             drawAllGroups();
             
-            alert(`1번 점을 0번 점의 위치로 이동했습니다.\n그룹 ${point1.groupIndex + 1}, 포인트 ${point1.pointIndex} → (${targetPoint.x}, ${targetPoint.y})`);
+            alert(`그룹 ${point1.groupIndex + 1} 전체를 평행이동했습니다.\n이동 벡터: (${dx}, ${dy})\n총 ${group1.points.length}개 점 이동`);
         });
 
         // 확대/축소 및 배율 Range Bar 이벤트
