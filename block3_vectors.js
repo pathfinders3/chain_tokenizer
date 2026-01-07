@@ -9,7 +9,7 @@ const canvas = document.getElementById('canvas');
         let currentData = null;
         let scalePercent = 60;
         let savedGroups = []; // 저장된 그룹들의 배열
-        let selectedPoint = null; // 선택된 점: { groupIndex: number, pointIndex: number }
+        let selectedPoints = []; // 선택된 점들의 배열: [{ groupIndex: number, pointIndex: number }]
         let currentTransform = null; // 현재 transform 함수 저장
         
         // 슬라이더 값 업데이트
@@ -161,6 +161,15 @@ const canvas = document.getElementById('canvas');
         window.deleteGroup = function(index) {
             if (confirm(`그룹 ${index + 1}을(를) 삭제하시겠습니까?`)) {
                 savedGroups.splice(index, 1);
+                
+                // 삭제된 그룹의 선택된 점 제거 및 인덱스 조정
+                selectedPoints = selectedPoints
+                    .filter(sp => sp.groupIndex !== index)
+                    .map(sp => ({
+                        groupIndex: sp.groupIndex > index ? sp.groupIndex - 1 : sp.groupIndex,
+                        pointIndex: sp.pointIndex
+                    }));
+                
                 updateGroupList();
                 drawAllGroups();
             }
@@ -284,7 +293,7 @@ const canvas = document.getElementById('canvas');
                 points.forEach((p, i) => {
                     const tp = transform(p);
                     const groupIndex = savedGroups.findIndex(g => g === group);
-                    const isSelected = selectedPoint && selectedPoint.groupIndex === groupIndex && selectedPoint.pointIndex === i;
+                    const isSelected = selectedPoints.some(sp => sp.groupIndex === groupIndex && sp.pointIndex === i);
                     
                     ctx.fillStyle = color;
                     ctx.beginPath();
@@ -407,18 +416,34 @@ const canvas = document.getElementById('canvas');
                 });
             });
             
-            // 가까운 점이 있으면 선택, 없으면 선택 해제
+            // 가까운 점이 있으면 선택/해제 처리
             if (closestPoint) {
-                selectedPoint = {
-                    groupIndex: closestPoint.groupIndex,
-                    pointIndex: closestPoint.pointIndex
-                };
+                const { groupIndex, pointIndex } = closestPoint;
                 
-                // 선택된 점 정보 표시
-                const group = savedGroups[closestPoint.groupIndex];
-                console.log(`선택된 점: 그룹 ${closestPoint.groupIndex + 1}, 포인트 ${closestPoint.pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
+                // 같은 그룹에서 이미 선택된 점이 있는지 확인
+                const existingIndex = selectedPoints.findIndex(sp => sp.groupIndex === groupIndex);
+                
+                if (existingIndex !== -1) {
+                    // 같은 점을 다시 클릭하면 선택 해제
+                    if (selectedPoints[existingIndex].pointIndex === pointIndex) {
+                        selectedPoints.splice(existingIndex, 1);
+                        console.log(`선택 해제: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}`);
+                    } else {
+                        // 다른 점을 클릭하면 해당 그룹의 선택을 교체
+                        selectedPoints[existingIndex] = { groupIndex, pointIndex };
+                        console.log(`선택 교체: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
+                    }
+                } else {
+                    // 새로운 그룹의 점 선택
+                    selectedPoints.push({ groupIndex, pointIndex });
+                    console.log(`선택 추가: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
+                }
             } else {
-                selectedPoint = null;
+                // 빈 공간 클릭 시 모든 선택 해제
+                if (selectedPoints.length > 0) {
+                    selectedPoints = [];
+                    console.log('모든 선택 해제');
+                }
             }
             
             drawAllGroups();
