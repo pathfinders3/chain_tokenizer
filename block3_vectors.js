@@ -11,6 +11,7 @@ const canvas = document.getElementById('canvas');
         let savedGroups = []; // 저장된 그룹들의 배열
         let selectedPoints = []; // 선택된 점들의 배열: [{ groupIndex: number, pointIndex: number }]
         let currentTransform = null; // 현재 transform 함수 저장
+        let draggingPoint = null; // 드래그 중인 점: { groupIndex, pointIndex, originalPos, startMousePos }
         
         // 슬라이더 값 업데이트
         toleranceSlider.addEventListener('input', (e) => {
@@ -423,6 +424,7 @@ const canvas = document.getElementById('canvas');
         
         // 캔버스 클릭으로 점 선택
         canvas.addEventListener('click', function(event) {
+            // 드래그 직후에는 클릭 이벤트 무시 (이미 mouseup에서 처리됨)
             if (!currentTransform || savedGroups.length === 0) return;
             
             const rect = canvas.getBoundingClientRect();
@@ -481,6 +483,150 @@ const canvas = document.getElementById('canvas');
             }
             
             drawAllGroups();
+        });
+        
+        // 마우스 다운: 드래그 시작 (선택된 그룹의 점만)
+        canvas.addEventListener('mousedown', function(event) {
+            if (!currentTransform || savedGroups.length === 0) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            let closestPoint = null;
+            let minDistance = 15; // 15픽셀 이내의 점만
+            
+            // 선택된(selected=true) 그룹의 점들만 확인
+            savedGroups.forEach((group, groupIndex) => {
+                if (!group.visible || !group.selected) return; // 선택되고 표시된 그룹만
+                
+                group.points.forEach((point, pointIndex) => {
+                    const tp = currentTransform(point);
+                    const distance = Math.sqrt(
+                        Math.pow(tp.x - mouseX, 2) + 
+                        Math.pow(tp.y - mouseY, 2)
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPoint = { groupIndex, pointIndex, point };
+                    }
+                });
+            });
+            
+            if (closestPoint) {
+                draggingPoint = {
+                    groupIndex: closestPoint.groupIndex,
+                    pointIndex: closestPoint.pointIndex,
+                    originalPos: { 
+                        x: closestPoint.point.x, 
+                        y: closestPoint.point.y 
+                    },
+                    startMousePos: { x: mouseX, y: mouseY },
+                    wasDragged: false
+                };
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+        
+        // 마우스 무브: 드래그 중
+        canvas.addEventListener('mousemove', function(event) {
+            if (!draggingPoint) {
+                canvas.style.cursor = 'default';
+                return;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            // 마우스 이동 거리 (화면 좌표)
+            const screenDx = mouseX - draggingPoint.startMousePos.x;
+            const screenDy = mouseY - draggingPoint.startMousePos.y;
+            
+            // 최소 5픽셀 이상 움직여야 드래그로 인식
+            const dragThreshold = 5;
+            const dragDistance = Math.sqrt(screenDx * screenDx + screenDy * screenDy);
+            
+            if (!draggingPoint.wasDragged && dragDistance < dragThreshold) {
+                // 아직 threshold를 넘지 않았으면 드래그 시작 안 함
+                return;
+            }
+            
+            draggingPoint.wasDragged = true;
+            
+            // 화면 좌표를 데이터 좌표로 변환하기 위해 스케일 역산
+            // transform 함수에서 사용하는 scale을 역으로 계산
+            const visibleGroups = savedGroups.filter(g => g.visible);
+            if (visibleGroups.length === 0) return;
+            
+            let allPoints = [];
+            visibleGroups.forEach(group => {
+                allPoints = allPoints.concat(group.points);
+            });
+            
+            const minX = Math.min(...allPoints.map(p => p.x));
+            const maxX = Math.max(...allPoints.map(p => p.x));
+            const minY = Math.min(...allPoints.map(p => p.y));
+            const maxY = Math.max(...allPoints.map(p => p.y));
+            
+            const padding = 40;
+            const baseScaleX = (canvas.width - padding * 2) / (maxX - minX || 1);
+            const baseScaleY = (canvas.height - padding * 2) / (maxY - minY || 1);
+            const scale = Math.min(baseScaleX, baseScaleY) * (scalePercent / 100);
+            
+            // 화면 이동 거리를 데이터 좌표 이동 거리로 변환
+            const dataDx = screenDx / scale;
+            const dataDy = screenDy / scale;
+            
+            // 드래그 중인 점만 임시로 이동 (미리보기)
+            savedGroups[draggingPoint.groupIndex].points[draggingPoint.pointIndex] = {
+                x: draggingPoint.originalPos.x + dataDx,
+                y: draggingPoint.originalPos.y + dataDy
+            };
+            
+            drawAllGroups();
+        });
+        
+        // 마우스 업: 드래그 종료, 그룹 전체 평행이동
+        canvas.addEventListener('mouseup', function(event) {
+            if (!draggingPoint) return;
+            
+            if (draggingPoint.wasDragged) {
+                // 드래그한 거리 계산
+                const movedPoint = savedGroups[draggingPoint.groupIndex].points[draggingPoint.pointIndex];
+                const dx = movedPoint.x - draggingPoint.originalPos.x;
+                const dy = movedPoint.y - draggingPoint.originalPos.y;
+                
+                // 그룹 전체를 평행이동
+                const group = savedGroups[draggingPoint.groupIndex];
+                group.points = group.points.map(p => ({
+                    x: p.x + dx,
+                    y: p.y + dy
+                }));
+                
+                // 원래 위치 복원 후 전체 이동 (이미 한 점은 이동했으므로)
+                group.points[draggingPoint.pointIndex] = {
+                    x: draggingPoint.originalPos.x + dx,
+                    y: draggingPoint.originalPos.y + dy
+                };
+                
+                console.log(`그룹 ${draggingPoint.groupIndex + 1} 드래그 이동 완료`);
+                console.log(`  이동 벡터: (${dx.toFixed(2)}, ${dy.toFixed(2)})`);
+                console.log(`  총 ${group.points.length}개 점 이동`);
+                
+                drawAllGroups();
+            } else {
+                // 드래그하지 않고 클릭만 한 경우, 원래 위치로 복원
+                savedGroups[draggingPoint.groupIndex].points[draggingPoint.pointIndex] = {
+                    x: draggingPoint.originalPos.x,
+                    y: draggingPoint.originalPos.y
+                };
+                drawAllGroups();
+            }
+            
+            canvas.style.cursor = 'default';
+            draggingPoint = null; // mouseup에서 즉시 초기화
         });
         
         // 초기 데이터 로드
