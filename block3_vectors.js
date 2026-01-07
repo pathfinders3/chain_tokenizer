@@ -126,13 +126,15 @@ const canvas = document.getElementById('canvas');
             let html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">';
             savedGroups.forEach((group, index) => {
                 const color = group.color;
+                const bgColor = group.selected ? '#4a4a4a' : '#3a3a3a';
+                const borderStyle = group.selected ? `border: 2px solid ${color};` : '';
                 html += `
-                    <div style="display: flex; align-items: center; padding: 8px; background: #3a3a3a; border-radius: 4px; min-width: 180px;">
+                    <div onclick="selectGroup(${index})" style="display: flex; align-items: center; padding: 8px; background: ${bgColor}; border-radius: 4px; min-width: 180px; cursor: pointer; ${borderStyle}">
                         <input type="checkbox" id="group${index}" ${group.visible ? 'checked' : ''} 
-                               onchange="toggleGroup(${index})" style="margin-right: 8px;">
+                               onchange="event.stopPropagation(); toggleGroup(${index})" style="margin-right: 8px;">
                         <div style="width: 18px; height: 18px; background: ${color}; border: 2px solid #fff; margin-right: 8px; flex-shrink: 0;"></div>
                         <label for="group${index}" style="cursor: pointer; color: #eee; font-size: 13px; white-space: nowrap; margin-right: 8px;">그룹 ${index + 1} (${group.points.length})</label>
-                        <button onclick="deleteGroup(${index})" style="padding: 3px 6px; font-size: 11px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">×</button>
+                        <button onclick="event.stopPropagation(); deleteGroup(${index})" style="padding: 3px 6px; font-size: 11px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">×</button>
                     </div>
                 `;
             });
@@ -143,6 +145,13 @@ const canvas = document.getElementById('canvas');
         // 그룹 표시/숨김 토글
         window.toggleGroup = function(index) {
             savedGroups[index].visible = !savedGroups[index].visible;
+            drawAllGroups();
+        };
+        
+        // 그룹 선택/해제 (굵게 표시)
+        window.selectGroup = function(index) {
+            savedGroups[index].selected = !savedGroups[index].selected;
+            updateGroupList();
             drawAllGroups();
         };
         
@@ -192,6 +201,7 @@ const canvas = document.getElementById('canvas');
                     points: JSON.parse(JSON.stringify(window.dpResult)), // 깊은 복사
                     color: color,
                     visible: true,
+                    selected: false,
                     originalCount: currentData ? currentData.tiles.length : 0
                 });
                 
@@ -251,10 +261,11 @@ const canvas = document.getElementById('canvas');
             visibleGroups.forEach((group, idx) => {
                 const points = group.points;
                 const color = group.color;
+                const lineWidth = group.selected ? 6 : 3; // 선택된 그룹은 더 굵게
                 
                 // 경로 그리기
                 ctx.strokeStyle = color;
-                ctx.lineWidth = 3;
+                ctx.lineWidth = lineWidth;
                 ctx.setLineDash([]);
                 ctx.beginPath();
                 points.forEach((p, i) => {
