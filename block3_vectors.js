@@ -316,14 +316,12 @@ const canvas = document.getElementById('canvas');
                             sortedSelected[0].groupIndex === groupIndex && 
                             sortedSelected[0].pointIndex === i) {
                             strokeColor = '#0000ff';
-                            console.log('1번(파란색)');
                         }
                         // 두 번째 최근 점(0번): 빨간색
                         else if (sortedSelected.length > 1 && 
                                  sortedSelected[1].groupIndex === groupIndex && 
                                  sortedSelected[1].pointIndex === i) {
                             strokeColor = '#ff0000';
-                            console.log('0번(빨간색)');
                         }
                         // 나머지 선택된 점: 노란색
                         else {
