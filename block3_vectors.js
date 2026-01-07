@@ -9,6 +9,8 @@ const canvas = document.getElementById('canvas');
         let currentData = null;
         let scalePercent = 60;
         let savedGroups = []; // 저장된 그룹들의 배열
+        let selectedPoint = null; // 선택된 점: { groupIndex: number, pointIndex: number }
+        let currentTransform = null; // 현재 transform 함수 저장
         
         // 슬라이더 값 업데이트
         toleranceSlider.addEventListener('input', (e) => {
@@ -257,6 +259,9 @@ const canvas = document.getElementById('canvas');
                 y: (p.y - minY) * scale + offsetY
             });
             
+            // 현재 transform 함수 저장 (클릭 이벤트에서 사용)
+            currentTransform = transform;
+            
             // 각 그룹 그리기
             visibleGroups.forEach((group, idx) => {
                 const points = group.points;
@@ -278,17 +283,20 @@ const canvas = document.getElementById('canvas');
                 // 포인트 그리기
                 points.forEach((p, i) => {
                     const tp = transform(p);
+                    const groupIndex = savedGroups.findIndex(g => g === group);
+                    const isSelected = selectedPoint && selectedPoint.groupIndex === groupIndex && selectedPoint.pointIndex === i;
+                    
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(tp.x, tp.y, 6, 0, Math.PI * 2);
+                    ctx.arc(tp.x, tp.y, isSelected ? 10 : 6, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.strokeStyle = 'white';
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = isSelected ? '#ffff00' : 'white';
+                    ctx.lineWidth = isSelected ? 3 : 2;
                     ctx.stroke();
                     
                     // 포인트 번호
-                    ctx.fillStyle = '#333';
-                    ctx.font = '11px sans-serif';
+                    ctx.fillStyle = isSelected ? '#000' : '#333';
+                    ctx.font = isSelected ? 'bold 13px sans-serif' : '11px sans-serif';
                     ctx.fillText(i, tp.x + 10, tp.y - 10);
                 });
             });
@@ -369,6 +377,52 @@ const canvas = document.getElementById('canvas');
                 ctx.fillText(i, tp.x + 10, tp.y - 10);
             });
         }
+        
+        // 캔버스 클릭으로 점 선택
+        canvas.addEventListener('click', function(event) {
+            if (!currentTransform || savedGroups.length === 0) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+            
+            let closestPoint = null;
+            let minDistance = 15; // 15픽셀 이내의 점만 선택
+            
+            // 표시 중인 모든 그룹의 모든 점과 거리 비교
+            savedGroups.forEach((group, groupIndex) => {
+                if (!group.visible) return;
+                
+                group.points.forEach((point, pointIndex) => {
+                    const tp = currentTransform(point);
+                    const distance = Math.sqrt(
+                        Math.pow(tp.x - clickX, 2) + 
+                        Math.pow(tp.y - clickY, 2)
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPoint = { groupIndex, pointIndex, point };
+                    }
+                });
+            });
+            
+            // 가까운 점이 있으면 선택, 없으면 선택 해제
+            if (closestPoint) {
+                selectedPoint = {
+                    groupIndex: closestPoint.groupIndex,
+                    pointIndex: closestPoint.pointIndex
+                };
+                
+                // 선택된 점 정보 표시
+                const group = savedGroups[closestPoint.groupIndex];
+                console.log(`선택된 점: 그룹 ${closestPoint.groupIndex + 1}, 포인트 ${closestPoint.pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
+            } else {
+                selectedPoint = null;
+            }
+            
+            drawAllGroups();
+        });
         
         // 초기 데이터 로드
         window.addEventListener('load', () => {
