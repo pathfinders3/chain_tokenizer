@@ -547,6 +547,76 @@ const canvas = document.getElementById('canvas');
             alert(`그룹 ${point1.groupIndex + 1} 전체를 평행이동했습니다.\n이동 벡터: (${dx}, ${dy})\n총 ${group1.points.length}개 점 이동`);
         });
 
+        // 겹친 점을 분리하는 버튼 이벤트
+        document.getElementById('separatePoints').addEventListener('click', function () {
+            // 최근 선택된 점 찾기
+            const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (sortedSelected.length < 1) {
+                alert('먼저 점을 선택해주세요.');
+                return;
+            }
+            
+            const recentPoint = sortedSelected[0]; // 1번 (파란색, 가장 최근)
+            const recentCoord = savedGroups[recentPoint.groupIndex].points[recentPoint.pointIndex];
+            
+            console.log(`가장 최근 선택된 점: 그룹 ${recentPoint.groupIndex + 1}, 포인트 ${recentPoint.pointIndex}, 좌표 (${recentCoord.x}, ${recentCoord.y})`);
+            
+            // 같은 좌표를 가진 모든 점들 찾기 (표시 중인 그룹만)
+            const overlappingPoints = [];
+            savedGroups.forEach((group, groupIndex) => {
+                if (!group.visible) return;
+                
+                group.points.forEach((point, pointIndex) => {
+                    if (point.x === recentCoord.x && point.y === recentCoord.y) {
+                        overlappingPoints.push({ groupIndex, pointIndex, point });
+                    }
+                });
+            });
+            
+            console.log(`같은 좌표에 있는 점들: ${overlappingPoints.length}개`);
+            
+            if (overlappingPoints.length < 2) {
+                alert('해당 위치에 겹친 점이 없습니다. (점이 1개만 있음)');
+                return;
+            }
+            
+            // 1번 점을 제외한 다른 점 중 첫 번째 것 선택
+            let pointToMove = null;
+            for (const op of overlappingPoints) {
+                if (op.groupIndex !== recentPoint.groupIndex || op.pointIndex !== recentPoint.pointIndex) {
+                    pointToMove = op;
+                    break;
+                }
+            }
+            
+            // 만약 모든 점이 같은 점이라면 (동일 그룹, 동일 인덱스) 리스트의 두 번째 것 사용
+            if (!pointToMove && overlappingPoints.length > 1) {
+                pointToMove = overlappingPoints[1];
+            }
+            
+            if (!pointToMove) {
+                alert('분리할 점을 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 선택된 그룹 전체를 (10, 10) 만큼 평행이동
+            const groupToMove = savedGroups[pointToMove.groupIndex];
+            groupToMove.points = groupToMove.points.map(p => ({
+                x: p.x + 10,
+                y: p.y + 10
+            }));
+            
+            console.log(`그룹 ${pointToMove.groupIndex + 1} 전체 분리 이동 완료`);
+            console.log(`  이동 벡터: (10, 10)`);
+            console.log(`  총 ${groupToMove.points.length}개 점 이동`);
+            
+            // 화면 재렌더링
+            drawAllGroups();
+            
+            alert(`겹친 점을 분리했습니다.\n그룹 ${pointToMove.groupIndex + 1} 전체를 (10, 10) 만큼 이동\n총 ${groupToMove.points.length}개 점 이동`);
+        });
+
         // 확대/축소 및 배율 Range Bar 이벤트
         function updateZoomUI() {
             document.getElementById('zoomPercent').textContent = scalePercent + '%';
