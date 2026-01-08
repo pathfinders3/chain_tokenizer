@@ -598,22 +598,46 @@ const canvas = document.getElementById('canvas');
                 const dx = movedPoint.x - draggingPoint.originalPos.x;
                 const dy = movedPoint.y - draggingPoint.originalPos.y;
                 
-                // 그룹 전체를 평행이동
-                const group = savedGroups[draggingPoint.groupIndex];
-                group.points = group.points.map(p => ({
-                    x: p.x + dx,
-                    y: p.y + dy
-                }));
-                
-                // 원래 위치 복원 후 전체 이동 (이미 한 점은 이동했으므로)
-                group.points[draggingPoint.pointIndex] = {
-                    x: draggingPoint.originalPos.x + dx,
-                    y: draggingPoint.originalPos.y + dy
+                // 먼저 드래그한 점을 원래 위치로 복원 (연결 감지를 위해)
+                savedGroups[draggingPoint.groupIndex].points[draggingPoint.pointIndex] = {
+                    x: draggingPoint.originalPos.x,
+                    y: draggingPoint.originalPos.y
                 };
+                
+                // 드래그한 그룹과 연결된 다른 그룹들 찾기 (이동 전 좌표 기준)
+                const draggedGroup = savedGroups[draggingPoint.groupIndex];
+                const linkedGroupIndices = new Set([draggingPoint.groupIndex]); // 드래그한 그룹 포함
+                
+                // 드래그한 그룹의 모든 점을 확인 (원래 위치)
+                draggedGroup.points.forEach(point => {
+                    // 같은 좌표를 가진 다른 그룹의 점들 찾기
+                    savedGroups.forEach((otherGroup, otherIndex) => {
+                        if (otherIndex === draggingPoint.groupIndex) return; // 같은 그룹 제외
+                        if (!otherGroup.visible) return; // 보이지 않는 그룹 제외
+                        
+                        otherGroup.points.forEach(otherPoint => {
+                            if (point.x === otherPoint.x && point.y === otherPoint.y) {
+                                linkedGroupIndices.add(otherIndex);
+                            }
+                        });
+                    });
+                });
+                
+                // 연결된 모든 그룹을 평행이동
+                linkedGroupIndices.forEach(groupIndex => {
+                    const group = savedGroups[groupIndex];
+                    group.points = group.points.map(p => ({
+                        x: p.x + dx,
+                        y: p.y + dy
+                    }));
+                });
                 
                 console.log(`그룹 ${draggingPoint.groupIndex + 1} 드래그 이동 완료`);
                 console.log(`  이동 벡터: (${dx.toFixed(2)}, ${dy.toFixed(2)})`);
-                console.log(`  총 ${group.points.length}개 점 이동`);
+                if (linkedGroupIndices.size > 1) {
+                    console.log(`  연결된 그룹: ${Array.from(linkedGroupIndices).map(i => i + 1).join(', ')}`);
+                    console.log(`  총 ${linkedGroupIndices.size}개 그룹 함께 이동`);
+                }
                 
                 drawAllGroups();
             } else {
@@ -687,8 +711,6 @@ const canvas = document.getElementById('canvas');
             
             // 화면 재렌더링
             drawAllGroups();
-            
-            alert(`그룹 ${point1.groupIndex + 1} 전체를 평행이동했습니다.\n이동 벡터: (${dx}, ${dy})\n총 ${group1.points.length}개 점 이동`);
         });
 
         // 겹친 점을 분리하는 버튼 이벤트
