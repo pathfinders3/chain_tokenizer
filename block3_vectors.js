@@ -665,15 +665,83 @@ const canvas = document.getElementById('canvas');
             draggingPoint = null; // mouseup에서 즉시 초기화
         });
         
+        // localStorage에 그룹 저장
+        function saveToLocalStorage() {
+            const dataToSave = {
+                groups: savedGroups,
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            };
+            localStorage.setItem('block3_savedGroups', JSON.stringify(dataToSave));
+            console.log('localStorage에 저장 완료:', savedGroups.length + '개 그룹');
+        }
+        
+        // localStorage에서 그룹 불러오기
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('block3_savedGroups');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data.groups && Array.isArray(data.groups)) {
+                        savedGroups = data.groups;
+                        console.log('localStorage에서 복원 완료:', savedGroups.length + '개 그룹');
+                        updateGroupList();
+                        drawAllGroups();
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.error('localStorage 불러오기 실패:', e);
+            }
+            return false;
+        }
+        
         // 초기 데이터 로드
         window.addEventListener('load', () => {
-            // 예제 데이터가 문서에 있으면 자동으로 로드
-            const exampleData = document.querySelector('antml\\:document_content');
-            if (exampleData) {
-                jsonInput.value = exampleData.textContent;
+            // localStorage에서 먼저 복원 시도
+            const restored = loadFromLocalStorage();
+            
+            // localStorage에 데이터가 없으면 예제 데이터 로드
+            if (!restored) {
+                // 예제 데이터가 문서에 있으면 자동으로 로드
+                const exampleData = document.querySelector('antml\\:document_content');
+                if (exampleData) {
+                    jsonInput.value = exampleData.textContent;
+                }
             }
         });
 
+        // 모든 그룹 저장 버튼 이벤트
+        document.getElementById('saveGroups').addEventListener('click', function () {
+            if (savedGroups.length === 0) {
+                alert('저장할 그룹이 없습니다.');
+                return;
+            }
+            
+            const dataToSave = {
+                groups: savedGroups,
+                timestamp: new Date().toISOString(),
+                version: '1.0',
+                totalGroups: savedGroups.length
+            };
+            const jsonStr = JSON.stringify(dataToSave, null, 2);
+            
+            // localStorage에 저장
+            saveToLocalStorage();
+            
+            // 클립보드에 복사
+            navigator.clipboard.writeText(jsonStr)
+                .then(() => alert(`모든 그룹 저장 완료!\n- ${savedGroups.length}개 그룹\n- localStorage에 저장됨\n- 클립보드에 복사됨`))
+                .catch(() => alert(`localStorage에 저장됨 (${savedGroups.length}개 그룹)\n클립보드 복사는 실패했습니다.`));
+        });
+        
+        // 창 닫을 때 자동 저장
+        window.addEventListener('beforeunload', function(e) {
+            if (savedGroups.length > 0) {
+                saveToLocalStorage();
+            }
+        });
+        
         // DP 결과 클립보드 복사 버튼 이벤트
         document.getElementById('copyDP').addEventListener('click', function () {
             if (window.dpResult && Array.isArray(window.dpResult)) {
