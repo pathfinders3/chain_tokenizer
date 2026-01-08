@@ -51,6 +51,18 @@ const canvas = document.getElementById('canvas');
             if (currentData) visualize();
         });
         
+        // 붙여넣기 버튼 이벤트
+        document.getElementById('pasteBtn').addEventListener('click', async function() {
+            try {
+                const text = await navigator.clipboard.readText();
+                jsonInput.value = text;
+                jsonInput.focus();
+            } catch (err) {
+                console.error('붙여넣기 실패:', err);
+                alert('붙여넣기에 실패했습니다. 클립보드 접근 권한을 확인해주세요.');
+            }
+        });
+        
         // Douglas-Peucker 알고리즘 구현
         function douglasPeucker(points, tolerance) {
             if (points.length <= 2) return points;

@@ -61,7 +61,10 @@
         <div class="content">
             <div class="controls">
                 <div class="control-group">
-                    <label>JSON 데이터 입력</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label>JSON 데이터 입력</label>
+                        <button id="pasteBtn" style="padding: 6px 12px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; font-size: 13px;">📋 붙여넣기</button>
+                    </div>
 <textarea id="jsonInput">{
   "_schema": {
     "tiles": "전체 타일 배열 - 각 타일은 {r: 행, c: 열, angle: 각도, direction: 방향}",
