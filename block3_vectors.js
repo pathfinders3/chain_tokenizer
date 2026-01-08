@@ -1,7 +1,6 @@
 const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const toleranceSlider = document.getElementById('tolerance');
-        const toleranceValue = document.getElementById('toleranceValue');
         const jsonInput = document.getElementById('jsonInput');
         const errorDiv = document.getElementById('error');
         const statsDiv = document.getElementById('stats');
@@ -15,7 +14,7 @@ const canvas = document.getElementById('canvas');
         
         // 슬라이더 값 업데이트
         toleranceSlider.addEventListener('input', (e) => {
-            toleranceValue.textContent = parseFloat(e.target.value).toFixed(1);
+            toleranceSlider.dataset.tooltip = parseFloat(e.target.value).toFixed(1);
             if (currentData) {
                 visualize();
             }
@@ -25,14 +24,14 @@ const canvas = document.getElementById('canvas');
             let v = parseFloat(toleranceSlider.value);
             v = Math.max(v - 0.3, parseFloat(toleranceSlider.min));
             toleranceSlider.value = v.toFixed(1);
-            toleranceValue.textContent = v.toFixed(1);
+            toleranceSlider.dataset.tooltip = v.toFixed(1);
             if (currentData) visualize();
         });
         document.getElementById('tolUpBtn').addEventListener('click', function () {
             let v = parseFloat(toleranceSlider.value);
             v = Math.min(v + 0.3, parseFloat(toleranceSlider.max));
             toleranceSlider.value = v.toFixed(1);
-            toleranceValue.textContent = v.toFixed(1);
+            toleranceSlider.dataset.tooltip = v.toFixed(1);
             if (currentData) visualize();
         });
         // Tolerance ±± 버튼 이벤트 (0.5씩)
@@ -40,14 +39,14 @@ const canvas = document.getElementById('canvas');
             let v = parseFloat(toleranceSlider.value);
             v = Math.max(v - 0.5, parseFloat(toleranceSlider.min));
             toleranceSlider.value = v.toFixed(1);
-            toleranceValue.textContent = v.toFixed(1);
+            toleranceSlider.dataset.tooltip = v.toFixed(1);
             if (currentData) visualize();
         });
         document.getElementById('bigTolUpBtn').addEventListener('click', function () {
             let v = parseFloat(toleranceSlider.value);
             v = Math.min(v + 0.5, parseFloat(toleranceSlider.max));
             toleranceSlider.value = v.toFixed(1);
-            toleranceValue.textContent = v.toFixed(1);
+            toleranceSlider.dataset.tooltip = v.toFixed(1);
             if (currentData) visualize();
         });
         

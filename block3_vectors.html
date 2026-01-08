@@ -63,7 +63,7 @@
                 <div class="control-group">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                         <label>JSON 데이터 입력</label>
-                        <button id="pasteBtn" style="padding: 6px 12px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; font-size: 13px;">📋 붙여넣기</button>
+                        <button id="pasteBtn" style="padding: 6px 12px; cursor: pointer; background: #2d6a2f; color: white; border: none; border-radius: 4px; font-size: 13px;">📋 붙여넣기</button>
                     </div>
 <textarea id="jsonInput">{
   "_schema": {
@@ -416,36 +416,32 @@
                     <div id="error" class="error" style="display: none;"></div>
                 </div>
                 
-                <div class="control-group" style="display: flex; align-items: center; gap: 10px;">
+                <div class="control-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                     <div class="slider-container" style="margin-bottom:0;">
-                        <div class="slider-label">
-                            <label style="margin: 0;">Tolerance (허용 오차)</label>
-                            <span class="slider-value" id="toleranceValue">2.0</span>
-                        </div>
                         <div style="display:flex;align-items:center;gap:2px;">
-                            <button id="bigTolDownBtn" type="button" style="min-width:28px;">––</button>
-                            <button id="tolDownBtn" type="button" style="min-width:28px;">－</button>
-                            <input type="range" id="tolerance" min="0" max="10" step="0.1" value="2" style="vertical-align:middle;">
-                            <button id="tolUpBtn" type="button" style="min-width:28px;">＋</button>
-                            <button id="bigTolUpBtn" type="button" style="min-width:28px;">++</button>
+                            <button id="bigTolDownBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">––</button>
+                            <button id="tolDownBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">－</button>
+                            <input type="range" id="tolerance" min="0" max="10" step="0.1" value="2" data-tooltip="2.0" style="vertical-align:middle;">
+                            <button id="tolUpBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">＋</button>
+                            <button id="bigTolUpBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">++</button>
                         </div>
                     </div>
                     <div class="zoom-controls" style="display:flex;align-items:center;gap:4px;margin-bottom:0;">
-                        <button id="bigZoomOutBtn" type="button">––</button>
-                        <button id="zoomOutBtn" type="button">－</button>
+                        <button id="bigZoomOutBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">––</button>
+                        <button id="zoomOutBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">－</button>
 <input type="range" id="zoomRange" min="5" max="100" step="5" value="60" style="width:110px;">
                         <span id="zoomPercent">100%</span>
-                        <button id="zoomInBtn" type="button">＋</button>
-                        <button id="bigZoomInBtn" type="button">++</button>
+                        <button id="zoomInBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">＋</button>
+                        <button id="bigZoomInBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">++</button>
                     </div>
                 </div>
                 
                 <div class="control-group">
                     <button onclick="visualize()">시각화 생성</button>
                     <button id="copyDP" type="button">DP 결과 복사</button>
-                    <button id="saveGroups" type="button" style="background: #004085; color: white; font-weight: bold;">💾 모든 그룹 저장</button>
-                    <button id="alignPoints" type="button" style="background: #5a0000; color: white; font-weight: bold;">1번(B) → 0번(R) 위치로 이동</button>
-                    <button id="separatePoints" type="button" style="background: #155724; color: white; font-weight: bold;">겹친 점 분리 (10px 이동)</button>
+                    <button id="saveGroups" type="button" style="background: #002850; color: white; font-weight: bold;">💾 모든 그룹 저장</button>
+                    <button id="alignPoints" type="button" style="background: #3d0000; color: white; font-weight: bold;">1번(B) → 0번(R) 위치로 이동</button>
+                    <button id="separatePoints" type="button" style="background: #0d3517; color: white; font-weight: bold;">겹친 점 분리 (10px 이동)</button>
                 </div>
                 
                 <div class="control-group">
