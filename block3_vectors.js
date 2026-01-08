@@ -479,12 +479,12 @@ const canvas = document.getElementById('canvas');
                     } else {
                         // 다른 점을 클릭하면 해당 그룹의 선택을 교체
                         selectedPoints[existingIndex] = { groupIndex, pointIndex, timestamp: Date.now() };
-                        console.log(`선택 교체: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
+                        console.log(`선택 교체: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x.toFixed(1)}, ${closestPoint.point.y.toFixed(1)})`);
                     }
                 } else {
                     // 새로운 그룹의 점 선택
                     selectedPoints.push({ groupIndex, pointIndex, timestamp: Date.now() });
-                    console.log(`선택 추가: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x}, ${closestPoint.point.y})`);
+                    console.log(`선택 추가: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x.toFixed(1)}, ${closestPoint.point.y.toFixed(1)})`);
                 }
             } else {
                 // 빈 공간 클릭 시 모든 선택 해제
@@ -806,7 +806,7 @@ const canvas = document.getElementById('canvas');
             const recentPoint = sortedSelected[0]; // 1번 (파란색, 가장 최근)
             const recentCoord = savedGroups[recentPoint.groupIndex].points[recentPoint.pointIndex];
             
-            console.log(`가장 최근 선택된 점: 그룹 ${recentPoint.groupIndex + 1}, 포인트 ${recentPoint.pointIndex}, 좌표 (${recentCoord.x}, ${recentCoord.y})`);
+            console.log(`가장 최근 선택된 점: 그룹 ${recentPoint.groupIndex + 1}, 포인트 ${recentPoint.pointIndex}, 좌표 (${recentCoord.x.toFixed(1)}, ${recentCoord.y.toFixed(1)})`);
             
             // 같은 좌표를 가진 모든 점들 찾기 (표시 중인 그룹만)
             const overlappingPoints = [];
