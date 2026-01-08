@@ -145,9 +145,9 @@ const canvas = document.getElementById('canvas');
                 html += `
                     <div onclick="selectGroup(${index})" style="display: flex; align-items: center; padding: 8px; background: ${bgColor}; border-radius: 4px; min-width: 180px; cursor: pointer; ${borderStyle}">
                         <input type="checkbox" id="group${index}" ${group.visible ? 'checked' : ''} 
-                               onchange="event.stopPropagation(); toggleGroup(${index})" style="margin-right: 8px;">
+                               onclick="event.stopPropagation(); toggleGroup(${index})" style="margin-right: 8px;">
                         <div style="width: 18px; height: 18px; background: ${color}; border: 2px solid #fff; margin-right: 8px; flex-shrink: 0;"></div>
-                        <label for="group${index}" style="cursor: pointer; color: #eee; font-size: 13px; white-space: nowrap; margin-right: 8px;">그룹 ${index + 1} (${group.points.length})</label>
+                        <label for="group${index}" onclick="event.stopPropagation(); toggleGroup(${index})" style="cursor: pointer; color: #eee; font-size: 13px; white-space: nowrap; margin-right: 8px;">그룹 ${index + 1} (${group.points.length})</label>
                         <button onclick="event.stopPropagation(); deleteGroup(${index})" style="padding: 3px 6px; font-size: 11px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">×</button>
                     </div>
                 `;
@@ -159,6 +159,7 @@ const canvas = document.getElementById('canvas');
         // 그룹 표시/숨김 토글
         window.toggleGroup = function(index) {
             savedGroups[index].visible = !savedGroups[index].visible;
+            updateGroupList();
             drawAllGroups();
         };
         
@@ -888,7 +889,7 @@ const canvas = document.getElementById('canvas');
                 scalePercent += 5;
                 if (scalePercent > 100) scalePercent = 100;
                 updateZoomUI();
-                visualize();
+                drawAllGroups();
             }
         });
 // 15% 확대/축소 큰 버튼 이벤트 (중첩 벗어나서 바깥에 이동)
@@ -897,7 +898,7 @@ document.getElementById('bigZoomInBtn').addEventListener('click', function () {
         scalePercent += 15;
         if (scalePercent > 100) scalePercent = 100;
         updateZoomUI();
-        visualize();
+        drawAllGroups();
     }
 });
 document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
@@ -905,7 +906,7 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
         scalePercent -= 15;
         if (scalePercent < 5) scalePercent = 5;
         updateZoomUI();
-        visualize();
+        drawAllGroups();
     }
 });
         document.getElementById('zoomOutBtn').addEventListener('click', function () {
@@ -913,12 +914,12 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
                 scalePercent -= 5;
                 if (scalePercent < 5) scalePercent = 5;
                 updateZoomUI();
-                visualize();
+                drawAllGroups();
             }
         });
         document.getElementById('zoomRange').addEventListener('input', function (e) {
             scalePercent = parseInt(e.target.value, 10);
             updateZoomUI();
-            visualize();
+            drawAllGroups();
         });
         updateZoomUI();
