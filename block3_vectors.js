@@ -170,6 +170,65 @@ const canvas = document.getElementById('canvas');
             drawAllGroups();
         };
         
+        // 선택된 점 정보 업데이트
+        function updatePointInfo() {
+            const pointInfoSection = document.getElementById('pointInfoSection');
+            const pointInfoDiv = document.getElementById('pointInfo');
+            
+            if (selectedPoints.length === 0) {
+                pointInfoSection.style.display = 'none';
+                return;
+            }
+            
+            pointInfoSection.style.display = 'block';
+            
+            let html = '';
+            
+            selectedPoints.forEach((sp, idx) => {
+                const group = savedGroups[sp.groupIndex];
+                const point = group.points[sp.pointIndex];
+                
+                // 연결된 점들 찾기 (같은 좌표를 가진 다른 그룹의 점들)
+                const connectedPoints = [];
+                savedGroups.forEach((otherGroup, otherGroupIndex) => {
+                    if (otherGroupIndex === sp.groupIndex) return; // 같은 그룹 제외
+                    
+                    otherGroup.points.forEach((otherPoint, otherPointIndex) => {
+                        if (point.x === otherPoint.x && point.y === otherPoint.y) {
+                            connectedPoints.push({
+                                groupIndex: otherGroupIndex,
+                                pointIndex: otherPointIndex,
+                                color: otherGroup.color
+                            });
+                        }
+                    });
+                });
+                
+                html += `<div style="margin-bottom: 12px; padding: 8px; background: #333; border-radius: 4px; border-left: 4px solid ${group.color};">`;
+                html += `<div style="font-weight: bold; margin-bottom: 4px;">📍 선택 ${idx + 1}</div>`;
+                html += `<div>그룹: <span style="color: ${group.color}; font-weight: bold;">그룹 ${sp.groupIndex + 1}</span></div>`;
+                html += `<div>포인트 인덱스: <strong>${sp.pointIndex}</strong></div>`;
+                html += `<div>좌표: <strong>(${point.x.toFixed(1)}, ${point.y.toFixed(1)})</strong></div>`;
+                
+                if (connectedPoints.length > 0) {
+                    html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
+                    html += `<div style="color: #feca57; font-weight: bold;">🔗 연결된 점: ${connectedPoints.length}개</div>`;
+                    connectedPoints.forEach(cp => {
+                        html += `<div style="margin-left: 12px; margin-top: 2px;">`;
+                        html += `• <span style="color: ${cp.color}; font-weight: bold;">그룹 ${cp.groupIndex + 1}</span> - 포인트 ${cp.pointIndex}`;
+                        html += `</div>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `<div style="margin-top: 6px; color: #888;">연결된 점 없음</div>`;
+                }
+                
+                html += `</div>`;
+            });
+            
+            pointInfoDiv.innerHTML = html;
+        }
+        
         // 그룹 삭제
         window.deleteGroup = function(index) {
             if (confirm(`그룹 ${index + 1}을(를) 삭제하시겠습니까?`)) {
@@ -494,6 +553,7 @@ const canvas = document.getElementById('canvas');
                 }
             }
             
+            updatePointInfo();
             drawAllGroups();
         });
         

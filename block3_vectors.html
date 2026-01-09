@@ -60,12 +60,13 @@
         
         <div class="content">
             <div class="controls">
-                <div class="control-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <label>JSON 데이터 입력</label>
-                        <button id="pasteBtn" style="padding: 6px 12px; cursor: pointer; background: #2d6a2f; color: white; border: none; border-radius: 4px; font-size: 13px;">📋 붙여넣기</button>
-                    </div>
-<textarea id="jsonInput">{
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <div class="control-group" style="flex: 1; margin-bottom: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label>JSON 데이터 입력</label>
+                            <button id="pasteBtn" style="padding: 6px 12px; cursor: pointer; background: #2d6a2f; color: white; border: none; border-radius: 4px; font-size: 13px;">📋 붙여넣기</button>
+                        </div>
+<textarea id="jsonInput" style="height: 200px;">{
   "_schema": {
     "tiles": "전체 타일 배열 - 각 타일은 {r: 행, c: 열, angle: 각도, direction: 방향}",
     "groups": "같은 방향의 타일 그룹 배열 - 각 그룹은 유사한 각도를 가진 타일들의 모음",
@@ -413,7 +414,14 @@
   }
 }
 </textarea>
-                    <div id="error" class="error" style="display: none;"></div>
+                        <div id="error" class="error" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="control-group" id="pointInfoSection" style="flex: 1; margin-bottom: 0; display: none;">
+                        <label>선택된 점 정보</label>
+                        <div id="pointInfo" style="border: 1px solid #555; padding: 12px; border-radius: 4px; background: #2a2a2a; color: #eee; font-size: 13px; line-height: 1.6; height: 200px; overflow-y: auto;">
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="control-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
