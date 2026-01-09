@@ -557,7 +557,7 @@ const canvas = document.getElementById('canvas');
             drawAllGroups();
         });
         
-        // 마우스 다운: 드래그 시작 (선택된 그룹의 점만)
+        // 마우스 다운: 드래그 시작 (모든 표시된 그룹의 점)
         canvas.addEventListener('mousedown', function(event) {
             if (!currentTransform || savedGroups.length === 0) return;
             
@@ -568,9 +568,9 @@ const canvas = document.getElementById('canvas');
             let closestPoint = null;
             let minDistance = 15; // 15픽셀 이내의 점만
             
-            // 선택된(selected=true) 그룹의 점들만 확인
+            // 표시된 모든 그룹의 점들 확인 (선택 여부와 무관)
             savedGroups.forEach((group, groupIndex) => {
-                if (!group.visible || !group.selected) return; // 선택되고 표시된 그룹만
+                if (!group.visible) return; // 표시된 그룹만
                 
                 group.points.forEach((point, pointIndex) => {
                     const tp = currentTransform(point);
@@ -704,7 +704,8 @@ const canvas = document.getElementById('canvas');
                     }));
                 });
                 
-                console.log(`그룹 ${draggingPoint.groupIndex + 1} 드래그 이동 완료`);
+                const isSelectedGroup = draggedGroup.selected;
+                console.log(`그룹 ${draggingPoint.groupIndex + 1} 드래그 이동 완료${isSelectedGroup ? ' [★선택된 그룹]' : ''}`);
                 console.log(`  이동 벡터: (${dx.toFixed(2)}, ${dy.toFixed(2)})`);
                 if (linkedGroupIndices.size > 1) {
                     console.log(`  연결된 그룹: ${Array.from(linkedGroupIndices).map(i => i + 1).join(', ')}`);
