@@ -170,6 +170,79 @@ const canvas = document.getElementById('canvas');
             drawAllGroups();
         };
         
+        // 좌표 편집 모드 시작
+        window.editPointCoordinates = function(selectionIndex) {
+            const sp = selectedPoints[selectionIndex];
+            const group = savedGroups[sp.groupIndex];
+            const point = group.points[sp.pointIndex];
+            
+            // 편집 UI 생성
+            const editDiv = document.getElementById(`coord-${selectionIndex}`);
+            editDiv.innerHTML = `
+                <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+                    <input type="number" id="editX-${selectionIndex}" value="${point.x.toFixed(1)}" 
+                           style="width: 70px; padding: 4px; background: #444; color: #fff; border: 1px solid #666; border-radius: 3px;" 
+                           step="0.1" placeholder="X">
+                    <input type="number" id="editY-${selectionIndex}" value="${point.y.toFixed(1)}" 
+                           style="width: 70px; padding: 4px; background: #444; color: #fff; border: 1px solid #666; border-radius: 3px;" 
+                           step="0.1" placeholder="Y">
+                    <button onclick="savePointCoordinates(${selectionIndex})" 
+                            style="padding: 4px 12px; background: #2d6a2f; color: white; border: none; border-radius: 3px; cursor: pointer;">✓</button>
+                    <button onclick="updatePointInfo()" 
+                            style="padding: 4px 12px; background: #666; color: white; border: none; border-radius: 3px; cursor: pointer;">✗</button>
+                </div>
+            `;
+            
+            // 첫 번째 입력 필드에 포커스
+            document.getElementById(`editX-${selectionIndex}`).focus();
+        };
+        
+        // 좌표 저장 (해당 그룹과 연결된 모든 그룹을 평행이동)
+        window.savePointCoordinates = function(selectionIndex) {
+            const sp = selectedPoints[selectionIndex];
+            const group = savedGroups[sp.groupIndex];
+            const oldPoint = group.points[sp.pointIndex];
+            
+            // 새 좌표 가져오기
+            const newX = parseFloat(document.getElementById(`editX-${selectionIndex}`).value);
+            const newY = parseFloat(document.getElementById(`editY-${selectionIndex}`).value);
+            
+            // 유효성 검사
+            if (isNaN(newX) || isNaN(newY)) {
+                alert('유효한 숫자를 입력해주세요.');
+                return;
+            }
+            
+            // 이동 거리 계산
+            const deltaX = newX - oldPoint.x;
+            const deltaY = newY - oldPoint.y;
+            
+            // 평행이동할 그룹들 찾기
+            const groupsToMove = new Set([sp.groupIndex]); // 현재 그룹 포함
+            
+            // 연결된 점들이 속한 그룹들 찾기
+            savedGroups.forEach((otherGroup, otherGroupIndex) => {
+                otherGroup.points.forEach((otherPoint, otherPointIndex) => {
+                    // 같은 좌표를 가진 점이 있으면 해당 그룹도 이동
+                    if (otherPoint.x === oldPoint.x && otherPoint.y === oldPoint.y) {
+                        groupsToMove.add(otherGroupIndex);
+                    }
+                });
+            });
+            
+            // 선택된 모든 그룹의 모든 점들을 평행이동
+            groupsToMove.forEach(groupIndex => {
+                savedGroups[groupIndex].points.forEach(point => {
+                    point.x += deltaX;
+                    point.y += deltaY;
+                });
+            });
+            
+            // UI 업데이트
+            updatePointInfo();
+            drawAllGroups();
+        };
+        
         // 선택된 점 정보 업데이트
         function updatePointInfo() {
             const pointInfoSection = document.getElementById('pointInfoSection');
@@ -208,7 +281,7 @@ const canvas = document.getElementById('canvas');
                 html += `<div style="font-weight: bold; margin-bottom: 4px;">📍 선택 ${idx + 1}</div>`;
                 html += `<div>그룹: <span style="color: ${group.color}; font-weight: bold;">그룹 ${sp.groupIndex + 1}</span></div>`;
                 html += `<div>포인트 인덱스: <strong>${sp.pointIndex}</strong></div>`;
-                html += `<div>좌표: <strong>(${point.x.toFixed(1)}, ${point.y.toFixed(1)})</strong></div>`;
+                html += `<div id="coord-${idx}">좌표: <strong style="cursor: pointer; padding: 2px 6px; background: #444; border-radius: 3px;" onclick="editPointCoordinates(${idx})" title="클릭하여 편집">(${point.x.toFixed(1)}, ${point.y.toFixed(1)})</strong></div>`;
                 
                 if (connectedPoints.length > 0) {
                     html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
