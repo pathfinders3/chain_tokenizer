@@ -1125,4 +1125,33 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
             updateZoomUI();
             drawAllGroups();
         });
+        
+        // 캔버스에서 +, - 키보드 이벤트로 확대/축소
+        canvas.addEventListener('keydown', function(e) {
+            // +, = 키로 확대 (Shift + = 또는 단순 = 키)
+            if (e.key === '+' || e.key === '=') {
+                e.preventDefault();
+                if (scalePercent < 100) {
+                    scalePercent += 5;
+                    if (scalePercent > 100) scalePercent = 100;
+                    updateZoomUI();
+                    drawAllGroups();
+                }
+            }
+            // - 키로 축소
+            else if (e.key === '-' || e.key === '_') {
+                e.preventDefault();
+                if (scalePercent > 5) {
+                    scalePercent -= 5;
+                    if (scalePercent < 5) scalePercent = 5;
+                    updateZoomUI();
+                    drawAllGroups();
+                }
+            }
+        });
+        
+        // 캔버스를 클릭하면 포커스를 받아 키보드 이벤트를 받을 수 있도록 설정
+        canvas.setAttribute('tabindex', '0');
+        canvas.focus();
+        
         updateZoomUI();
