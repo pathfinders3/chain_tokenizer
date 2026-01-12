@@ -12,6 +12,11 @@ const canvas = document.getElementById('canvas');
         let currentTransform = null; // 현재 transform 함수 저장
         let draggingPoint = null; // 드래그 중인 점: { groupIndex, pointIndex, originalPos, startMousePos }
         
+        // 점 표시 On/Off 상태
+        let showOriginalPoints = true;
+        let showSimplifiedPoints = true;
+        let showGroupPoints = true;
+        
         // 슬라이더 값 업데이트
         toleranceSlider.addEventListener('input', (e) => {
             toleranceSlider.dataset.tooltip = parseFloat(e.target.value).toFixed(1);
@@ -60,6 +65,30 @@ const canvas = document.getElementById('canvas');
                 console.error('붙여넣기 실패:', err);
                 alert('붙여넣기에 실패했습니다. 클립보드 접근 권한을 확인해주세요.');
             }
+        });
+        
+        // 점 표시 체크박스 이벤트 리스너
+        document.getElementById('showOriginalPoints').addEventListener('change', function(e) {
+            showOriginalPoints = e.target.checked;
+            if (currentData) {
+                visualize(); // 임시 시각화가 표시 중이면 다시 그리기
+            } else if (savedGroups.length > 0) {
+                drawAllGroups(); // 저장된 그룹이 있으면 다시 그리기
+            }
+        });
+        
+        document.getElementById('showSimplifiedPoints').addEventListener('change', function(e) {
+            showSimplifiedPoints = e.target.checked;
+            if (currentData) {
+                visualize(); // 임시 시각화가 표시 중이면 다시 그리기
+            } else if (savedGroups.length > 0) {
+                drawAllGroups(); // 저장된 그룹이 있으면 다시 그리기
+            }
+        });
+        
+        document.getElementById('showGroupPoints').addEventListener('change', function(e) {
+            showGroupPoints = e.target.checked;
+            drawAllGroups(); // 저장된 그룹 다시 그리기
         });
         
         // Douglas-Peucker 알고리즘 구현
@@ -434,59 +463,61 @@ const canvas = document.getElementById('canvas');
                 });
                 ctx.stroke();
                 
-                // 포인트 그리기
-                points.forEach((p, i) => {
-                    const tp = transform(p);
-                    const groupIndex = savedGroups.findIndex(g => g === group);
-                    const selectedIndex = selectedPoints.findIndex(sp => sp.groupIndex === groupIndex && sp.pointIndex === i);
-                    const isSelected = selectedIndex !== -1;
-                    
-                    // 선택된 점들을 timestamp 기준으로 정렬하여 최근 2개 찾기
-                    const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
-                    let pointColor = color;
-                    let strokeColor = 'white';
-                    let pointSize = 6;
-                    let strokeWidth = 2;
-                    let fontWeight = '11px sans-serif';
-                    let fontColor = '#333';
-                    
-                    if (isSelected) {
-                        pointSize = 10;
-                        strokeWidth = 3;
-                        fontWeight = 'bold 13px sans-serif';
-                        fontColor = '#000';
+                // 포인트 그리기 (showGroupPoints가 true일 때만)
+                if (showGroupPoints) {
+                    points.forEach((p, i) => {
+                        const tp = transform(p);
+                        const groupIndex = savedGroups.findIndex(g => g === group);
+                        const selectedIndex = selectedPoints.findIndex(sp => sp.groupIndex === groupIndex && sp.pointIndex === i);
+                        const isSelected = selectedIndex !== -1;
                         
-                        // 가장 최근 점(1번): 파란색
-                        if (sortedSelected.length > 0 && 
-                            sortedSelected[0].groupIndex === groupIndex && 
-                            sortedSelected[0].pointIndex === i) {
-                            strokeColor = '#0000ff';
+                        // 선택된 점들을 timestamp 기준으로 정렬하여 최근 2개 찾기
+                        const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+                        let pointColor = color;
+                        let strokeColor = 'white';
+                        let pointSize = 6;
+                        let strokeWidth = 2;
+                        let fontWeight = '11px sans-serif';
+                        let fontColor = '#333';
+                        
+                        if (isSelected) {
+                            pointSize = 10;
+                            strokeWidth = 3;
+                            fontWeight = 'bold 13px sans-serif';
+                            fontColor = '#000';
+                            
+                            // 가장 최근 점(1번): 파란색
+                            if (sortedSelected.length > 0 && 
+                                sortedSelected[0].groupIndex === groupIndex && 
+                                sortedSelected[0].pointIndex === i) {
+                                strokeColor = '#0000ff';
+                            }
+                            // 두 번째 최근 점(0번): 빨간색
+                            else if (sortedSelected.length > 1 && 
+                                     sortedSelected[1].groupIndex === groupIndex && 
+                                     sortedSelected[1].pointIndex === i) {
+                                strokeColor = '#ff0000';
+                            }
+                            // 나머지 선택된 점: 노란색
+                            else {
+                                strokeColor = '#ffff00';
+                            }
                         }
-                        // 두 번째 최근 점(0번): 빨간색
-                        else if (sortedSelected.length > 1 && 
-                                 sortedSelected[1].groupIndex === groupIndex && 
-                                 sortedSelected[1].pointIndex === i) {
-                            strokeColor = '#ff0000';
-                        }
-                        // 나머지 선택된 점: 노란색
-                        else {
-                            strokeColor = '#ffff00';
-                        }
-                    }
-                    
-                    ctx.fillStyle = pointColor;
-                    ctx.beginPath();
-                    ctx.arc(tp.x, tp.y, pointSize, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = strokeColor;
-                    ctx.lineWidth = strokeWidth;
-                    ctx.stroke();
-                    
-                    // 포인트 번호
-                    ctx.fillStyle = fontColor;
-                    ctx.font = fontWeight;
-                    ctx.fillText(i, tp.x + 10, tp.y - 10);
-                });
+                        
+                        ctx.fillStyle = pointColor;
+                        ctx.beginPath();
+                        ctx.arc(tp.x, tp.y, pointSize, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = strokeWidth;
+                        ctx.stroke();
+                        
+                        // 포인트 번호
+                        ctx.fillStyle = fontColor;
+                        ctx.font = fontWeight;
+                        ctx.fillText(i, tp.x + 10, tp.y - 10);
+                    });
+                }
             });
         }
         
@@ -527,14 +558,16 @@ const canvas = document.getElementById('canvas');
             });
             ctx.stroke();
             
-            // 원본 포인트 (작은 회색 점)
-            originalPoints.forEach(p => {
-                const tp = transform(p);
-                ctx.fillStyle = '#ddd';
-                ctx.beginPath();
-                ctx.arc(tp.x, tp.y, 3, 0, Math.PI * 2);
-                ctx.fill();
-            });
+            // 원본 포인트 (작은 회색 점) - showOriginalPoints가 true일 때만
+            if (showOriginalPoints) {
+                originalPoints.forEach(p => {
+                    const tp = transform(p);
+                    ctx.fillStyle = '#ddd';
+                    ctx.beginPath();
+                    ctx.arc(tp.x, tp.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
             
             // 단순화된 경로 (굵은 보라색 실선)
             ctx.strokeStyle = '#667eea';
@@ -548,22 +581,24 @@ const canvas = document.getElementById('canvas');
             });
             ctx.stroke();
             
-            // 단순화된 포인트 (큰 보라색 점)
-            simplifiedPoints.forEach((p, i) => {
-                const tp = transform(p);
-                ctx.fillStyle = '#764ba2';
-                ctx.beginPath();
-                ctx.arc(tp.x, tp.y, 6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // 포인트 번호
-                ctx.fillStyle = '#333';
-                ctx.font = '11px sans-serif';
-                ctx.fillText(i, tp.x + 10, tp.y - 10);
-            });
+            // 단순화된 포인트 (큰 보라색 점) - showSimplifiedPoints가 true일 때만
+            if (showSimplifiedPoints) {
+                simplifiedPoints.forEach((p, i) => {
+                    const tp = transform(p);
+                    ctx.fillStyle = '#764ba2';
+                    ctx.beginPath();
+                    ctx.arc(tp.x, tp.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // 포인트 번호
+                    ctx.fillStyle = '#333';
+                    ctx.font = '11px sans-serif';
+                    ctx.fillText(i, tp.x + 10, tp.y - 10);
+                });
+            }
         }
         
         // 캔버스 클릭으로 점 선택

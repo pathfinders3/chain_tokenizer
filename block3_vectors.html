@@ -452,6 +452,21 @@
                     <button id="separatePoints" type="button" style="background: #0d3517; color: white; font-weight: bold;">겹친 점 분리 (10px 이동)</button>
                 </div>
                 
+                <div class="control-group" style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="showOriginalPoints" checked>
+                        <span>원본 점 표시 (회색)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="showSimplifiedPoints" checked>
+                        <span>단순화 점 표시 (보라색)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="showGroupPoints" checked>
+                        <span>저장 그룹 점 표시</span>
+                    </label>
+                </div>
+                
                 <div class="control-group">
                     <label>저장된 그룹 목록</label>
                     <div id="groupList" style="max-height: 300px; overflow-y: auto; border: 1px solid #555; padding: 10px; border-radius: 4px; background: #2a2a2a;">
