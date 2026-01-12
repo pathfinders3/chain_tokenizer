@@ -11,6 +11,7 @@ const canvas = document.getElementById('canvas');
         let selectedPoints = []; // 선택된 점들의 배열: [{ groupIndex: number, pointIndex: number }]
         let currentTransform = null; // 현재 transform 함수 저장
         let draggingPoint = null; // 드래그 중인 점: { groupIndex, pointIndex, originalPos, startMousePos }
+        let undoBackup = null; // 실행 취소를 위한 백업 (마지막 작업 1개)
         
         // 점 표시 On/Off 상태
         let showOriginalPoints = true;
@@ -967,6 +968,9 @@ const canvas = document.getElementById('canvas');
                 return;
             }
             
+            // 실행 취소를 위해 현재 상태 백업 (deep copy)
+            undoBackup = JSON.parse(JSON.stringify(savedGroups));
+            
             const point1 = sortedSelected[0]; // 1번 (파란색, 가장 최근)
             const point0 = sortedSelected[1]; // 0번 (빨간색, 두 번째 최근)
             
@@ -1032,6 +1036,9 @@ const canvas = document.getElementById('canvas');
                 alert('먼저 점을 선택해주세요.');
                 return;
             }
+            
+            // 실행 취소를 위해 현재 상태 백업 (deep copy)
+            undoBackup = JSON.parse(JSON.stringify(savedGroups));
             
             const recentPoint = sortedSelected[0]; // 1번 (파란색, 가장 최근)
             const recentCoord = savedGroups[recentPoint.groupIndex].points[recentPoint.pointIndex];
@@ -1135,8 +1142,21 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
             drawAllGroups();
         });
         
-        // 캔버스에서 +, - 키보드 이벤트로 확대/축소
-        canvas.addEventListener('keydown', function(e) {
+        // 캔버스 및 전역에서 키보드 이벤트 처리
+        const handleKeyDown = function(e) {
+            // Ctrl+Z로 실행 취소
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                if (undoBackup) {
+                    savedGroups = JSON.parse(JSON.stringify(undoBackup));
+                    console.log('실행 취소 완료 (Ctrl+Z)');
+                    drawAllGroups();
+                } else {
+                    console.log('취소할 작업이 없습니다.');
+                }
+                return;
+            }
+            
             // +, = 키로 확대 (Shift + = 또는 단순 = 키)
             if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
@@ -1157,7 +1177,11 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
                     drawAllGroups();
                 }
             }
-        });
+        };
+        
+        // 캔버스와 문서 전체에 이벤트 리스너 추가
+        canvas.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keydown', handleKeyDown);
         
         // 캔버스를 클릭하면 포커스를 받아 키보드 이벤트를 받을 수 있도록 설정
         canvas.setAttribute('tabindex', '0');
