@@ -970,47 +970,56 @@ const canvas = document.getElementById('canvas');
             const point1 = sortedSelected[0]; // 1번 (파란색, 가장 최근)
             const point0 = sortedSelected[1]; // 0번 (빨간색, 두 번째 최근)
             
-            // 항상 더 큰 그룹 번호가 더 작은 그룹 번호의 좌표를 따라가도록
-            let fromGroup, toGroup;
-            let fromPointIndex, toPointIndex;
+            // 파란색(1번)이 빨간색(0번) 위치로 이동
+            const fromGroup = point1.groupIndex;
+            const toGroup = point0.groupIndex;
+            const fromPointIndex = point1.pointIndex;
+            const toPointIndex = point0.pointIndex;
             
-            if (point1.groupIndex > point0.groupIndex) {
-                // point1(더 큰 그룹)이 point0(더 작은 그룹)을 따라감
-                fromGroup = point1.groupIndex;
-                toGroup = point0.groupIndex;
-                fromPointIndex = point1.pointIndex;
-                toPointIndex = point0.pointIndex;
-            } else {
-                // point0(더 큰 그룹)이 point1(더 작은 그룹)을 따라감
-                fromGroup = point0.groupIndex;
-                toGroup = point1.groupIndex;
-                fromPointIndex = point0.pointIndex;
-                toPointIndex = point1.pointIndex;
-            }
-            
-            // 목표 점(앞 그룹)의 좌표 가져오기
+            // 목표 점(0번, 빨간색)의 좌표 가져오기
             const targetPoint = savedGroups[toGroup].points[toPointIndex];
             
-            // 이동할 점(다음 그룹)의 원래 좌표
+            // 이동할 점(1번, 파란색)의 원래 좌표
             const beforePoint = savedGroups[fromGroup].points[fromPointIndex];
             
             // 이동 벡터 계산 (dx, dy)
             const dx = targetPoint.x - beforePoint.x;
             const dy = targetPoint.y - beforePoint.y;
             
-            // 다음 그룹의 모든 점들을 같은 벡터만큼 평행이동
+            // 1번 그룹의 모든 점들을 같은 벡터만큼 평행이동
             const groupToMove = savedGroups[fromGroup];
             groupToMove.points = groupToMove.points.map(p => ({
                 x: p.x + dx,
                 y: p.y + dy
             }));
             
-            console.log(`그룹 ${fromGroup + 1} → 그룹 ${toGroup + 1} 위치로 이동 완료`);
+            console.log(`그룹 ${fromGroup + 1} (파란색) → 그룹 ${toGroup + 1} (빨간색) 위치로 이동 완료`);
             console.log(`  이동 벡터: (${dx.toFixed(1)}, ${dy.toFixed(1)})`);
             console.log(`  기준 점 이동: (${beforePoint.x.toFixed(1)}, ${beforePoint.y.toFixed(1)}) → (${(beforePoint.x + dx).toFixed(1)}, ${(beforePoint.y + dy).toFixed(1)})`);
             console.log(`  총 ${groupToMove.points.length}개 점 이동`);
             
             // 화면 재렌더링
+            drawAllGroups();
+        });
+        
+        // 0번과 1번 점을 교환하는 버튼 이벤트
+        document.getElementById('swapPoints').addEventListener('click', function () {
+            // 최근 2개 점 찾기
+            const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (sortedSelected.length < 2) {
+                alert('최소 2개의 점을 선택해야 합니다. (현재: ' + sortedSelected.length + '개)');
+                return;
+            }
+            
+            // timestamp를 교환하여 0번과 1번을 바꿈
+            const temp = sortedSelected[0].timestamp;
+            sortedSelected[0].timestamp = sortedSelected[1].timestamp;
+            sortedSelected[1].timestamp = temp;
+            
+            console.log('0번(빨간색) ↔ 1번(파란색) 교환 완료');
+            
+            // 화면 재렌더링 (색상이 바뀌어 표시됨)
             drawAllGroups();
         });
 
