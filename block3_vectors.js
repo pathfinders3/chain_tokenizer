@@ -12,6 +12,7 @@ const canvas = document.getElementById('canvas');
         let currentTransform = null; // 현재 transform 함수 저장
         let draggingPoint = null; // 드래그 중인 점: { groupIndex, pointIndex, originalPos, startMousePos }
         let undoBackup = null; // 실행 취소를 위한 백업 (마지막 작업 1개)
+        let viewOffset = { x: 0, y: 0 }; // 화면 중심 이동 offset (F1 키 등으로 조정)
         
         // Undo/Redo 시스템
         let undoStack = []; // 이전 상태들 (최대 20개)
@@ -843,8 +844,8 @@ const canvas = document.getElementById('canvas');
             const baseScaleY = (canvas.height - padding * 2) / (maxY - minY || 1);
             const scale = Math.min(baseScaleX, baseScaleY) * (scalePercent / 100);
             
-            const offsetX = padding + (canvas.width - padding * 2 - (maxX - minX) * scale) / 2;
-            const offsetY = padding + (canvas.height - padding * 2 - (maxY - minY) * scale) / 2;
+            const offsetX = padding + (canvas.width - padding * 2 - (maxX - minX) * scale) / 2 + viewOffset.x;
+            const offsetY = padding + (canvas.height - padding * 2 - (maxY - minY) * scale) / 2 + viewOffset.y;
             
             const transform = (p) => ({
                 x: (p.x - minX) * scale + offsetX,
@@ -1626,6 +1627,51 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
         
         // 캔버스 및 전역에서 키보드 이벤트 처리
         const handleKeyDown = function(e) {
+            // F1 키: 선택된 점을 캔버스 중앙에 표시
+            if (e.key === 'F1') {
+                e.preventDefault();
+                
+                if (selectedPoints.length === 0) {
+                    console.log('[F1] 선택된 점이 없습니다.');
+                    return;
+                }
+                
+                // 가장 최근 선택된 점 찾기
+                const recentPoint = selectedPoints.reduce((prev, current) => 
+                    (current.timestamp > prev.timestamp) ? current : prev
+                );
+                
+                const group = savedGroups[recentPoint.groupIndex];
+                const point = group.points[recentPoint.pointIndex];
+                
+                // 현재 transform이 있을 때만 중앙 정렬 가능
+                if (!currentTransform) {
+                    console.log('[F1] Transform이 준비되지 않았습니다.');
+                    return;
+                }
+                
+                // 점의 화면 좌표 계산 (viewOffset 없이)
+                const tempOffset = { ...viewOffset };
+                viewOffset = { x: 0, y: 0 };
+                drawAllGroups(); // 일단 기본 위치로 그려서 transform 업데이트
+                
+                const screenPoint = currentTransform(point);
+                
+                // 캔버스 중앙 좌표
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                // 점을 중앙으로 이동시키기 위한 offset 계산
+                viewOffset.x = centerX - screenPoint.x;
+                viewOffset.y = centerY - screenPoint.y;
+                
+                // 다시 그리기
+                drawAllGroups();
+                
+                console.log(`[F1] 그룹 ${recentPoint.groupIndex + 1}, 점 ${recentPoint.pointIndex}를 중앙에 표시`);
+                return;
+            }
+            
             // Ctrl+Z: Undo
             if (e.ctrlKey && e.key === 'z') {
                 e.preventDefault();
