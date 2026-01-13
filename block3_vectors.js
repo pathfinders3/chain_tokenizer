@@ -832,7 +832,8 @@ const canvas = document.getElementById('canvas');
                         y: closestPoint.point.y 
                     },
                     startMousePos: { x: mouseX, y: mouseY },
-                    wasDragged: false
+                    wasDragged: false,
+                    ctrlKey: event.ctrlKey  // CTRL 키 상태 저장
                 };
                 canvas.style.cursor = 'grabbing';
             }
@@ -915,9 +916,10 @@ const canvas = document.getElementById('canvas');
                 
                 const draggedGroup = savedGroups[draggingPoint.groupIndex];
                 const isSelectedGroup = draggedGroup.selected;
+                const isCtrlPressed = draggingPoint.ctrlKey;  // CTRL 키 눌림 상태
                 
-                if (isSelectedGroup) {
-                    // 선택된 그룹의 점: 해당 점과 겹치는 점들만 이동
+                if (isSelectedGroup || isCtrlPressed) {
+                    // 선택된 그룹이거나 CTRL 키가 눌린 경우: 해당 점과 겹치는 점들만 이동
                     const pointsToMove = []; // { groupIndex, pointIndex }
                     
                     // 드래그한 점과 같은 좌표를 가진 모든 점 찾기
@@ -940,7 +942,8 @@ const canvas = document.getElementById('canvas');
                         };
                     });
                     
-                    console.log(`그룹 ${draggingPoint.groupIndex + 1} 점 ${draggingPoint.pointIndex} 이동 완료 [★선택된 그룹 - 점만 이동]`);
+                    const modeText = isCtrlPressed ? 'CTRL 키 - 점만 이동' : '★선택된 그룹 - 점만 이동';
+                    console.log(`그룹 ${draggingPoint.groupIndex + 1} 점 ${draggingPoint.pointIndex} 이동 완료 [${modeText}]`);
                     console.log(`  이동 벡터: (${dx.toFixed(2)}, ${dy.toFixed(2)})`);
                     console.log(`  이동된 점: ${pointsToMove.length}개 (겹치는 점 포함)`);
                     if (pointsToMove.length > 1) {
