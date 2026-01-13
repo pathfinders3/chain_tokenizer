@@ -1227,6 +1227,41 @@ const canvas = document.getElementById('canvas');
             drawAllGroups();
         });
 
+        // 선택된 그룹 색상 변경 버튼 이벤트
+        document.getElementById('changeSelectedGroupColors').addEventListener('click', function () {
+            // 선택된 그룹들 찾기
+            const selectedGroups = savedGroups
+                .map((group, index) => ({ group, index }))
+                .filter(item => item.group.selected);
+            
+            if (selectedGroups.length === 0) {
+                alert('먼저 그룹을 선택해주세요. (그룹 영역을 클릭)');
+                return;
+            }
+            
+            // 랜덤 색상 생성 함수
+            function getRandomColor() {
+                const colors = [
+                    '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', 
+                    '#feca57', '#ff6348', '#00d2d3', '#ee5a6f', '#c471ed',
+                    '#12c2e9', '#f857a6', '#3494e6', '#ec008c', '#fc6767',
+                    '#5f72bd', '#9921e8', '#a8eb12', '#06beb6', '#48b1bf'
+                ];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            
+            // 각 선택된 그룹의 색상을 랜덤하게 변경
+            selectedGroups.forEach(({ group, index }) => {
+                const oldColor = group.color;
+                group.color = getRandomColor();
+                console.log(`그룹 ${index + 1} 색상 변경: ${oldColor} → ${group.color}`);
+            });
+            
+            // UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+        });
+
         // 확대/축소 및 배율 Range Bar 이벤트
         function updateZoomUI() {
             document.getElementById('zoomPercent').textContent = scalePercent + '%';
