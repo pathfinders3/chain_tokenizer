@@ -425,19 +425,21 @@
                 </div>
                 
                 <div class="control-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <button onclick="visualize()">시각화 생성</button>
+                    <button id="copyDP" type="button">DP 결과 복사</button>
                     <div class="slider-container" style="margin-bottom:0;">
                         <div style="display:flex;align-items:center;gap:2px;">
-                            <button id="bigTolDownBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">––</button>
-                            <button id="tolDownBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">－</button>
-                            <input type="range" id="tolerance" min="0" max="10" step="0.1" value="2" data-tooltip="2.0" style="vertical-align:middle;">
-                            <button id="tolUpBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">＋</button>
-                            <button id="bigTolUpBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">++</button>
+                            <button id="bigTolDownBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;" title="Tolerance 0.5 감소">––</button>
+                            <button id="tolDownBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;" title="Tolerance 0.3 감소">－</button>
+                            <input type="range" id="tolerance" min="0" max="10" step="0.1" value="2" data-tooltip="2.0" style="vertical-align:middle;" title="Tolerance 조절">
+                            <button id="tolUpBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;" title="Tolerance 0.3 증가">＋</button>
+                            <button id="bigTolUpBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;" title="Tolerance 0.5 증가">++</button>
                         </div>
                     </div>
                     <div class="zoom-controls" style="display:flex;align-items:center;gap:4px;margin-bottom:0;">
                         <button id="bigZoomOutBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">––</button>
                         <button id="zoomOutBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">－</button>
-<input type="range" id="zoomRange" min="5" max="100" step="5" value="60" style="width:110px;">
+<input type="range" id="zoomRange" min="5" max="200" step="5" value="60" style="width:110px;">
                         <span id="zoomPercent">100%</span>
                         <button id="zoomInBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">＋</button>
                         <button id="bigZoomInBtn" type="button" style="min-width:28px; height:32px; padding:4px 8px;">++</button>
@@ -445,8 +447,6 @@
                 </div>
                 
                 <div class="control-group">
-                    <button onclick="visualize()">시각화 생성</button>
-                    <button id="copyDP" type="button">DP 결과 복사</button>
                     <button id="saveGroups" type="button" style="background: #002850; color: white; font-weight: bold;">💾 모든 그룹 저장</button>
                     <button id="alignPoints" type="button" style="background: #3d0000; color: white; font-weight: bold;" title="파란색 점(1번, 최근 선택)이 빨간색 점(0번, 두 번째 선택) 위치로 이동합니다. 점이 속한 그룹 전체가 함께 평행이동합니다.">→ 점 이동 →</button>
                     <button id="createSubGroup" type="button" style="background: #1a5c70; color: white; font-weight: bold;" title="같은 그룹에서 선택한 2개의 점 사이의 점들로 새로운 그룹을 생성합니다.">✂️ 부분 그룹 생성</button>

@@ -1440,15 +1440,44 @@ const canvas = document.getElementById('canvas');
                 return;
             }
             
-            // 랜덤 색상 생성 함수
+            // 랜덤 색상 생성 함수 (더 다양한 색상)
             function getRandomColor() {
-                const colors = [
-                    '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', 
-                    '#feca57', '#ff6348', '#00d2d3', '#ee5a6f', '#c471ed',
-                    '#12c2e9', '#f857a6', '#3494e6', '#ec008c', '#fc6767',
-                    '#5f72bd', '#9921e8', '#a8eb12', '#06beb6', '#48b1bf'
-                ];
-                return colors[Math.floor(Math.random() * colors.length)];
+                // 방법 1: HSL을 사용한 랜덤 색상 (더 다양하고 선명한 색상)
+                const hue = Math.floor(Math.random() * 360); // 0-360도
+                const saturation = 60 + Math.floor(Math.random() * 40); // 60-100%
+                const lightness = 50 + Math.floor(Math.random() * 15); // 50-65%
+                const hslColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                
+                // HSL을 HEX로 변환
+                const h = hue / 360;
+                const s = saturation / 100;
+                const l = lightness / 100;
+                
+                let r, g, b;
+                if (s === 0) {
+                    r = g = b = l;
+                } else {
+                    const hue2rgb = (p, q, t) => {
+                        if (t < 0) t += 1;
+                        if (t > 1) t -= 1;
+                        if (t < 1/6) return p + (q - p) * 6 * t;
+                        if (t < 1/2) return q;
+                        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                        return p;
+                    };
+                    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                    const p = 2 * l - q;
+                    r = hue2rgb(p, q, h + 1/3);
+                    g = hue2rgb(p, q, h);
+                    b = hue2rgb(p, q, h - 1/3);
+                }
+                
+                const toHex = x => {
+                    const hex = Math.round(x * 255).toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                };
+                
+                return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
             }
             
             // 각 선택된 그룹의 색상을 랜덤하게 변경
@@ -1469,18 +1498,18 @@ const canvas = document.getElementById('canvas');
             document.getElementById('zoomRange').value = scalePercent;
         }
         document.getElementById('zoomInBtn').addEventListener('click', function () {
-            if (scalePercent < 100) {
+            if (scalePercent < 200) {
                 scalePercent += 5;
-                if (scalePercent > 100) scalePercent = 100;
+                if (scalePercent > 200) scalePercent = 200;
                 updateZoomUI();
                 drawAllGroups();
             }
         });
 // 15% 확대/축소 큰 버튼 이벤트 (중첩 벗어나서 바깥에 이동)
 document.getElementById('bigZoomInBtn').addEventListener('click', function () {
-    if (scalePercent < 100) {
+    if (scalePercent < 200) {
         scalePercent += 15;
-        if (scalePercent > 100) scalePercent = 100;
+        if (scalePercent > 200) scalePercent = 200;
         updateZoomUI();
         drawAllGroups();
     }
@@ -1525,9 +1554,9 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
             // +, = 키로 확대 (Shift + = 또는 단순 = 키)
             if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
-                if (scalePercent < 100) {
+                if (scalePercent < 200) {
                     scalePercent += 5;
-                    if (scalePercent > 100) scalePercent = 100;
+                    if (scalePercent > 200) scalePercent = 200;
                     updateZoomUI();
                     drawAllGroups();
                 }
