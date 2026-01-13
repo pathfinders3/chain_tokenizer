@@ -13,6 +13,11 @@ const canvas = document.getElementById('canvas');
         let draggingPoint = null; // 드래그 중인 점: { groupIndex, pointIndex, originalPos, startMousePos }
         let undoBackup = null; // 실행 취소를 위한 백업 (마지막 작업 1개)
         
+        // Undo/Redo 시스템
+        let undoStack = []; // 이전 상태들 (최대 20개)
+        let redoStack = []; // 다시 실행할 상태들
+        const MAX_HISTORY = 20; // 최대 히스토리 개수
+        
         // 점 표시 On/Off 상태
         let showOriginalPoints = true;
         let showSimplifiedPoints = true;
@@ -287,7 +292,10 @@ const canvas = document.getElementById('canvas');
             
             let html = '';
             
-            selectedPoints.forEach((sp, idx) => {
+            // 최근 선택 순으로 정렬 (timestamp 내림차순)
+            const sortedPoints = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+            
+            sortedPoints.forEach((sp, idx) => {
                 const group = savedGroups[sp.groupIndex];
                 const point = group.points[sp.pointIndex];
                 
@@ -350,7 +358,10 @@ const canvas = document.getElementById('canvas');
                 
                 if (linkedGroups.length > 0) {
                     html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
-                    html += `<div style="color: #4facfe; font-weight: bold;">🔀 이 그룹과 연결된 그룹: ${linkedGroups.length}개</div>`;
+                    // 자기 자신 포함 (+1)하여 ● 개수 표시
+                    const totalGroups = linkedGroups.length + 1; // 연결된 그룹 + 자기 자신
+                    const dots = '●'.repeat(totalGroups);
+                    html += `<div style="color: #4facfe; font-weight: bold;">🔀 이 그룹과 연결된 그룹: ${linkedGroups.length}개 ${dots}</div>`;
                     linkedGroups.forEach(lg => {
                         html += `<div style="margin-left: 12px; margin-top: 2px;">`;
                         html += `• <span style="color: ${lg.color}; font-weight: bold;">그룹 ${lg.groupIndex + 1}</span> (${lg.pointCount}개 점)`;
@@ -359,7 +370,7 @@ const canvas = document.getElementById('canvas');
                     html += `</div>`;
                 } else {
                     html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
-                    html += `<div style="color: #888;">이 그룹과 연결된 그룹 없음</div>`;
+                    html += `<div style="color: #888;">이 그룹과 연결된 그룹 없음 ●</div>`;
                     html += `</div>`;
                 }
                 
@@ -492,8 +503,85 @@ const canvas = document.getElementById('canvas');
             alert(`새로운 끊어진 그룹이 생성되었습니다!\n포함: ${brokenPoints.length}개의 점\n제외: ${excludedCount}개의 점 (인덱스 ${startIdx + 1}~${endIdx - 1})`);
         }
         
+        // ===== Undo/Redo 시스템 함수들 =====
+        
+        // savedGroups의 현재 상태를 히스토리에 저장 (작업 수행 전에 호출)
+        function saveToHistory() {
+            // savedGroups의 깊은 복사본 생성
+            const snapshot = JSON.parse(JSON.stringify(savedGroups));
+            
+            // undoStack에 추가
+            undoStack.push(snapshot);
+            
+            // 최대 개수 제한
+            if (undoStack.length > MAX_HISTORY) {
+                undoStack.shift(); // 가장 오래된 것 제거
+            }
+            
+            // 새 작업이 수행되면 redoStack 초기화
+            redoStack = [];
+            
+            console.log(`[History] 저장됨 (Stack: ${undoStack.length}개)`);
+        }
+        
+        // Undo 실행 (Ctrl+Z)
+        function performUndo() {
+            if (undoStack.length === 0) {
+                console.log('[Undo] 되돌릴 작업이 없습니다.');
+                return;
+            }
+            
+            // 현재 상태를 redoStack에 저장
+            const currentSnapshot = JSON.parse(JSON.stringify(savedGroups));
+            redoStack.push(currentSnapshot);
+            
+            // undoStack에서 이전 상태 복원
+            const previousState = undoStack.pop();
+            savedGroups = previousState;
+            
+            // 선택 상태 초기화
+            selectedPoints = [];
+            
+            // UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+            saveToLocalStorage();
+            
+            console.log(`[Undo] 실행됨 (Undo Stack: ${undoStack.length}, Redo Stack: ${redoStack.length})`);
+        }
+        
+        // Redo 실행 (Ctrl+Y 또는 Ctrl+Shift+Z)
+        function performRedo() {
+            if (redoStack.length === 0) {
+                console.log('[Redo] 다시 실행할 작업이 없습니다.');
+                return;
+            }
+            
+            // 현재 상태를 undoStack에 저장
+            const currentSnapshot = JSON.parse(JSON.stringify(savedGroups));
+            undoStack.push(currentSnapshot);
+            
+            // redoStack에서 다음 상태 복원
+            const nextState = redoStack.pop();
+            savedGroups = nextState;
+            
+            // 선택 상태 초기화
+            selectedPoints = [];
+            
+            // UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+            saveToLocalStorage();
+            
+            console.log(`[Redo] 실행됨 (Undo Stack: ${undoStack.length}, Redo Stack: ${redoStack.length})`);
+        }
+        
+        // ===== 끝: Undo/Redo 시스템 함수들 =====
+        
         // 한 선으로 통합 함수
         function mergeLinkedGroups() {
+            // 작업 전 상태 저장 (Undo 지원)
+            saveToHistory();
             // 1. 선택된 점이 있는지 확인
             if (selectedPoints.length === 0) {
                 alert('먼저 점을 선택해주세요.');
@@ -1548,6 +1636,20 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
                 } else {
                     console.log('취소할 작업이 없습니다.');
                 }
+                return;
+            }
+            
+            // Ctrl+Z: Undo
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                performUndo();
+                return;
+            }
+            
+            // Ctrl+Y 또는 Ctrl+Shift+Z: Redo
+            if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+                e.preventDefault();
+                performRedo();
                 return;
             }
             
