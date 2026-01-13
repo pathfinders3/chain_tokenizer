@@ -332,6 +332,125 @@ const canvas = document.getElementById('canvas');
             pointInfoDiv.innerHTML = html;
         }
         
+        // 부분 그룹 생성 버튼 이벤트
+        document.getElementById('createSubGroup').addEventListener('click', function() {
+            createSubGroup();
+        });
+        
+        // 끊어진 그룹 생성 버튼 이벤트
+        document.getElementById('createBrokenGroup').addEventListener('click', function() {
+            createBrokenGroup();
+        });
+        
+        // 부분 그룹 생성 함수
+        function createSubGroup() {
+            // 1. 선택된 점이 정확히 2개인지 확인
+            if (selectedPoints.length !== 2) {
+                alert('한 그룹 내에서 정확히 2개의 점을 선택해주세요.');
+                return;
+            }
+            
+            // 2. 두 점이 같은 그룹에 속하는지 확인
+            const point1 = selectedPoints[0];
+            const point2 = selectedPoints[1];
+            
+            if (point1.groupIndex !== point2.groupIndex) {
+                alert('같은 그룹 내의 점 2개를 선택해주세요.');
+                return;
+            }
+            
+            const groupIndex = point1.groupIndex;
+            const group = savedGroups[groupIndex];
+            
+            // 3. 두 점의 인덱스를 정렬 (시작점, 끝점 결정)
+            const startIdx = Math.min(point1.pointIndex, point2.pointIndex);
+            const endIdx = Math.max(point1.pointIndex, point2.pointIndex);
+            
+            // 4. 두 점 사이의 점들 추출 (두 점 포함)
+            const subPoints = group.points.slice(startIdx, endIdx + 1);
+            
+            if (subPoints.length < 2) {
+                alert('부분 그룹을 생성할 수 없습니다. (최소 2개의 점 필요)');
+                return;
+            }
+            
+            // 5. 새로운 그룹 생성
+            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6348', '#00d2d3'];
+            const color = colors[savedGroups.length % colors.length];
+            
+            savedGroups.push({
+                points: JSON.parse(JSON.stringify(subPoints)), // 깊은 복사
+                color: color,
+                visible: true,
+                selected: false,
+                originalCount: subPoints.length
+            });
+            
+            // 6. UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+            
+            console.log(`부분 그룹 생성: 그룹 ${groupIndex + 1}의 ${startIdx}번~${endIdx}번 점 (총 ${subPoints.length}개)`);
+            alert(`새로운 그룹이 생성되었습니다! (${subPoints.length}개의 점)`);
+        }
+        
+        // 끊어진 그룹 생성 함수
+        function createBrokenGroup() {
+            // 1. 선택된 점이 정확히 2개인지 확인
+            if (selectedPoints.length !== 2) {
+                alert('한 그룹 내에서 정확히 2개의 점을 선택해주세요.');
+                return;
+            }
+            
+            // 2. 두 점이 같은 그룹에 속하는지 확인
+            const point1 = selectedPoints[0];
+            const point2 = selectedPoints[1];
+            
+            if (point1.groupIndex !== point2.groupIndex) {
+                alert('같은 그룹 내의 점 2개를 선택해주세요.');
+                return;
+            }
+            
+            const groupIndex = point1.groupIndex;
+            const group = savedGroups[groupIndex];
+            
+            // 3. 두 점의 인덱스를 정렬 (시작점, 끝점 결정)
+            const startIdx = Math.min(point1.pointIndex, point2.pointIndex);
+            const endIdx = Math.max(point1.pointIndex, point2.pointIndex);
+            
+            // 4. 두 점 사이의 점들을 제외한 나머지 점들 추출
+            // 0 ~ startIdx까지 + endIdx ~ 끝까지
+            const brokenPoints = [
+                ...group.points.slice(0, startIdx + 1),  // 시작부터 첫 번째 선택점까지 (포함)
+                ...group.points.slice(endIdx)             // 두 번째 선택점부터 끝까지 (포함)
+            ];
+            
+            if (brokenPoints.length < 2) {
+                alert('끊어진 그룹을 생성할 수 없습니다. (최소 2개의 점 필요)');
+                return;
+            }
+            
+            // 5. 새로운 그룹 생성
+            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6348', '#00d2d3'];
+            const color = colors[savedGroups.length % colors.length];
+            
+            savedGroups.push({
+                points: JSON.parse(JSON.stringify(brokenPoints)), // 깊은 복사
+                color: color,
+                visible: true,
+                selected: false,
+                originalCount: brokenPoints.length
+            });
+            
+            // 6. UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+            
+            const excludedCount = endIdx - startIdx - 1;
+            console.log(`끊어진 그룹 생성: 그룹 ${groupIndex + 1}의 0~${startIdx}번 + ${endIdx}~끝 점 (중간 ${excludedCount}개 제외, 총 ${brokenPoints.length}개)`);
+            alert(`새로운 끊어진 그룹이 생성되었습니다!\n포함: ${brokenPoints.length}개의 점\n제외: ${excludedCount}개의 점 (인덱스 ${startIdx + 1}~${endIdx - 1})`);
+        }
+        
         // 그룹 삭제
         window.deleteGroup = function(index) {
             if (confirm(`그룹 ${index + 1}을(를) 삭제하시겠습니까?`)) {
@@ -636,21 +755,30 @@ const canvas = document.getElementById('canvas');
             if (closestPoint) {
                 const { groupIndex, pointIndex } = closestPoint;
                 
-                // 같은 그룹에서 이미 선택된 점이 있는지 확인
-                const existingIndex = selectedPoints.findIndex(sp => sp.groupIndex === groupIndex);
+                // 같은 점이 이미 선택되어 있는지 확인
+                const alreadySelectedIndex = selectedPoints.findIndex(sp => 
+                    sp.groupIndex === groupIndex && sp.pointIndex === pointIndex
+                );
                 
-                if (existingIndex !== -1) {
+                if (alreadySelectedIndex !== -1) {
                     // 같은 점을 다시 클릭하면 선택 해제
-                    if (selectedPoints[existingIndex].pointIndex === pointIndex) {
-                        selectedPoints.splice(existingIndex, 1);
-                        console.log(`선택 해제: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}`);
-                    } else {
-                        // 다른 점을 클릭하면 해당 그룹의 선택을 교체
-                        selectedPoints[existingIndex] = { groupIndex, pointIndex, timestamp: Date.now() };
-                        console.log(`선택 교체: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x.toFixed(1)}, ${closestPoint.point.y.toFixed(1)})`);
-                    }
+                    selectedPoints.splice(alreadySelectedIndex, 1);
+                    console.log(`선택 해제: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}`);
                 } else {
-                    // 새로운 그룹의 점 선택
+                    // 전체적으로 이미 2개가 선택되어 있으면 가장 오래된 점을 제거
+                    if (selectedPoints.length >= 2) {
+                        const oldestPoint = selectedPoints.reduce((oldest, current) => 
+                            current.timestamp < oldest.timestamp ? current : oldest
+                        );
+                        const oldestIndex = selectedPoints.findIndex(sp => 
+                            sp.groupIndex === oldestPoint.groupIndex && 
+                            sp.pointIndex === oldestPoint.pointIndex
+                        );
+                        selectedPoints.splice(oldestIndex, 1);
+                        console.log(`최대 2개 제한으로 그룹 ${oldestPoint.groupIndex + 1}의 포인트 ${oldestPoint.pointIndex} 자동 해제`);
+                    }
+                    
+                    // 새로운 점 추가
                     selectedPoints.push({ groupIndex, pointIndex, timestamp: Date.now() });
                     console.log(`선택 추가: 그룹 ${groupIndex + 1}, 포인트 ${pointIndex}, 좌표 (${closestPoint.point.x.toFixed(1)}, ${closestPoint.point.y.toFixed(1)})`);
                 }
