@@ -307,15 +307,35 @@ const canvas = document.getElementById('canvas');
                     });
                 });
                 
+                // 이 점이 속한 그룹과 연결된 모든 그룹 찾기
+                const linkedGroupsSet = new Set();
+                group.points.forEach(groupPoint => {
+                    savedGroups.forEach((otherGroup, otherGroupIndex) => {
+                        if (otherGroupIndex === sp.groupIndex) return; // 같은 그룹 제외
+                        
+                        otherGroup.points.forEach(otherPoint => {
+                            if (groupPoint.x === otherPoint.x && groupPoint.y === otherPoint.y) {
+                                linkedGroupsSet.add(otherGroupIndex);
+                            }
+                        });
+                    });
+                });
+                
+                const linkedGroups = Array.from(linkedGroupsSet).map(groupIndex => ({
+                    groupIndex: groupIndex,
+                    color: savedGroups[groupIndex].color,
+                    pointCount: savedGroups[groupIndex].points.length
+                }));
+                
                 html += `<div style="margin-bottom: 12px; padding: 8px; background: #333; border-radius: 4px; border-left: 4px solid ${group.color};">`;
                 html += `<div style="font-weight: bold; margin-bottom: 4px;">📍 선택 ${idx + 1}</div>`;
-                html += `<div>그룹: <span style="color: ${group.color}; font-weight: bold;">그룹 ${sp.groupIndex + 1}</span></div>`;
+                html += `<div>그룹: <span style="color: ${group.color}; font-weight: bold;">그룹 ${sp.groupIndex + 1}</span> (총 ${group.points.length}개 점)</div>`;
                 html += `<div>포인트 인덱스: <strong>${sp.pointIndex}</strong></div>`;
                 html += `<div id="coord-${idx}">좌표: <strong style="cursor: pointer; padding: 2px 6px; background: #444; border-radius: 3px;" onclick="editPointCoordinates(${idx})" title="클릭하여 편집">(${point.x.toFixed(1)}, ${point.y.toFixed(1)})</strong></div>`;
                 
                 if (connectedPoints.length > 0) {
                     html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
-                    html += `<div style="color: #feca57; font-weight: bold;">🔗 연결된 점: ${connectedPoints.length}개</div>`;
+                    html += `<div style="color: #feca57; font-weight: bold;">🔗 이 점과 겹치는 점: ${connectedPoints.length}개</div>`;
                     connectedPoints.forEach(cp => {
                         html += `<div style="margin-left: 12px; margin-top: 2px;">`;
                         html += `• <span style="color: ${cp.color}; font-weight: bold;">그룹 ${cp.groupIndex + 1}</span> - 포인트 ${cp.pointIndex}`;
@@ -323,7 +343,24 @@ const canvas = document.getElementById('canvas');
                     });
                     html += `</div>`;
                 } else {
-                    html += `<div style="margin-top: 6px; color: #888;">연결된 점 없음</div>`;
+                    html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
+                    html += `<div style="color: #888;">이 점과 겹치는 점 없음</div>`;
+                    html += `</div>`;
+                }
+                
+                if (linkedGroups.length > 0) {
+                    html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
+                    html += `<div style="color: #4facfe; font-weight: bold;">🔀 이 그룹과 연결된 그룹: ${linkedGroups.length}개</div>`;
+                    linkedGroups.forEach(lg => {
+                        html += `<div style="margin-left: 12px; margin-top: 2px;">`;
+                        html += `• <span style="color: ${lg.color}; font-weight: bold;">그룹 ${lg.groupIndex + 1}</span> (${lg.pointCount}개 점)`;
+                        html += `</div>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #555;">`;
+                    html += `<div style="color: #888;">이 그룹과 연결된 그룹 없음</div>`;
+                    html += `</div>`;
                 }
                 
                 html += `</div>`;
@@ -340,6 +377,11 @@ const canvas = document.getElementById('canvas');
         // 끊어진 그룹 생성 버튼 이벤트
         document.getElementById('createBrokenGroup').addEventListener('click', function() {
             createBrokenGroup();
+        });
+        
+        // 한 선으로 통합 버튼 이벤트
+        document.getElementById('mergeLinkedGroups').addEventListener('click', function() {
+            mergeLinkedGroups();
         });
         
         // 부분 그룹 생성 함수
@@ -391,7 +433,6 @@ const canvas = document.getElementById('canvas');
             drawAllGroups();
             
             console.log(`부분 그룹 생성: 그룹 ${groupIndex + 1}의 ${startIdx}번~${endIdx}번 점 (총 ${subPoints.length}개)`);
-            alert(`새로운 그룹이 생성되었습니다! (${subPoints.length}개의 점)`);
         }
         
         // 끊어진 그룹 생성 함수
@@ -449,6 +490,166 @@ const canvas = document.getElementById('canvas');
             const excludedCount = endIdx - startIdx - 1;
             console.log(`끊어진 그룹 생성: 그룹 ${groupIndex + 1}의 0~${startIdx}번 + ${endIdx}~끝 점 (중간 ${excludedCount}개 제외, 총 ${brokenPoints.length}개)`);
             alert(`새로운 끊어진 그룹이 생성되었습니다!\n포함: ${brokenPoints.length}개의 점\n제외: ${excludedCount}개의 점 (인덱스 ${startIdx + 1}~${endIdx - 1})`);
+        }
+        
+        // 한 선으로 통합 함수
+        function mergeLinkedGroups() {
+            // 1. 선택된 점이 있는지 확인
+            if (selectedPoints.length === 0) {
+                alert('먼저 점을 선택해주세요.');
+                return;
+            }
+            
+            // 2. 가장 최근에 선택한 점 찾기
+            const sortedSelected = [...selectedPoints].sort((a, b) => b.timestamp - a.timestamp);
+            const recentPoint = sortedSelected[0];
+            const baseGroupIndex = recentPoint.groupIndex;
+            const baseGroup = savedGroups[baseGroupIndex];
+            
+            // 3. 연결된 그룹들과 연결점 정보 찾기
+            const linkedGroups = new Map(); // groupIndex -> 연결점들의 배열
+            linkedGroups.set(baseGroupIndex, []); // 기준 그룹 포함
+            
+            // 기준 그룹의 각 점에 대해 확인
+            baseGroup.points.forEach((point, pointIndex) => {
+                // 같은 좌표를 가진 다른 그룹의 점들 찾기
+                savedGroups.forEach((otherGroup, otherIndex) => {
+                    if (otherIndex === baseGroupIndex) return; // 같은 그룹 제외
+                    if (!otherGroup.visible) return; // 보이지 않는 그룹 제외
+                    
+                    otherGroup.points.forEach((otherPoint, otherPointIndex) => {
+                        if (point.x === otherPoint.x && point.y === otherPoint.y) {
+                            // 연결점 발견
+                            if (!linkedGroups.has(otherIndex)) {
+                                linkedGroups.set(otherIndex, []);
+                            }
+                            linkedGroups.get(otherIndex).push({
+                                baseGroupIndex: baseGroupIndex,
+                                basePointIndex: pointIndex,
+                                otherGroupIndex: otherIndex,
+                                otherPointIndex: otherPointIndex,
+                                coord: { x: point.x, y: point.y }
+                            });
+                        }
+                    });
+                });
+            });
+            
+            if (linkedGroups.size === 1) {
+                alert('연결된 그룹이 없습니다.');
+                return;
+            }
+            
+            // 4. 모든 연결점이 끝점(시작점 또는 마지막점)인지 확인
+            let canMerge = true;
+            let invalidConnection = null;
+            
+            linkedGroups.forEach((connections, groupIndex) => {
+                if (groupIndex === baseGroupIndex) return; // 기준 그룹은 건너뜀
+                
+                connections.forEach(conn => {
+                    const baseGroupSize = savedGroups[conn.baseGroupIndex].points.length;
+                    const otherGroupSize = savedGroups[conn.otherGroupIndex].points.length;
+                    
+                    // 기준 그룹에서 끝점인지 확인 (인덱스 0 또는 마지막)
+                    const isBaseEndPoint = conn.basePointIndex === 0 || conn.basePointIndex === baseGroupSize - 1;
+                    
+                    // 연결된 그룹에서 끝점인지 확인
+                    const isOtherEndPoint = conn.otherPointIndex === 0 || conn.otherPointIndex === otherGroupSize - 1;
+                    
+                    if (!isBaseEndPoint || !isOtherEndPoint) {
+                        canMerge = false;
+                        invalidConnection = {
+                            baseGroup: conn.baseGroupIndex + 1,
+                            basePoint: conn.basePointIndex,
+                            baseIsEnd: isBaseEndPoint,
+                            otherGroup: conn.otherGroupIndex + 1,
+                            otherPoint: conn.otherPointIndex,
+                            otherIsEnd: isOtherEndPoint
+                        };
+                    }
+                });
+            });
+            
+            if (!canMerge) {
+                let message = '중간 점이 연결되어 있어 통합할 수 없습니다.\n\n';
+                message += `그룹 ${invalidConnection.baseGroup}의 ${invalidConnection.baseIsEnd ? '끝점' : '중간점'} (인덱스 ${invalidConnection.basePoint})과\n`;
+                message += `그룹 ${invalidConnection.otherGroup}의 ${invalidConnection.otherIsEnd ? '끝점' : '중간점'} (인덱스 ${invalidConnection.otherPoint})이 연결되어 있습니다.\n\n`;
+                message += '통합 가능 조건: 양쪽 그룹 모두에서 끝점(시작점 또는 마지막점)끼리 연결되어야 합니다.';
+                alert(message);
+                return;
+            }
+            
+            // 5. 연결 정보를 기반으로 올바른 순서로 그룹 통합
+            // 2개 그룹만 통합 가능하도록 제한 (더 복잡한 경우는 순서 결정이 어려움)
+            const groupIndicesArray = Array.from(linkedGroups.keys());
+            if (groupIndicesArray.length !== 2) {
+                alert('현재는 2개의 그룹만 통합할 수 있습니다.');
+                return;
+            }
+            
+            const group1Index = groupIndicesArray[0];
+            const group2Index = groupIndicesArray[1];
+            const group1 = savedGroups[group1Index];
+            const group2 = savedGroups[group2Index];
+            
+            // 연결 정보 가져오기
+            const connections = linkedGroups.get(group2Index);
+            if (!connections || connections.length === 0) {
+                alert('연결점을 찾을 수 없습니다.');
+                return;
+            }
+            
+            const conn = connections[0]; // 첫 번째 연결점 사용
+            const g1Size = group1.points.length;
+            const g2Size = group2.points.length;
+            
+            let mergedPoints = [];
+            
+            // 연결 타입에 따라 올바르게 통합
+            if (conn.basePointIndex === g1Size - 1 && conn.otherPointIndex === 0) {
+                // 그룹1의 마지막 점과 그룹2의 첫 점이 연결
+                // 그룹1 + 그룹2 (연결점 중복 제거)
+                mergedPoints = [...group1.points, ...group2.points.slice(1)];
+                console.log('통합 방식: 그룹1 + 그룹2 (연결점 제거)');
+            } else if (conn.basePointIndex === g1Size - 1 && conn.otherPointIndex === g2Size - 1) {
+                // 그룹1의 마지막 점과 그룹2의 마지막 점이 연결
+                // 그룹1 + 그룹2 역순 (연결점 중복 제거)
+                mergedPoints = [...group1.points, ...group2.points.slice(0, -1).reverse()];
+                console.log('통합 방식: 그룹1 + 그룹2 역순 (연결점 제거)');
+            } else if (conn.basePointIndex === 0 && conn.otherPointIndex === 0) {
+                // 그룹1의 첫 점과 그룹2의 첫 점이 연결
+                // 그룹1 역순 + 그룹2 (연결점 중복 제거)
+                mergedPoints = [...group1.points.slice(1).reverse(), ...group2.points];
+                console.log('통합 방식: 그룹1 역순 + 그룹2 (연결점 제거)');
+            } else if (conn.basePointIndex === 0 && conn.otherPointIndex === g2Size - 1) {
+                // 그룹1의 첫 점과 그룹2의 마지막 점이 연결
+                // 그룹2 + 그룹1 (연결점 중복 제거)
+                mergedPoints = [...group2.points, ...group1.points.slice(1)];
+                console.log('통합 방식: 그룹2 + 그룹1 (연결점 제거)');
+            } else {
+                alert('예상치 못한 연결 형태입니다.');
+                return;
+            }
+            
+            // 6. 새로운 통합 그룹 생성
+            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6348', '#00d2d3'];
+            const color = colors[savedGroups.length % colors.length];
+            
+            savedGroups.push({
+                points: JSON.parse(JSON.stringify(mergedPoints)), // 깊은 복사
+                color: color,
+                visible: true,
+                selected: false,
+                originalCount: mergedPoints.length
+            });
+            
+            // 7. UI 업데이트
+            updateGroupList();
+            drawAllGroups();
+            
+            console.log(`한 선으로 통합: 그룹 ${group1Index + 1}, ${group2Index + 1} 통합 (총 ${mergedPoints.length}개의 점)`);
+            console.log(`  그룹1: ${g1Size}개, 그룹2: ${g2Size}개 → 통합: ${mergedPoints.length}개`);
         }
         
         // 그룹 삭제
