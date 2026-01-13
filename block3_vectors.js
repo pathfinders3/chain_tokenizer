@@ -1626,19 +1626,6 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
         
         // 캔버스 및 전역에서 키보드 이벤트 처리
         const handleKeyDown = function(e) {
-            // Ctrl+Z로 실행 취소
-            if (e.ctrlKey && e.key === 'z') {
-                e.preventDefault();
-                if (undoBackup) {
-                    savedGroups = JSON.parse(JSON.stringify(undoBackup));
-                    console.log('실행 취소 완료 (Ctrl+Z)');
-                    drawAllGroups();
-                } else {
-                    console.log('취소할 작업이 없습니다.');
-                }
-                return;
-            }
-            
             // Ctrl+Z: Undo
             if (e.ctrlKey && e.key === 'z') {
                 e.preventDefault();
@@ -1650,6 +1637,54 @@ document.getElementById('bigZoomOutBtn').addEventListener('click', function () {
             if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
                 e.preventDefault();
                 performRedo();
+                return;
+            }
+            
+            // DEL 키: 가장 최근 선택된 점이 속한 그룹 삭제
+            if (e.key === 'Delete' || e.key === 'Del') {
+                e.preventDefault();
+                
+                if (selectedPoints.length === 0) {
+                    console.log('[DEL] 선택된 점이 없습니다.');
+                    return;
+                }
+                
+                // 가장 최근 선택된 점 찾기 (timestamp가 가장 큰 것)
+                const recentPoint = selectedPoints.reduce((prev, current) => 
+                    (current.timestamp > prev.timestamp) ? current : prev
+                );
+                
+                const groupIndex = recentPoint.groupIndex;
+                const group = savedGroups[groupIndex];
+                
+                if (!group) {
+                    console.log('[DEL] 그룹을 찾을 수 없습니다.');
+                    return;
+                }
+                
+                // 삭제 전 상태 저장 (Undo 지원)
+                saveToHistory();
+                
+                // 그룹 삭제
+                savedGroups.splice(groupIndex, 1);
+                
+                // 선택된 점들 중에서 삭제된 그룹의 점들 제거 및 인덱스 조정
+                selectedPoints = selectedPoints.filter(sp => {
+                    if (sp.groupIndex === groupIndex) {
+                        return false; // 삭제된 그룹의 점 제거
+                    } else if (sp.groupIndex > groupIndex) {
+                        sp.groupIndex--; // 인덱스 조정
+                    }
+                    return true;
+                });
+                
+                // UI 업데이트
+                updateGroupList();
+                updatePointInfo();
+                drawAllGroups();
+                saveToLocalStorage();
+                
+                console.log(`[DEL] 그룹 ${groupIndex + 1} 삭제됨 (${group.points.length}개 점)`);
                 return;
             }
             
