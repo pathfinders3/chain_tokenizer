@@ -71,6 +71,24 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// 카메라를 초기 위치로 리셋
+function resetCamera() {
+    if (!camera || !controls) {
+        console.warn('카메라가 초기화되지 않았습니다.');
+        return;
+    }
+    
+    // 카메라 위치 리셋 (정면 뷰)
+    camera.position.set(0, 0, 500);
+    camera.rotation.set(0, 0, 0);
+    
+    // OrbitControls 타겟 리셋 (원점)
+    controls.target.set(0, 0, 0);
+    controls.update();
+    
+    console.log('카메라 위치 리셋 완료');
+}
+
 // 선택된 그룹 하이라이트 업데이트
 function updateSelection() {
     groupObjects.forEach(groupObj => {
@@ -497,6 +515,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             alert('JSON 파싱 오류: ' + err.message);
         }
+    });
+
+    // 카메라 리셋
+    document.getElementById('resetCameraBtn').addEventListener('click', () => {
+        resetCamera();
     });
 
     // 캔버스 지우기
