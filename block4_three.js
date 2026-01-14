@@ -50,19 +50,44 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
     const ctx = canvas.getContext('2d');
     const groups = jsonData.groups;
 
+    console.log('=== 렌더링 시작 ===');
+    console.log('그룹 수:', groups.length);
+    console.log('캔버스 크기:', canvas.width, 'x', canvas.height);
+    console.log('옵션:', config);
+
     // 캔버스 초기화
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 좌표 변환 함수
+    // 모든 점의 바운딩 박스 계산
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    groups.forEach(group => {
+        if (group.visible !== false && group.points && group.points.length > 0) {
+            group.points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                minY = Math.min(minY, point.y);
+                maxX = Math.max(maxX, point.x);
+                maxY = Math.max(maxY, point.y);
+            });
+        }
+    });
+
+    // 데이터의 중심점 계산
+    const dataCenterX = (minX + maxX) / 2;
+    const dataCenterY = (minY + maxY) / 2;
+
+    console.log('데이터 범위:', { minX, minY, maxX, maxY });
+    console.log('데이터 중심:', { dataCenterX, dataCenterY });
+
+    // 좌표 변환 함수 (데이터 중심을 캔버스 중앙에 배치)
     function transform(x, y) {
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const scale = config.scalePercent / 100;
         return {
-            x: centerX + x * scale + config.viewOffset.x,
-            y: centerY - y * scale + config.viewOffset.y
+            x: centerX + (x - dataCenterX) * scale + config.viewOffset.x,
+            y: centerY - (y - dataCenterY) * scale + config.viewOffset.y
         };
     }
 
@@ -70,13 +95,22 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
     groups.forEach((group, groupIndex) => {
         // visible이 false인 경우 건너뛰기
         if (group.visible === false) {
+            console.log(`그룹 ${groupIndex + 1}: 숨김 처리됨`);
             return;
         }
 
         const color = group.color || '#667eea';
         const points = group.points;
 
+        console.log(`그룹 ${groupIndex + 1}:`, {
+            color,
+            pointCount: points.length,
+            visible: group.visible,
+            firstPoint: points[0]
+        });
+
         if (!points || points.length === 0) {
+            console.log(`그룹 ${groupIndex + 1}: 점이 없음`);
             return;
         }
 
@@ -125,6 +159,7 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
         }
     });
 
+    console.log('=== 렌더링 완료 ===');
     return true;
 }
 
@@ -217,6 +252,21 @@ const canvas = document.getElementById('canvas');
         const lineWidthValue = document.getElementById('lineWidthValue');
         const showPointsCheck = document.getElementById('showPointsCheck');
         const showLinesCheck = document.getElementById('showLinesCheck');
+
+        // textarea 직접 붙여넣기 이벤트
+        jsonInput.addEventListener('paste', (e) => {
+            // 붙여넣기 후 잠시 뒤에 자동 렌더링 시도
+            setTimeout(() => {
+                if (jsonInput.value.trim()) {
+                    try {
+                        const jsonData = JSON.parse(jsonInput.value);
+                        console.log('textarea에 붙여넣기 감지:', jsonData);
+                    } catch (err) {
+                        console.log('JSON 파싱 대기 중...');
+                    }
+                }
+            }, 100);
+        });
 
         // 슬라이더 값 표시 업데이트
         scaleSlider.addEventListener('input', (e) => {
