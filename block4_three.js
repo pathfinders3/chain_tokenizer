@@ -268,18 +268,44 @@ const canvas = document.getElementById('canvas');
             }, 100);
         });
 
-        // 슬라이더 값 표시 업데이트
+        // 실시간 렌더링 함수
+        function reRender() {
+            if (!jsonInput.value.trim()) return;
+            
+            try {
+                const jsonData = JSON.parse(jsonInput.value);
+                const options = {
+                    scalePercent: parseInt(scaleSlider.value),
+                    pointSize: parseInt(pointSizeSlider.value),
+                    lineWidth: parseInt(lineWidthSlider.value),
+                    showPoints: showPointsCheck.checked,
+                    showLines: showLinesCheck.checked
+                };
+                renderSavedGroups(jsonData, canvas, options);
+            } catch (err) {
+                console.error('렌더링 오류:', err);
+            }
+        }
+
+        // 슬라이더 값 표시 업데이트 + 실시간 렌더링
         scaleSlider.addEventListener('input', (e) => {
             scaleValue.textContent = e.target.value + '%';
+            reRender();
         });
 
         pointSizeSlider.addEventListener('input', (e) => {
             pointSizeValue.textContent = e.target.value;
+            reRender();
         });
 
         lineWidthSlider.addEventListener('input', (e) => {
             lineWidthValue.textContent = e.target.value;
+            reRender();
         });
+
+        // 체크박스 변경 시 실시간 렌더링
+        showPointsCheck.addEventListener('change', reRender);
+        showLinesCheck.addEventListener('change', reRender);
 
         // 클립보드에서 붙여넣기
         document.getElementById('pasteBtn').addEventListener('click', async () => {
