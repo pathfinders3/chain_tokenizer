@@ -18,6 +18,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 let scene, camera, renderer, controls;
 let groupObjects = []; // Three.js 그룹 객체들
 let currentJsonData = null;
+let raycaster, mouse;
+let selectedGroup = null;
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -52,6 +54,11 @@ function initThreeJS(canvas) {
     directionalLight.position.set(0, 1, 1);
     scene.add(directionalLight);
 
+    // Raycaster 초기화 (객체 선택용)
+    raycaster = new THREE.Raycaster();
+    raycaster.params.Line.threshold = 3; // 선 클릭 감지 범위 확대
+    mouse = new THREE.Vector2();
+
     // 애니메이션 루프 시작
     animate();
 
@@ -62,6 +69,90 @@ function animate() {
     requestAnimationFrame(animate);
     controls.update();
     renderer.render(scene, camera);
+}
+
+// 선택된 그룹 하이라이트 업데이트
+function updateSelection() {
+    groupObjects.forEach(groupObj => {
+        const isSelected = groupObj === selectedGroup;
+        
+        // 그룹 내 모든 객체 순회
+        groupObj.children.forEach(child => {
+            // 실제 데이터 라인만 처리 (점 테두리 제외)
+            if (child.userData.isDataLine) {
+                // 선택된 경우 노란색으로, 아니면 원래 색상으로
+                if (isSelected) {
+                    child.material.color.setHex(0xffff00); // 노란색
+                    child.material.linewidth = 3;
+                } else {
+                    // 원래 색상으로 복원
+                    if (groupObj.userData.originalColor) {
+                        child.material.color.copy(groupObj.userData.originalColor);
+                    }
+                }
+            } 
+            // 실제 데이터 점만 처리
+            else if (child.userData.isDataPoint) {
+                // 점(Sphere)도 하이라이트
+                if (isSelected) {
+                    child.material.emissive = new THREE.Color(0xffff00);
+                    child.material.emissiveIntensity = 0.5;
+                } else {
+                    child.material.emissive = new THREE.Color(0x000000);
+                    child.material.emissiveIntensity = 0;
+                }
+            }
+            // 점 테두리(edges)는 항상 흰색 유지
+        });
+    });
+}
+
+// 마우스 클릭으로 그룹 선택
+function onCanvasClick(event, canvas) {
+    // 캔버스 내 마우스 위치 계산 (정규화된 좌표: -1 ~ 1)
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    // Raycaster로 광선 쏘기
+    raycaster.setFromCamera(mouse, camera);
+
+    // 모든 그룹의 자식 객체들과 교차 검사
+    const allObjects = [];
+    groupObjects.forEach(group => {
+        group.children.forEach(child => {
+            allObjects.push(child);
+        });
+    });
+
+    const intersects = raycaster.intersectObjects(allObjects, false);
+
+    if (intersects.length > 0) {
+        // 클릭된 객체의 부모 그룹 찾기
+        const clickedObject = intersects[0].object;
+        const clickedGroup = groupObjects.find(group => 
+            group.children.includes(clickedObject)
+        );
+
+        if (clickedGroup) {
+            // 같은 그룹을 다시 클릭하면 선택 해제
+            if (selectedGroup === clickedGroup) {
+                selectedGroup = null;
+                console.log('선택 해제');
+            } else {
+                selectedGroup = clickedGroup;
+                console.log('그룹 선택:', clickedGroup.userData.groupIndex);
+            }
+            updateSelection();
+        }
+    } else {
+        // 빈 공간 클릭 시 선택 해제
+        if (selectedGroup) {
+            selectedGroup = null;
+            console.log('선택 해제');
+            updateSelection();
+        }
+    }
 }
 
 function renderSavedGroups(jsonData, canvas, options = {}) {
@@ -150,6 +241,11 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
 
         // Three.js Group 생성
         const groupObject = new THREE.Group();
+        
+        // 그룹 메타데이터 저장
+        groupObject.userData.groupIndex = groupIndex;
+        groupObject.userData.originalColor = new THREE.Color(color);
+        groupObject.userData.color = color;
 
         // 3D 좌표 변환 (중심을 원점으로)
         const vertices = points.map(p => 
@@ -168,6 +264,7 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
                 linewidth: config.lineWidth // WebGL에서는 대부분 1로 제한됨
             });
             const line = new THREE.Line(lineGeometry, lineMaterial);
+            line.userData.isDataLine = true; // 실제 데이터 라인 표시
             groupObject.add(line);
         }
 
@@ -175,11 +272,16 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
         if (config.showPoints) {
             vertices.forEach(vertex => {
                 const sphereGeometry = new THREE.SphereGeometry(config.pointSize, 16, 16);
-                const sphereMaterial = new THREE.MeshBasicMaterial({ 
-                    color: new THREE.Color(color)
+                const sphereMaterial = new THREE.MeshStandardMaterial({ 
+                    color: new THREE.Color(color),
+                    emissive: new THREE.Color(0x000000),
+                    emissiveIntensity: 0,
+                    metalness: 0.3,
+                    roughness: 0.7
                 });
                 const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
                 sphere.position.copy(vertex);
+                sphere.userData.isDataPoint = true; // 실제 데이터 점 표시
                 groupObject.add(sphere);
 
                 // 흰색 테두리 (선택사항)
@@ -187,6 +289,7 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
                 const edgesMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
                 const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
                 edges.position.copy(vertex);
+                edges.userData.isEdge = true; // 테두리 표시
                 groupObject.add(edges);
             });
         }
@@ -291,6 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const lineWidthValue = document.getElementById('lineWidthValue');
     const showPointsCheck = document.getElementById('showPointsCheck');
     const showLinesCheck = document.getElementById('showLinesCheck');
+
+    // 캔버스 클릭 이벤트 (그룹 선택)
+    canvas.addEventListener('click', (event) => {
+        onCanvasClick(event, canvas);
+    });
 
     // textarea 직접 붙여넣기 이벤트
     jsonInput.addEventListener('paste', (e) => {
