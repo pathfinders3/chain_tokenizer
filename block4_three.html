@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Douglas-Peucker 알고리즘 시각화</title>
+    <link rel="icon" type="image/png" href="block3.png">
+
+    <!-- 같은 이름의 CSS -->
+    <link rel="stylesheet" href="block3_vectors.css">
+</head>
+
+<body>
+	
+<div class="container">
+        <h1>📊 저장된 그룹 렌더링 예제</h1>
+        
+        <div class="controls">
+            <button id="pasteBtn">📋 클립보드에서 붙여넣기</button>
+            <button id="loadFromStorageBtn">💾 localStorage에서 불러오기</button>
+            <button id="renderBtn">🎨 렌더링</button>
+            <button id="clearBtn">🗑️ 캔버스 지우기</button>
+            <button id="infoBtn">ℹ️ 정보 출력</button>
+        </div>
+
+        <textarea id="jsonInput" placeholder="여기에 JSON 데이터를 붙여넣으세요..."></textarea>
+
+        <div class="controls">
+            <div class="slider-group">
+                <label>스케일:</label>
+                <input type="range" id="scaleSlider" min="20" max="150" value="60" step="5">
+                <span id="scaleValue">60%</span>
+            </div>
+
+            <div class="slider-group">
+                <label>점 크기:</label>
+                <input type="range" id="pointSizeSlider" min="1" max="10" value="4" step="1">
+                <span id="pointSizeValue">4</span>
+            </div>
+
+            <div class="slider-group">
+                <label>선 두께:</label>
+                <input type="range" id="lineWidthSlider" min="1" max="5" value="2" step="1">
+                <span id="lineWidthValue">2</span>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="showPointsCheck" checked>
+                <label for="showPointsCheck">점 표시</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="showLinesCheck" checked>
+                <label for="showLinesCheck">선 표시</label>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="1200" height="800"></canvas>
+
+        <div class="info">
+            <h3>사용 방법</h3>
+            <ol>
+                <li><strong>클립보드에서 붙여넣기:</strong> block3_vectors.html에서 '모든 그룹 저장' 버튼을 눌러 클립보드에 복사한 후, 이 버튼을 클릭하세요.</li>
+                <li><strong>localStorage에서 불러오기:</strong> 같은 브라우저에서 저장한 데이터를 불러옵니다.</li>
+                <li><strong>렌더링:</strong> JSON 데이터를 캔버스에 그립니다.</li>
+                <li><strong>스케일/크기 조정:</strong> 슬라이더를 조정한 후 렌더링 버튼을 다시 누르면 적용됩니다.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- renderSavedGroups.js 함수를 여기에 포함 -->
+    <script src="block4_three.js"></script>
+	
+</body>
+</html>
+	
