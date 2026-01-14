@@ -89,6 +89,51 @@ function resetCamera() {
     console.log('카메라 위치 리셋 완료');
 }
 
+// 정면 뷰 (XY 평면) - Z축에서 바라봄
+function setCameraViewXY() {
+    if (!camera || !controls) {
+        console.warn('카메라가 초기화되지 않았습니다.');
+        return;
+    }
+    
+    camera.position.set(0, 0, 500);
+    camera.rotation.set(0, 0, 0);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    
+    console.log('정면 뷰 (XY) 설정');
+}
+
+// 위 뷰 (XZ 평면) - Y축 위에서 아래로 바라봄
+function setCameraViewXZ() {
+    if (!camera || !controls) {
+        console.warn('카메라가 초기화되지 않았습니다.');
+        return;
+    }
+    
+    camera.position.set(0, 500, 0);
+    camera.rotation.set(-Math.PI / 2, 0, 0);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    
+    console.log('위 뷰 (XZ) 설정');
+}
+
+// 측면 뷰 (YZ 평면) - X축 옆에서 바라봄
+function setCameraViewYZ() {
+    if (!camera || !controls) {
+        console.warn('카메라가 초기화되지 않았습니다.');
+        return;
+    }
+    
+    camera.position.set(500, 0, 0);
+    camera.rotation.set(0, Math.PI / 2, 0);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    
+    console.log('측면 뷰 (YZ) 설정');
+}
+
 // 선택된 그룹 하이라이트 업데이트
 function updateSelection() {
     groupObjects.forEach(groupObj => {
@@ -517,9 +562,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 카메라 리셋
-    document.getElementById('resetCameraBtn').addEventListener('click', () => {
-        resetCamera();
+    // 카메라 뷰 전환 버튼들
+    document.getElementById('viewXYBtn').addEventListener('click', () => {
+        setCameraViewXY();
+    });
+
+    document.getElementById('viewXZBtn').addEventListener('click', () => {
+        setCameraViewXZ();
+    });
+
+    document.getElementById('viewYZBtn').addEventListener('click', () => {
+        setCameraViewYZ();
     });
 
     // 캔버스 지우기
