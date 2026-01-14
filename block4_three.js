@@ -1,35 +1,73 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
 /**
- * 저장된 그룹 데이터를 캔버스에 렌더링하는 함수
+ * Three.js 기반 저장된 그룹 데이터 렌더링
  * 
  * @param {Object} jsonData - '모든 그룹 저장'으로 저장한 JSON 데이터
  * @param {HTMLCanvasElement} canvas - 그릴 캔버스 엘리먼트
  * @param {Object} options - 옵션 설정 (선택사항)
  * @param {number} options.scalePercent - 스케일 비율 (기본값: 60)
- * @param {Object} options.viewOffset - 화면 오프셋 (기본값: {x: 0, y: 0})
  * @param {boolean} options.showPoints - 점 표시 여부 (기본값: true)
  * @param {boolean} options.showLines - 선 표시 여부 (기본값: true)
  * @param {number} options.pointSize - 점 크기 (기본값: 4)
  * @param {number} options.lineWidth - 선 두께 (기본값: 2)
- * 
- * @example
- * // 기본 사용법
- * const jsonData = JSON.parse(clipboardText);
- * const canvas = document.getElementById('myCanvas');
- * renderSavedGroups(jsonData, canvas);
- * 
- * @example
- * // 옵션 사용
- * renderSavedGroups(jsonData, canvas, {
- *   scalePercent: 80,
- *   pointSize: 6,
- *   lineWidth: 3
- * });
  */
+
+// 전역 변수
+let scene, camera, renderer, controls;
+let groupObjects = []; // Three.js 그룹 객체들
+let currentJsonData = null;
+
+function initThreeJS(canvas) {
+    // Scene 생성
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    // Camera 생성 (PerspectiveCamera)
+    const aspect = canvas.width / canvas.height;
+    camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 10000);
+    camera.position.z = 500;
+
+    // Renderer 생성 (기존 캔버스 재사용)
+    renderer = new THREE.WebGLRenderer({ 
+        canvas: canvas,
+        antialias: true 
+    });
+    renderer.setSize(canvas.width, canvas.height);
+
+    // OrbitControls 추가 (마우스로 회전/확대/이동)
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // 부드러운 움직임
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 50;
+    controls.maxDistance = 2000;
+
+    // 조명 추가 (선택사항)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight.position.set(0, 1, 1);
+    scene.add(directionalLight);
+
+    // 애니메이션 루프 시작
+    animate();
+
+    console.log('Three.js 초기화 완료');
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
 function renderSavedGroups(jsonData, canvas, options = {}) {
     // 기본 옵션 설정
     const config = {
         scalePercent: options.scalePercent ?? 60,
-        viewOffset: options.viewOffset ?? { x: 0, y: 0 },
         showPoints: options.showPoints ?? true,
         showLines: options.showLines ?? true,
         pointSize: options.pointSize ?? 4,
@@ -47,18 +85,23 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
         return false;
     }
 
-    const ctx = canvas.getContext('2d');
+    // Three.js 초기화 (최초 1회만)
+    if (!renderer) {
+        initThreeJS(canvas);
+    }
+
+    currentJsonData = jsonData;
     const groups = jsonData.groups;
 
-    console.log('=== 렌더링 시작 ===');
+    console.log('=== Three.js 렌더링 시작 ===');
     console.log('그룹 수:', groups.length);
-    console.log('캔버스 크기:', canvas.width, 'x', canvas.height);
     console.log('옵션:', config);
 
-    // 캔버스 초기화
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 기존 그룹 객체들 제거
+    groupObjects.forEach(group => {
+        scene.remove(group);
+    });
+    groupObjects = [];
 
     // 모든 점의 바운딩 박스 계산
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -80,16 +123,7 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
     console.log('데이터 범위:', { minX, minY, maxX, maxY });
     console.log('데이터 중심:', { dataCenterX, dataCenterY });
 
-    // 좌표 변환 함수 (데이터 중심을 캔버스 중앙에 배치)
-    function transform(x, y) {
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const scale = config.scalePercent / 100;
-        return {
-            x: centerX + (x - dataCenterX) * scale + config.viewOffset.x,
-            y: centerY - (y - dataCenterY) * scale + config.viewOffset.y
-        };
-    }
+    const scale = config.scalePercent / 100;
 
     // 각 그룹 그리기
     groups.forEach((group, groupIndex) => {
@@ -114,52 +148,54 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
             return;
         }
 
+        // Three.js Group 생성
+        const groupObject = new THREE.Group();
+
+        // 3D 좌표 변환 (중심을 원점으로)
+        const vertices = points.map(p => 
+            new THREE.Vector3(
+                (p.x - dataCenterX) * scale,
+                (p.y - dataCenterY) * scale,
+                0
+            )
+        );
+
         // 선 그리기
         if (config.showLines && points.length > 1) {
-            ctx.beginPath();
-            ctx.strokeStyle = color;
-            ctx.lineWidth = config.lineWidth;
-
-            const firstPoint = transform(points[0].x, points[0].y);
-            ctx.moveTo(firstPoint.x, firstPoint.y);
-
-            for (let i = 1; i < points.length; i++) {
-                const p = transform(points[i].x, points[i].y);
-                ctx.lineTo(p.x, p.y);
-            }
-
-            ctx.stroke();
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(vertices);
+            const lineMaterial = new THREE.LineBasicMaterial({ 
+                color: new THREE.Color(color),
+                linewidth: config.lineWidth // WebGL에서는 대부분 1로 제한됨
+            });
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            groupObject.add(line);
         }
 
         // 점 그리기
         if (config.showPoints) {
-            points.forEach((point, pointIndex) => {
-                const p = transform(point.x, point.y);
+            vertices.forEach(vertex => {
+                const sphereGeometry = new THREE.SphereGeometry(config.pointSize, 16, 16);
+                const sphereMaterial = new THREE.MeshBasicMaterial({ 
+                    color: new THREE.Color(color)
+                });
+                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                sphere.position.copy(vertex);
+                groupObject.add(sphere);
 
-                // 점 원 그리기
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, config.pointSize, 0, Math.PI * 2);
-                ctx.fillStyle = color;
-                ctx.fill();
-
-                // 점 테두리
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // 그룹이 선택된 경우 강조 표시
-                if (group.selected) {
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, config.pointSize + 3, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#ffff00';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
+                // 흰색 테두리 (선택사항)
+                const edgesGeometry = new THREE.EdgesGeometry(sphereGeometry);
+                const edgesMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+                const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+                edges.position.copy(vertex);
+                groupObject.add(edges);
             });
         }
+
+        scene.add(groupObject);
+        groupObjects.push(groupObject);
     });
 
-    console.log('=== 렌더링 완료 ===');
+    console.log('=== Three.js 렌더링 완료 ===');
     return true;
 }
 
@@ -242,150 +278,154 @@ function printGroupInfo(jsonData) {
         }
     });
 }
-const canvas = document.getElementById('canvas');
-        const jsonInput = document.getElementById('jsonInput');
-        const scaleSlider = document.getElementById('scaleSlider');
-        const scaleValue = document.getElementById('scaleValue');
-        const pointSizeSlider = document.getElementById('pointSizeSlider');
-        const pointSizeValue = document.getElementById('pointSizeValue');
-        const lineWidthSlider = document.getElementById('lineWidthSlider');
-        const lineWidthValue = document.getElementById('lineWidthValue');
-        const showPointsCheck = document.getElementById('showPointsCheck');
-        const showLinesCheck = document.getElementById('showLinesCheck');
 
-        // textarea 직접 붙여넣기 이벤트
-        jsonInput.addEventListener('paste', (e) => {
-            // 붙여넣기 후 잠시 뒤에 자동 렌더링 시도
-            setTimeout(() => {
-                if (jsonInput.value.trim()) {
-                    try {
-                        const jsonData = JSON.parse(jsonInput.value);
-                        console.log('textarea에 붙여넣기 감지:', jsonData);
-                    } catch (err) {
-                        console.log('JSON 파싱 대기 중...');
-                    }
-                }
-            }, 100);
-        });
+// DOM이 로드된 후 실행
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('canvas');
+    const jsonInput = document.getElementById('jsonInput');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const scaleValue = document.getElementById('scaleValue');
+    const pointSizeSlider = document.getElementById('pointSizeSlider');
+    const pointSizeValue = document.getElementById('pointSizeValue');
+    const lineWidthSlider = document.getElementById('lineWidthSlider');
+    const lineWidthValue = document.getElementById('lineWidthValue');
+    const showPointsCheck = document.getElementById('showPointsCheck');
+    const showLinesCheck = document.getElementById('showLinesCheck');
 
-        // 실시간 렌더링 함수
-        function reRender() {
-            if (!jsonInput.value.trim()) return;
-            
-            try {
-                const jsonData = JSON.parse(jsonInput.value);
-                const options = {
-                    scalePercent: parseInt(scaleSlider.value),
-                    pointSize: parseInt(pointSizeSlider.value),
-                    lineWidth: parseInt(lineWidthSlider.value),
-                    showPoints: showPointsCheck.checked,
-                    showLines: showLinesCheck.checked
-                };
-                renderSavedGroups(jsonData, canvas, options);
-            } catch (err) {
-                console.error('렌더링 오류:', err);
-            }
-        }
-
-        // 슬라이더 값 표시 업데이트 + 실시간 렌더링
-        scaleSlider.addEventListener('input', (e) => {
-            scaleValue.textContent = e.target.value + '%';
-            reRender();
-        });
-
-        pointSizeSlider.addEventListener('input', (e) => {
-            pointSizeValue.textContent = e.target.value;
-            reRender();
-        });
-
-        lineWidthSlider.addEventListener('input', (e) => {
-            lineWidthValue.textContent = e.target.value;
-            reRender();
-        });
-
-        // 체크박스 변경 시 실시간 렌더링
-        showPointsCheck.addEventListener('change', reRender);
-        showLinesCheck.addEventListener('change', reRender);
-
-        // 클립보드에서 붙여넣기
-        document.getElementById('pasteBtn').addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                jsonInput.value = text;
-                alert('클립보드 내용을 붙여넣었습니다!');
-            } catch (err) {
-                alert('클립보드 읽기 실패: ' + err.message);
-            }
-        });
-
-        // localStorage에서 불러오기
-        document.getElementById('loadFromStorageBtn').addEventListener('click', () => {
-            const text = localStorage.getItem('block3_savedGroups');
-            if (text) {
-                jsonInput.value = text;
-                alert('localStorage에서 데이터를 불러왔습니다!');
-            } else {
-                alert('localStorage에 저장된 데이터가 없습니다.');
-            }
-        });
-
-        // 렌더링
-        document.getElementById('renderBtn').addEventListener('click', () => {
-            try {
-                const jsonData = JSON.parse(jsonInput.value);
-                const options = {
-                    scalePercent: parseInt(scaleSlider.value),
-                    pointSize: parseInt(pointSizeSlider.value),
-                    lineWidth: parseInt(lineWidthSlider.value),
-                    showPoints: showPointsCheck.checked,
-                    showLines: showLinesCheck.checked
-                };
-                
-                const success = renderSavedGroups(jsonData, canvas, options);
-                if (success) {
-                    alert('렌더링 완료!');
-                } else {
-                    alert('렌더링 실패. 콘솔을 확인하세요.');
-                }
-            } catch (err) {
-                alert('JSON 파싱 오류: ' + err.message);
-            }
-        });
-
-        // 캔버스 지우기
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#1a1a2e';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        });
-
-        // 정보 출력
-        document.getElementById('infoBtn').addEventListener('click', () => {
-            try {
-                const jsonData = JSON.parse(jsonInput.value);
-                printGroupInfo(jsonData);
-                alert('그룹 정보를 콘솔에 출력했습니다. F12를 눌러 확인하세요.');
-            } catch (err) {
-                alert('JSON 파싱 오류: ' + err.message);
-            }
-        });
-
-        // 페이지 로드 시 localStorage에서 자동 불러오기 시도
-        window.addEventListener('load', () => {
-            const text = localStorage.getItem('block3_savedGroups');
-            if (text) {
-                jsonInput.value = text;
-                // 자동 렌더링
+    // textarea 직접 붙여넣기 이벤트
+    jsonInput.addEventListener('paste', (e) => {
+        // 붙여넣기 후 잠시 뒤에 자동 렌더링 시도
+        setTimeout(() => {
+            if (jsonInput.value.trim()) {
                 try {
-                    const jsonData = JSON.parse(text);
-                    renderSavedGroups(jsonData, canvas, {
-                        scalePercent: 60,
-                        pointSize: 4,
-                        lineWidth: 2
-                    });
+                    const jsonData = JSON.parse(jsonInput.value);
+                    console.log('textarea에 붙여넣기 감지:', jsonData);
                 } catch (err) {
-                    console.error('자동 렌더링 실패:', err);
+                    console.log('JSON 파싱 대기 중...');
                 }
             }
+        }, 100);
+    });
+
+    // 실시간 렌더링 함수
+    function reRender() {
+        if (!jsonInput.value.trim()) return;
+        
+        try {
+            const jsonData = JSON.parse(jsonInput.value);
+            const options = {
+                scalePercent: parseInt(scaleSlider.value),
+                pointSize: parseInt(pointSizeSlider.value),
+                lineWidth: parseInt(lineWidthSlider.value),
+                showPoints: showPointsCheck.checked,
+                showLines: showLinesCheck.checked
+            };
+            renderSavedGroups(jsonData, canvas, options);
+        } catch (err) {
+            console.error('렌더링 오류:', err);
+        }
+    }
+
+    // 슬라이더 값 표시 업데이트 + 실시간 렌더링
+    scaleSlider.addEventListener('input', (e) => {
+        scaleValue.textContent = e.target.value + '%';
+        reRender();
+    });
+
+    pointSizeSlider.addEventListener('input', (e) => {
+        pointSizeValue.textContent = e.target.value;
+        reRender();
+    });
+
+    lineWidthSlider.addEventListener('input', (e) => {
+        lineWidthValue.textContent = e.target.value;
+        reRender();
+    });
+
+    // 체크박스 변경 시 실시간 렌더링
+    showPointsCheck.addEventListener('change', reRender);
+    showLinesCheck.addEventListener('change', reRender);
+
+    // 클립보드에서 붙여넣기
+    document.getElementById('pasteBtn').addEventListener('click', async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            jsonInput.value = text;
+            alert('클립보드 내용을 붙여넣었습니다!');
+        } catch (err) {
+            alert('클립보드 읽기 실패: ' + err.message);
+        }
+    });
+
+    // localStorage에서 불러오기
+    document.getElementById('loadFromStorageBtn').addEventListener('click', () => {
+        const text = localStorage.getItem('block3_savedGroups');
+        if (text) {
+            jsonInput.value = text;
+            alert('localStorage에서 데이터를 불러왔습니다!');
+        } else {
+            alert('localStorage에 저장된 데이터가 없습니다.');
+        }
+    });
+
+    // 렌더링
+    document.getElementById('renderBtn').addEventListener('click', () => {
+        try {
+            const jsonData = JSON.parse(jsonInput.value);
+            const options = {
+                scalePercent: parseInt(scaleSlider.value),
+                pointSize: parseInt(pointSizeSlider.value),
+                lineWidth: parseInt(lineWidthSlider.value),
+                showPoints: showPointsCheck.checked,
+                showLines: showLinesCheck.checked
+            };
+            
+            const success = renderSavedGroups(jsonData, canvas, options);
+            if (success) {
+                alert('렌더링 완료!');
+            } else {
+                alert('렌더링 실패. 콘솔을 확인하세요.');
+            }
+        } catch (err) {
+            alert('JSON 파싱 오류: ' + err.message);
+        }
+    });
+
+    // 캔버스 지우기
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        // Three.js 씬에서 모든 그룹 제거
+        groupObjects.forEach(group => {
+            scene.remove(group);
         });
+        groupObjects = [];
+        console.log('캔버스 지우기 완료');
+    });
+
+    // 정보 출력
+    document.getElementById('infoBtn').addEventListener('click', () => {
+        try {
+            const jsonData = JSON.parse(jsonInput.value);
+            printGroupInfo(jsonData);
+            alert('그룹 정보를 콘솔에 출력했습니다. F12를 눌러 확인하세요.');
+        } catch (err) {
+            alert('JSON 파싱 오류: ' + err.message);
+        }
+    });
+
+    // 페이지 로드 시 localStorage에서 자동 불러오기 시도
+    const text = localStorage.getItem('block3_savedGroups');
+    if (text) {
+        jsonInput.value = text;
+        // 자동 렌더링
+        try {
+            const jsonData = JSON.parse(text);
+            renderSavedGroups(jsonData, canvas, {
+                scalePercent: 60,
+                pointSize: 4,
+                lineWidth: 2
+            });
+        } catch (err) {
+            console.error('자동 렌더링 실패:', err);
+        }
+    }
+});
