@@ -25,6 +25,7 @@ let selectedPointIndex = null; // 선택된 점의 인덱스
 let gridHelper = null; // 격자 객체
 let highlightedLines = []; // 강조된 격자선들 (배열)
 let gridPlane = null; // 현재 격자 평면 (교차 계산용)
+let selectedGroupData = null; // 선택된 그룹의 원본 데이터
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -151,6 +152,37 @@ function updateCameraDistanceDisplay() {
         const distance = camera.position.length();
         distanceElement.textContent = Math.round(distance);
     }
+}
+
+// 다음 점까지의 거리 UI 업데이트
+function updateNextPointDistance() {
+    const distanceElement = document.getElementById('nextPointDistanceValue');
+    if (!distanceElement) return;
+
+    // 점이 선택되지 않았거나, 그룹 데이터가 없으면 - 표시
+    if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
+        distanceElement.textContent = '-';
+        return;
+    }
+
+    const points = selectedGroupData.points;
+    if (!points || selectedPointIndex >= points.length - 1) {
+        // 마지막 점이거나 유효하지 않은 경우
+        distanceElement.textContent = '다음점없음';
+        return;
+    }
+
+    // 현재 점과 다음 점 가져오기
+    const currentPoint = points[selectedPointIndex];
+    const nextPoint = points[selectedPointIndex + 1];
+
+    // 거리 계산 (유클리드 거리)
+    const dx = nextPoint.x - currentPoint.x;
+    const dy = nextPoint.y - currentPoint.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // 소수점 2자리까지 표시
+    distanceElement.textContent = distance.toFixed(2);
 }
 
 // 격자 생성/업데이트
@@ -373,6 +405,7 @@ function onCanvasClick(event, canvas) {
                 selectedGroup = null;
                 selectedPoint = null;
                 selectedPointIndex = null;
+                selectedGroupData = null;
                 console.log('선택 해제');
             } else {
                 selectedGroup = clickedGroup;
@@ -383,15 +416,21 @@ function onCanvasClick(event, canvas) {
                     // 점의 인덱스 찾기
                     const pointObjects = clickedGroup.children.filter(child => child.userData.isDataPoint);
                     selectedPointIndex = pointObjects.indexOf(clickedObject);
+                    // 선택된 그룹의 원본 데이터 저장
+                    if (currentJsonData && currentJsonData.groups) {
+                        selectedGroupData = currentJsonData.groups[clickedGroup.userData.groupIndex];
+                    }
                     console.log('그룹 및 점 선택:', clickedGroup.userData.groupIndex, '점 인덱스:', selectedPointIndex);
                 } else {
                     // 선을 클릭한 경우
                     selectedPoint = null;
                     selectedPointIndex = null;
+                    selectedGroupData = null;
                     console.log('그룹 선택:', clickedGroup.userData.groupIndex);
                 }
             }
             updateSelection();
+            updateNextPointDistance();
         }
     } else {
         // 빈 공간 클릭 시 선택 해제
@@ -399,8 +438,10 @@ function onCanvasClick(event, canvas) {
             selectedGroup = null;
             selectedPoint = null;
             selectedPointIndex = null;
+            selectedGroupData = null;
             console.log('선택 해제');
             updateSelection();
+            updateNextPointDistance();
         }
     }
 }
