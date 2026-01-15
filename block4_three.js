@@ -23,6 +23,8 @@ let selectedGroup = null;
 let selectedPoint = null; // 선택된 점 객체
 let selectedPointIndex = null; // 선택된 점의 인덱스
 let gridHelper = null; // 격자 객체
+let highlightedLines = []; // 강조된 격자선들 (배열)
+let gridPlane = null; // 현재 격자 평면 (교차 계산용)
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -159,8 +161,13 @@ function updateGrid(show, plane, size, spacing) {
         gridHelper = null;
     }
 
-    if (!show) return;
+    if (!show) {
+        gridPlane = null;
+        return;
+    }
 
+    gridPlane = plane; // 현재 평면 저장
+    
     // spacing을 실제 간격으로 사용, divisions 계산
     const divisions = Math.floor(size / spacing);
     
@@ -179,6 +186,101 @@ function updateGrid(show, plane, size, spacing) {
 
     scene.add(gridHelper);
     console.log(`격자 표시: ${plane} 평면, 크기: ${size}, 간격: ${spacing}, 분할수: ${divisions}`);
+}
+
+// 격자선 강조 추가 (고정)
+function addHighlightedGridLine(event, canvas, gridSize, gridSpacing, axis) {
+    if (!gridPlane) return;
+
+    // 마우스 위치 계산
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    // 격자 평면과의 교차점 찾기
+    let planeNormal, planePoint;
+    if (gridPlane === 'XY') {
+        planeNormal = new THREE.Vector3(0, 0, 1);
+        planePoint = new THREE.Vector3(0, 0, 0);
+    } else if (gridPlane === 'XZ') {
+        planeNormal = new THREE.Vector3(0, 1, 0);
+        planePoint = new THREE.Vector3(0, 0, 0);
+    } else { // YZ
+        planeNormal = new THREE.Vector3(1, 0, 0);
+        planePoint = new THREE.Vector3(0, 0, 0);
+    }
+
+    const plane = new THREE.Plane(planeNormal, 0);
+    const intersectPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, intersectPoint);
+
+    if (!intersectPoint) return;
+
+    // 가장 가까운 격자선 좌표 계산
+    let lineStart, lineEnd;
+    const halfSize = gridSize / 2;
+
+    if (gridPlane === 'XY') {
+        if (axis === 'X') {
+            // X 방향 (수평선)
+            const nearestY = Math.round(intersectPoint.y / gridSpacing) * gridSpacing;
+            lineStart = new THREE.Vector3(-halfSize, nearestY, 0);
+            lineEnd = new THREE.Vector3(halfSize, nearestY, 0);
+        } else if (axis === 'Y') {
+            // Y 방향 (수직선)
+            const nearestX = Math.round(intersectPoint.x / gridSpacing) * gridSpacing;
+            lineStart = new THREE.Vector3(nearestX, -halfSize, 0);
+            lineEnd = new THREE.Vector3(nearestX, halfSize, 0);
+        }
+    } else if (gridPlane === 'XZ') {
+        if (axis === 'X') {
+            // X 방향
+            const nearestZ = Math.round(intersectPoint.z / gridSpacing) * gridSpacing;
+            lineStart = new THREE.Vector3(-halfSize, 0, nearestZ);
+            lineEnd = new THREE.Vector3(halfSize, 0, nearestZ);
+        } else if (axis === 'Y') {
+            // Z 방향 (XZ 평면에서 Y는 Z축)
+            const nearestX = Math.round(intersectPoint.x / gridSpacing) * gridSpacing;
+            lineStart = new THREE.Vector3(nearestX, 0, -halfSize);
+            lineEnd = new THREE.Vector3(nearestX, 0, halfSize);
+        }
+    } else { // YZ
+        if (axis === 'X') {
+            // Y 방향 (YZ 평면에서 X는 Y축)
+            const nearestZ = Math.round(intersectPoint.z / gridSpacing) * gridSpacing;
+            lineStart = new THREE.Vector3(0, -halfSize, nearestZ);
+            lineEnd = new THREE.Vector3(0, halfSize, nearestZ);
+        } else if (axis === 'Y') {
+            // Z 방향
+            const nearestY = Math.round(intersectPoint.y / gridSpacing) * gridSpacing;
+            lineStart = new THREE.Vector3(0, nearestY, -halfSize);
+            lineEnd = new THREE.Vector3(0, nearestY, halfSize);
+        }
+    }
+
+    // 강조선 그리기
+    if (lineStart && lineEnd) {
+        const geometry = new THREE.BufferGeometry().setFromPoints([lineStart, lineEnd]);
+        const material = new THREE.LineBasicMaterial({ 
+            color: axis === 'X' ? 0xff0000 : 0x00ff00,
+            linewidth: 3
+        });
+        const line = new THREE.Line(geometry, material);
+        scene.add(line);
+        highlightedLines.push(line);
+        console.log(`격자선 추가: ${axis}축 방향, 총 ${highlightedLines.length}개`);
+    }
+}
+
+// 모든 강조된 격자선 제거
+function clearAllHighlightedLines() {
+    highlightedLines.forEach(line => {
+        scene.remove(line);
+    });
+    highlightedLines = [];
+    console.log('모든 강조된 격자선 제거');
 }
 
 // 선택된 그룹 하이라이트 업데이트
@@ -549,6 +651,26 @@ document.addEventListener('DOMContentLoaded', () => {
         onCanvasClick(event, canvas);
     });
 
+    // 키보드 이벤트 (격자선 강조 추가)
+    let lastMouseEvent = null;
+    canvas.addEventListener('mousemove', (event) => {
+        lastMouseEvent = event; // 마지막 마우스 위치 저장
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'F7' && lastMouseEvent) {
+            event.preventDefault();
+            const gridSizeValue = parseInt(document.getElementById('gridSizeSlider').value);
+            const gridSpacingValue = parseInt(document.getElementById('gridDivisionsSlider').value);
+            addHighlightedGridLine(lastMouseEvent, canvas, gridSizeValue, gridSpacingValue, 'X');
+        } else if (event.key === 'F8' && lastMouseEvent) {
+            event.preventDefault();
+            const gridSizeValue = parseInt(document.getElementById('gridSizeSlider').value);
+            const gridSpacingValue = parseInt(document.getElementById('gridDivisionsSlider').value);
+            addHighlightedGridLine(lastMouseEvent, canvas, gridSizeValue, gridSpacingValue, 'Y');
+        }
+    });
+
     // textarea 직접 붙여넣기 이벤트
     jsonInput.addEventListener('paste', (e) => {
         // 붙여넣기 후 잠시 뒤에 자동 렌더링 시도
@@ -631,6 +753,11 @@ document.addEventListener('DOMContentLoaded', () => {
     gridDivisionsSlider.addEventListener('input', (e) => {
         gridDivisionsValue.textContent = e.target.value;
         updateGridFromUI();
+    });
+
+    // 강조된 격자선 모두 지우기 버튼
+    document.getElementById('clearHighlightedLinesBtn').addEventListener('click', () => {
+        clearAllHighlightedLines();
     });
 
     // 클립보드에서 붙여넣기
