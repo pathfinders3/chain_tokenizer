@@ -85,18 +85,24 @@
         .slider-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 5px;
         }
 
         .slider-group label {
             font-weight: bold;
-            min-width: 80px;
+            min-width: 70px;
             color: #b0b0b0;
+            font-size: 13px;
+        }
+
+        .slider-group span {
+            min-width: 40px;
+            font-size: 13px;
         }
 
         input[type="range"] {
             flex: 1;
-            max-width: 200px;
+            max-width: 150px;
         }
 
         .slider-group span {

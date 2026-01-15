@@ -71,6 +71,9 @@ function animate() {
     requestAnimationFrame(animate);
     controls.update();
     renderer.render(scene, camera);
+    
+    // 카메라 거리 UI 업데이트
+    updateCameraDistanceDisplay();
 }
 
 // 카메라를 초기 위치로 리셋
@@ -134,6 +137,17 @@ function setCameraViewYZ() {
     controls.update();
     
     console.log('측면 뷰 (YZ) 설정');
+}
+
+// 카메라 거리 표시 업데이트
+function updateCameraDistanceDisplay() {
+    if (!camera) return;
+    
+    const distanceElement = document.getElementById('cameraDistanceValue');
+    if (distanceElement) {
+        const distance = camera.position.length();
+        distanceElement.textContent = Math.round(distance);
+    }
 }
 
 // 선택된 그룹 하이라이트 업데이트
