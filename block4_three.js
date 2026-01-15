@@ -20,6 +20,8 @@ let groupObjects = []; // Three.js 그룹 객체들
 let currentJsonData = null;
 let raycaster, mouse;
 let selectedGroup = null;
+let selectedPoint = null; // 선택된 점 객체
+let selectedPointIndex = null; // 선택된 점의 인덱스
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -156,13 +158,31 @@ function updateSelection() {
             } 
             // 실제 데이터 점만 처리
             else if (child.userData.isDataPoint) {
+                // 선택된 점인지 확인
+                const isSelectedPoint = (selectedPoint === child);
+                
                 // 점(Sphere)도 하이라이트
                 if (isSelected) {
-                    child.material.emissive = new THREE.Color(0xffff00);
-                    child.material.emissiveIntensity = 0.5;
+                    if (isSelectedPoint) {
+                        // 클릭한 점은 빨간색으로 강조 + 크기 확대
+                        child.material.color.setHex(0xff0000);
+                        child.material.emissive = new THREE.Color(0xff0000);
+                        child.material.emissiveIntensity = 1.0;
+                        child.scale.set(1.5, 1.5, 1.5); // 1.5배 확대
+                    } else {
+                        // 같은 그룹의 다른 점들은 노란색으로
+                        child.material.emissive = new THREE.Color(0xffff00);
+                        child.material.emissiveIntensity = 0.5;
+                        child.scale.set(1, 1, 1); // 원래 크기
+                    }
                 } else {
                     child.material.emissive = new THREE.Color(0x000000);
                     child.material.emissiveIntensity = 0;
+                    child.scale.set(1, 1, 1); // 원래 크기
+                    // 원래 색상 복원
+                    if (groupObj.userData.originalColor) {
+                        child.material.color.copy(groupObj.userData.originalColor);
+                    }
                 }
             }
             // 점 테두리(edges)는 항상 흰색 유지
@@ -180,11 +200,14 @@ function onCanvasClick(event, canvas) {
     // Raycaster로 광선 쏘기
     raycaster.setFromCamera(mouse, camera);
 
-    // 모든 그룹의 자식 객체들과 교차 검사
+    // 모든 그룹의 자식 객체들과 교차 검사 (테두리는 제외)
     const allObjects = [];
     groupObjects.forEach(group => {
         group.children.forEach(child => {
-            allObjects.push(child);
+            // 테두리(edges)는 클릭 감지에서 제외
+            if (!child.userData.isEdge) {
+                allObjects.push(child);
+            }
         });
     });
 
@@ -199,12 +222,27 @@ function onCanvasClick(event, canvas) {
 
         if (clickedGroup) {
             // 같은 그룹을 다시 클릭하면 선택 해제
-            if (selectedGroup === clickedGroup) {
+            if (selectedGroup === clickedGroup && selectedPoint === clickedObject) {
                 selectedGroup = null;
+                selectedPoint = null;
+                selectedPointIndex = null;
                 console.log('선택 해제');
             } else {
                 selectedGroup = clickedGroup;
-                console.log('그룹 선택:', clickedGroup.userData.groupIndex);
+                
+                // 점을 클릭했는지 확인
+                if (clickedObject.userData.isDataPoint) {
+                    selectedPoint = clickedObject;
+                    // 점의 인덱스 찾기
+                    const pointObjects = clickedGroup.children.filter(child => child.userData.isDataPoint);
+                    selectedPointIndex = pointObjects.indexOf(clickedObject);
+                    console.log('그룹 및 점 선택:', clickedGroup.userData.groupIndex, '점 인덱스:', selectedPointIndex);
+                } else {
+                    // 선을 클릭한 경우
+                    selectedPoint = null;
+                    selectedPointIndex = null;
+                    console.log('그룹 선택:', clickedGroup.userData.groupIndex);
+                }
             }
             updateSelection();
         }
@@ -212,6 +250,8 @@ function onCanvasClick(event, canvas) {
         // 빈 공간 클릭 시 선택 해제
         if (selectedGroup) {
             selectedGroup = null;
+            selectedPoint = null;
+            selectedPointIndex = null;
             console.log('선택 해제');
             updateSelection();
         }
@@ -333,7 +373,7 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
 
         // 점 그리기
         if (config.showPoints) {
-            vertices.forEach(vertex => {
+            vertices.forEach((vertex, vertexIndex) => {
                 const sphereGeometry = new THREE.SphereGeometry(config.pointSize, 16, 16);
                 const sphereMaterial = new THREE.MeshStandardMaterial({ 
                     color: new THREE.Color(color),
@@ -345,6 +385,7 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
                 const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
                 sphere.position.copy(vertex);
                 sphere.userData.isDataPoint = true; // 실제 데이터 점 표시
+                sphere.userData.pointIndex = vertexIndex; // 점의 인덱스 저장
                 groupObject.add(sphere);
 
                 // 흰색 테두리 (선택사항)
