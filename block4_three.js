@@ -26,6 +26,9 @@ let gridHelper = null; // 격자 객체
 let highlightedLines = []; // 강조된 격자선들 (배열)
 let gridPlane = null; // 현재 격자 평면 (교차 계산용)
 let selectedGroupData = null; // 선택된 그룹의 원본 데이터
+let rotationMode = 'horizontal'; // 회전 모드: 'horizontal' (좌우) 또는 'vertical' (위아래)
+let savedPolarAngle = null; // 저장된 수직 각도
+let savedAzimuthAngle = null; // 저장된 수평 각도
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -74,10 +77,64 @@ function initThreeJS(canvas) {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
+    
+    // 회전 모드에 따라 각도 제한
+    applyRotationConstraints();
+    
     renderer.render(scene, camera);
     
     // 카메라 거리 UI 업데이트
     updateCameraDistanceDisplay();
+}
+
+// 회전 제약 적용
+function applyRotationConstraints() {
+    if (!controls) return;
+    
+    if (rotationMode === 'horizontal') {
+        // 좌우 회전 모드: 수직 각도(Polar) 고정
+        if (savedPolarAngle !== null) {
+            const currentPolar = controls.getPolarAngle();
+            if (Math.abs(currentPolar - savedPolarAngle) > 0.01) {
+                controls.minPolarAngle = savedPolarAngle;
+                controls.maxPolarAngle = savedPolarAngle;
+            }
+        }
+    } else if (rotationMode === 'vertical') {
+        // 위아래 회전 모드: 수평 각도(Azimuth) 고정
+        if (savedAzimuthAngle !== null) {
+            const currentAzimuth = controls.getAzimuthalAngle();
+            if (Math.abs(currentAzimuth - savedAzimuthAngle) > 0.01) {
+                controls.minAzimuthAngle = savedAzimuthAngle;
+                controls.maxAzimuthAngle = savedAzimuthAngle;
+            }
+        }
+    }
+}
+
+// 회전 모드 설정
+function setRotationMode(mode) {
+    if (!controls) return;
+    
+    rotationMode = mode;
+    
+    if (mode === 'horizontal') {
+        // 좌우 회전 모드: 수평(Azimuth)은 자유, 수직(Polar)은 현재 각도로 고정
+        savedPolarAngle = controls.getPolarAngle();
+        controls.minPolarAngle = savedPolarAngle;
+        controls.maxPolarAngle = savedPolarAngle;
+        controls.minAzimuthAngle = -Infinity;
+        controls.maxAzimuthAngle = Infinity;
+        console.log('회전 모드: 좌우 회전 (수직 각도 고정:', savedPolarAngle, ')');
+    } else if (mode === 'vertical') {
+        // 위아래 회전 모드: 수직(Polar)은 자유, 수평(Azimuth)은 현재 각도로 고정
+        savedAzimuthAngle = controls.getAzimuthalAngle();
+        controls.minAzimuthAngle = savedAzimuthAngle;
+        controls.maxAzimuthAngle = savedAzimuthAngle;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        console.log('회전 모드: 위아래 회전 (수평 각도 고정:', savedAzimuthAngle, ')');
+    }
 }
 
 // 카메라를 초기 위치로 리셋
@@ -845,6 +902,31 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('JSON 파싱 오류: ' + err.message);
         }
     });
+
+    // 회전 모드 버튼들
+    const rotateHorizontalBtn = document.getElementById('rotateHorizontalBtn');
+    const rotateVerticalBtn = document.getElementById('rotateVerticalBtn');
+    
+    rotateHorizontalBtn.addEventListener('click', () => {
+        setRotationMode('horizontal');
+        // 버튼 스타일 업데이트
+        rotateHorizontalBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        rotateVerticalBtn.style.background = '';
+    });
+    
+    rotateVerticalBtn.addEventListener('click', () => {
+        setRotationMode('vertical');
+        // 버튼 스타일 업데이트
+        rotateVerticalBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        rotateHorizontalBtn.style.background = '';
+    });
+    
+    // 기본 모드 설정 (좌우 회전)
+    setTimeout(() => {
+        if (controls) {
+            setRotationMode('horizontal');
+        }
+    }, 100);
 
     // 카메라 뷰 전환 버튼들
     document.getElementById('viewXYBtn').addEventListener('click', () => {
