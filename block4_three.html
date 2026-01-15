@@ -76,6 +76,34 @@
             </div>
         </div>
 
+        <div class="controls">
+            <div class="checkbox-group">
+                <input type="checkbox" id="showGridCheck">
+                <label for="showGridCheck">격자 표시</label>
+            </div>
+
+            <div class="slider-group">
+                <label>격자 평면:</label>
+                <select id="gridPlaneSelect">
+                    <option value="XY">XY 평면</option>
+                    <option value="XZ" selected>XZ 평면</option>
+                    <option value="YZ">YZ 평면</option>
+                </select>
+            </div>
+
+            <div class="slider-group">
+                <label>격자 크기:</label>
+                <input type="range" id="gridSizeSlider" min="100" max="1000" value="500" step="50">
+                <span id="gridSizeValue">500</span>
+            </div>
+
+            <div class="slider-group">
+                <label>격자 간격:</label>
+                <input type="range" id="gridDivisionsSlider" min="10" max="100" value="50" step="5">
+                <span id="gridDivisionsValue">50</span>
+            </div>
+        </div>
+
         <canvas id="canvas" width="1200" height="800"></canvas>
 
         <div class="info">

@@ -22,6 +22,7 @@ let raycaster, mouse;
 let selectedGroup = null;
 let selectedPoint = null; // 선택된 점 객체
 let selectedPointIndex = null; // 선택된 점의 인덱스
+let gridHelper = null; // 격자 객체
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -148,6 +149,36 @@ function updateCameraDistanceDisplay() {
         const distance = camera.position.length();
         distanceElement.textContent = Math.round(distance);
     }
+}
+
+// 격자 생성/업데이트
+function updateGrid(show, plane, size, spacing) {
+    // 기존 격자 제거
+    if (gridHelper) {
+        scene.remove(gridHelper);
+        gridHelper = null;
+    }
+
+    if (!show) return;
+
+    // spacing을 실제 간격으로 사용, divisions 계산
+    const divisions = Math.floor(size / spacing);
+    
+    // GridHelper 생성 (XZ 평면 기본)
+    gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
+    
+    // 평면에 따라 회전
+    if (plane === 'XY') {
+        // XY 평면 (Z축 기준 90도 회전)
+        gridHelper.rotation.x = Math.PI / 2;
+    } else if (plane === 'YZ') {
+        // YZ 평면 (Z축 기준 90도 회전)
+        gridHelper.rotation.z = Math.PI / 2;
+    }
+    // XZ는 기본값이므로 회전 불필요
+
+    scene.add(gridHelper);
+    console.log(`격자 표시: ${plane} 평면, 크기: ${size}, 간격: ${spacing}, 분할수: ${divisions}`);
 }
 
 // 선택된 그룹 하이라이트 업데이트
@@ -571,6 +602,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // 체크박스 변경 시 실시간 렌더링
     showPointsCheck.addEventListener('change', reRender);
     showLinesCheck.addEventListener('change', reRender);
+
+    // 격자 컨트롤
+    const showGridCheck = document.getElementById('showGridCheck');
+    const gridPlaneSelect = document.getElementById('gridPlaneSelect');
+    const gridSizeSlider = document.getElementById('gridSizeSlider');
+    const gridSizeValue = document.getElementById('gridSizeValue');
+    const gridDivisionsSlider = document.getElementById('gridDivisionsSlider');
+    const gridDivisionsValue = document.getElementById('gridDivisionsValue');
+
+    function updateGridFromUI() {
+        updateGrid(
+            showGridCheck.checked,
+            gridPlaneSelect.value,
+            parseInt(gridSizeSlider.value),
+            parseInt(gridDivisionsSlider.value)
+        );
+    }
+
+    showGridCheck.addEventListener('change', updateGridFromUI);
+    gridPlaneSelect.addEventListener('change', updateGridFromUI);
+    
+    gridSizeSlider.addEventListener('input', (e) => {
+        gridSizeValue.textContent = e.target.value;
+        updateGridFromUI();
+    });
+    
+    gridDivisionsSlider.addEventListener('input', (e) => {
+        gridDivisionsValue.textContent = e.target.value;
+        updateGridFromUI();
+    });
 
     // 클립보드에서 붙여넣기
     document.getElementById('pasteBtn').addEventListener('click', async () => {

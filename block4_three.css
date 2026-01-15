@@ -141,4 +141,20 @@
             cursor: pointer;
             user-select: none;
             color: #b0b0b0;
+            font-size: 13px;
+        }
+
+        select {
+            padding: 5px 10px;
+            background: #16213e;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
         }
