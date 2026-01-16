@@ -858,6 +858,16 @@ document.addEventListener('DOMContentLoaded', () => {
         clearAllHighlightedLines();
     });
 
+    // Textarea 토글
+    document.getElementById('toggleTextareaBtn').addEventListener('click', () => {
+        const textarea = document.getElementById('jsonInput');
+        if (textarea.style.display === 'none') {
+            textarea.style.display = 'block';
+        } else {
+            textarea.style.display = 'none';
+        }
+    });
+
     // 클립보드에서 붙여넣기
     document.getElementById('pasteBtn').addEventListener('click', async () => {
         try {

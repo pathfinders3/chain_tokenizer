@@ -25,11 +25,12 @@
         <h1>📊 저장된 그룹 렌더링 예제</h1>
         
         <div class="controls">
-            <button id="pasteBtn">📋 클립보드에서 붙여넣기</button>
-            <button id="loadFromStorageBtn">💾 localStorage에서 불러오기</button>
+            <button id="pasteBtn" title="클립보드에서 붙여넣기" style="background: #2E2019;">📋 붙여넣기</button>
+            <button id="loadFromStorageBtn" title="localStorage에서 불러오기" style="background: #2E2019;">💾 Load</button>
             <button id="renderBtn">🎨 렌더링</button>
             <button id="clearBtn">🗑️ 캔버스 지우기</button>
             <button id="infoBtn">ℹ️ 정보 출력</button>
+            <button id="toggleTextareaBtn">📝 입력창 토글</button>
         </div>
 
         <div class="controls">
@@ -37,10 +38,7 @@
             <button id="viewXYBtn">📐 정면 (XY)</button>
             <button id="viewXZBtn">📏 위 (XZ)</button>
             <button id="viewYZBtn">📊 측면 (YZ)</button>
-        </div>
-
-        <div class="controls">
-            <label style="font-weight: bold; color: #667eea;">회전 모드:</label>
+            <label style="font-weight: bold; color: #667eea; margin-left: 20px;">회전 모드:</label>
             <button id="rotateHorizontalBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">↔️ 좌우 회전</button>
             <button id="rotateVerticalBtn">↕️ 위아래 회전</button>
         </div>

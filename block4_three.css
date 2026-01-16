@@ -35,20 +35,21 @@
         }
 
         button {
-            padding: 10px 20px;
+            padding: 7px 20px;
             background: #667eea;
             color: white;
-            border: none;
+            border: 2px solid rgba(255, 255, 255, 0.2);
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
             transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         button:hover {
             background: #5568d3;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
         }
 
         button:active {
