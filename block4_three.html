@@ -87,13 +87,29 @@
 
         <div class="controls">
             <label style="font-weight: bold; color: #f093fb;">회전 자취:</label>
-            <button id="createRotationTraceBtn" title="선택된 점의 좌우 회전 자취를 새 그룹으로 생성">🔄 자취 생성</button>
+            <button id="createRotationTraceBtn" title="선택된 점의 회전 자취를 새 그룹으로 생성">🔄 자취 생성</button>
             <label style="font-size: 12px; color: #b0b0b0;">t 범위:</label>
             <input type="number" id="tStartInput" value="0" step="0.1" style="width: 60px; padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
             <label style="font-size: 12px; color: #b0b0b0;">~</label>
             <input type="number" id="tEndInput" value="6.28" step="0.1" style="width: 60px; padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
             <label style="font-size: 12px; color: #b0b0b0;">간격:</label>
             <input type="number" id="tStepInput" value="0.2" step="0.05" min="0.01" style="width: 60px; padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
+        </div>
+
+        <div class="controls">
+            <label style="font-size: 12px; color: #b0b0b0;">회전축 방향:</label>
+            <select id="rotationAxisSelect" style="padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
+                <option value="Y" selected>Y축 (좌우)</option>
+                <option value="X">X축 (전후)</option>
+                <option value="Z">Z축 (상하)</option>
+            </select>
+            <label style="font-size: 12px; color: #b0b0b0; margin-left: 10px;">축 위치:</label>
+            <label style="font-size: 12px; color: #b0b0b0;">x=</label>
+            <input type="number" id="axisXInput" value="0" step="1" style="width: 50px; padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
+            <label style="font-size: 12px; color: #b0b0b0;">y=</label>
+            <input type="number" id="axisYInput" value="0" step="1" style="width: 50px; padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
+            <label style="font-size: 12px; color: #b0b0b0;">z=</label>
+            <input type="number" id="axisZInput" value="0" step="1" style="width: 50px; padding: 5px; background: #16213e; color: #e0e0e0; border: 1px solid #444; border-radius: 3px;">
         </div>
 
         <div class="controls">

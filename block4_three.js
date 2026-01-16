@@ -88,7 +88,7 @@ function animate() {
 }
 
 // 회전 자취 생성 함수
-function createRotationTrace(tStart, tEnd, tStep) {
+function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisPosition) {
     if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
         alert('먼저 점을 선택해주세요!');
         return;
@@ -113,26 +113,52 @@ function createRotationTrace(tStart, tEnd, tStep) {
     const dataCenterX = (minX + maxX) / 2;
     const dataCenterY = (minY + maxY) / 2;
 
-    // 중심으로부터의 상대 좌표
-    const relativeX = originalPoint.x - dataCenterX;
-    const relativeY = originalPoint.y - dataCenterY;
-    
-    // 회전 자취 점들 생성 (Y축 중심 회전)
+    // 회전 자취 점들 생성
     const tracePoints = [];
+    
     for (let t = tStart; t <= tEnd; t += tStep) {
-        // Y축 중심으로 회전 (좌우 회전)
-        const rotatedX = relativeX * Math.cos(t);
-        const rotatedZ = relativeX * Math.sin(t);
+        let rotatedPoint;
         
-        // 다시 절대 좌표로 변환
-        tracePoints.push({
-            x: rotatedX + dataCenterX,
-            y: originalPoint.y,
-            z: rotatedZ
-        });
+        if (rotationAxis === 'Y') {
+            // Y축 중심 회전 (좌우)
+            const dx = originalPoint.x - axisPosition.x;
+            const dz = (originalPoint.z || 0) - axisPosition.z;
+            const rotatedX = dx * Math.cos(t) - dz * Math.sin(t) + axisPosition.x;
+            const rotatedZ = dx * Math.sin(t) + dz * Math.cos(t) + axisPosition.z;
+            rotatedPoint = {
+                x: rotatedX,
+                y: originalPoint.y,
+                z: rotatedZ
+            };
+        } else if (rotationAxis === 'X') {
+            // X축 중심 회전 (전후)
+            const dy = originalPoint.y - axisPosition.y;
+            const dz = (originalPoint.z || 0) - axisPosition.z;
+            const rotatedY = dy * Math.cos(t) - dz * Math.sin(t) + axisPosition.y;
+            const rotatedZ = dy * Math.sin(t) + dz * Math.cos(t) + axisPosition.z;
+            rotatedPoint = {
+                x: originalPoint.x,
+                y: rotatedY,
+                z: rotatedZ
+            };
+        } else if (rotationAxis === 'Z') {
+            // Z축 중심 회전 (상하)
+            const dx = originalPoint.x - axisPosition.x;
+            const dy = originalPoint.y - axisPosition.y;
+            const rotatedX = dx * Math.cos(t) - dy * Math.sin(t) + axisPosition.x;
+            const rotatedY = dx * Math.sin(t) + dy * Math.cos(t) + axisPosition.y;
+            rotatedPoint = {
+                x: rotatedX,
+                y: rotatedY,
+                z: originalPoint.z || 0
+            };
+        }
+        
+        tracePoints.push(rotatedPoint);
     }
 
-    console.log(`회전 자취 생성: ${tracePoints.length}개 점, t: ${tStart} ~ ${tEnd}, step: ${tStep}`);
+    console.log(`회전 자취 생성: ${tracePoints.length}개 점, 축: ${rotationAxis}, t: ${tStart} ~ ${tEnd}, step: ${tStep}`);
+    console.log('축 위치:', axisPosition);
     console.log('원본 점:', originalPoint);
     console.log('생성된 첫 점:', tracePoints[0]);
     console.log('생성된 마지막 점:', tracePoints[tracePoints.length - 1]);
@@ -153,8 +179,6 @@ function createRotationTrace(tStart, tEnd, tStep) {
 
     // JSON 데이터에 추가
     currentJsonData.groups.push(newGroup);
-
-    alert(`회전 자취 생성 완료! (${tracePoints.length}개 점)`);
     
     // 자동 재렌더링
     const canvas = document.getElementById('canvas');
@@ -955,9 +979,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const tStart = parseFloat(document.getElementById('tStartInput').value);
         const tEnd = parseFloat(document.getElementById('tEndInput').value);
         const tStep = parseFloat(document.getElementById('tStepInput').value);
+        const rotationAxis = document.getElementById('rotationAxisSelect').value;
+        const axisX = parseFloat(document.getElementById('axisXInput').value);
+        const axisY = parseFloat(document.getElementById('axisYInput').value);
+        const axisZ = parseFloat(document.getElementById('axisZInput').value);
         
         if (isNaN(tStart) || isNaN(tEnd) || isNaN(tStep)) {
             alert('유효한 숫자를 입력해주세요.');
+            return;
+        }
+        
+        if (isNaN(axisX) || isNaN(axisY) || isNaN(axisZ)) {
+            alert('축 위치에 유효한 숫자를 입력해주세요.');
             return;
         }
         
@@ -971,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        createRotationTrace(tStart, tEnd, tStep);
+        createRotationTrace(tStart, tEnd, tStep, rotationAxis, { x: axisX, y: axisY, z: axisZ });
     });
 
     // 클립보드에서 붙여넣기
