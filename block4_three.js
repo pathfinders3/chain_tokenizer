@@ -87,6 +87,88 @@ function animate() {
     updateCameraDistanceDisplay();
 }
 
+// 회전 자취 생성 함수
+function createRotationTrace(tStart, tEnd, tStep) {
+    if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
+        alert('먼저 점을 선택해주세요!');
+        return;
+    }
+
+    // 선택된 점의 원본 좌표
+    const originalPoint = selectedGroupData.points[selectedPointIndex];
+    
+    // 데이터 중심 계산 (현재 렌더링과 동일하게)
+    const groups = currentJsonData.groups;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    groups.forEach(group => {
+        if (group.visible !== false && group.points && group.points.length > 0) {
+            group.points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                minY = Math.min(minY, point.y);
+                maxX = Math.max(maxX, point.x);
+                maxY = Math.max(maxY, point.y);
+            });
+        }
+    });
+    const dataCenterX = (minX + maxX) / 2;
+    const dataCenterY = (minY + maxY) / 2;
+
+    // 중심으로부터의 상대 좌표
+    const relativeX = originalPoint.x - dataCenterX;
+    const relativeY = originalPoint.y - dataCenterY;
+    
+    // 회전 자취 점들 생성 (Y축 중심 회전)
+    const tracePoints = [];
+    for (let t = tStart; t <= tEnd; t += tStep) {
+        // Y축 중심으로 회전 (좌우 회전)
+        const rotatedX = relativeX * Math.cos(t);
+        const rotatedZ = relativeX * Math.sin(t);
+        
+        // 다시 절대 좌표로 변환
+        tracePoints.push({
+            x: rotatedX + dataCenterX,
+            y: originalPoint.y,
+            z: rotatedZ
+        });
+    }
+
+    console.log(`회전 자취 생성: ${tracePoints.length}개 점, t: ${tStart} ~ ${tEnd}, step: ${tStep}`);
+    console.log('원본 점:', originalPoint);
+    console.log('생성된 첫 점:', tracePoints[0]);
+    console.log('생성된 마지막 점:', tracePoints[tracePoints.length - 1]);
+
+    // 새 그룹 생성 (z 좌표 포함)
+    const newGroup = {
+        color: '#f093fb', // 분홍색으로 구분
+        points: tracePoints, // z 좌표를 포함한 전체 점 저장
+        visible: true,
+        metadata: {
+            type: 'rotation_trace',
+            originalPoint: originalPoint,
+            tStart: tStart,
+            tEnd: tEnd,
+            tStep: tStep
+        }
+    };
+
+    // JSON 데이터에 추가
+    currentJsonData.groups.push(newGroup);
+
+    alert(`회전 자취 생성 완료! (${tracePoints.length}개 점)`);
+    
+    // 자동 재렌더링
+    const canvas = document.getElementById('canvas');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const pointSizeSlider = document.getElementById('pointSizeSlider');
+    const lineWidthSlider = document.getElementById('lineWidthSlider');
+    
+    renderSavedGroups(currentJsonData, canvas, {
+        scalePercent: parseInt(scaleSlider.value),
+        pointSize: parseInt(pointSizeSlider.value),
+        lineWidth: parseInt(lineWidthSlider.value)
+    });
+}
+
 // 회전 제약 적용
 function applyRotationConstraints() {
     if (!controls) return;
@@ -595,12 +677,12 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
         groupObject.userData.originalColor = new THREE.Color(color);
         groupObject.userData.color = color;
 
-        // 3D 좌표 변환 (중심을 원점으로)
+        // 3D 좌표 변환 (중심을 원점으로, z 좌표가 있으면 사용)
         const vertices = points.map(p => 
             new THREE.Vector3(
                 (p.x - dataCenterX) * scale,
                 (p.y - dataCenterY) * scale,
-                0
+                (p.z || 0) * scale  // z 좌표가 있으면 사용, 없으면 0
             )
         );
 
@@ -866,6 +948,30 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             textarea.style.display = 'none';
         }
+    });
+
+    // 회전 자취 생성 버튼
+    document.getElementById('createRotationTraceBtn').addEventListener('click', () => {
+        const tStart = parseFloat(document.getElementById('tStartInput').value);
+        const tEnd = parseFloat(document.getElementById('tEndInput').value);
+        const tStep = parseFloat(document.getElementById('tStepInput').value);
+        
+        if (isNaN(tStart) || isNaN(tEnd) || isNaN(tStep)) {
+            alert('유효한 숫자를 입력해주세요.');
+            return;
+        }
+        
+        if (tStep <= 0) {
+            alert('간격은 0보다 커야 합니다.');
+            return;
+        }
+        
+        if (tStart >= tEnd) {
+            alert('시작값은 끝값보다 작아야 합니다.');
+            return;
+        }
+        
+        createRotationTrace(tStart, tEnd, tStep);
     });
 
     // 클립보드에서 붙여넣기
