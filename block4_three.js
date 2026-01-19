@@ -306,6 +306,22 @@ function setCameraViewYZ() {
     console.log('측면 뷰 (YZ) 설정');
 }
 
+// 선택된 점의 좌표 표시 업데이트
+function updateSelectedPointDisplay() {
+    const selectedPointCoordsSpan = document.getElementById('selectedPointCoords');
+    if (!selectedPointCoordsSpan) return;
+    
+    if (selectedPoint && selectedPointIndex !== null && selectedGroupData) {
+        const point = selectedGroupData.points[selectedPointIndex];
+        const x = point.x.toFixed(1);
+        const y = point.y.toFixed(1);
+        const z = (point.z || 0).toFixed(1);
+        selectedPointCoordsSpan.textContent = `(${x}, ${y}, ${z})`;
+    } else {
+        selectedPointCoordsSpan.textContent = '-';
+    }
+}
+
 // 카메라 거리 표시 업데이트
 function updateCameraDistanceDisplay() {
     if (!camera) return;
@@ -570,6 +586,7 @@ function onCanvasClick(event, canvas) {
                 selectedPointIndex = null;
                 selectedGroupData = null;
                 console.log('선택 해제');
+                updateSelectedPointDisplay();
             } else {
                 selectedGroup = clickedGroup;
                 
@@ -584,11 +601,15 @@ function onCanvasClick(event, canvas) {
                         selectedGroupData = currentJsonData.groups[clickedGroup.userData.groupIndex];
                     }
                     console.log('그룹 및 점 선택:', clickedGroup.userData.groupIndex, '점 인덱스:', selectedPointIndex);
+                    
+                    // 선택된 점의 좌표 표시
+                    updateSelectedPointDisplay();
                 } else {
                     // 선을 클릭한 경우
                     selectedPoint = null;
                     selectedPointIndex = null;
                     selectedGroupData = null;
+                    updateSelectedPointDisplay();
                     console.log('그룹 선택:', clickedGroup.userData.groupIndex);
                 }
             }
@@ -605,6 +626,7 @@ function onCanvasClick(event, canvas) {
             console.log('선택 해제');
             updateSelection();
             updateNextPointDistance();
+            updateSelectedPointDisplay();
         }
     }
 }
@@ -972,6 +994,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             textarea.style.display = 'none';
         }
+    });
+
+    // 선택된 점의 좌표를 축 위치로 복사
+    document.getElementById('copyToAxisBtn').addEventListener('click', () => {
+        if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
+            alert('먼저 점을 선택해주세요!');
+            return;
+        }
+        
+        const point = selectedGroupData.points[selectedPointIndex];
+        document.getElementById('axisXInput').value = point.x.toFixed(1);
+        document.getElementById('axisYInput').value = point.y.toFixed(1);
+        document.getElementById('axisZInput').value = (point.z || 0).toFixed(1);
     });
 
     // 회전 자취 생성 버튼
