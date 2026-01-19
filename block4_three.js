@@ -88,7 +88,7 @@ function animate() {
 }
 
 // 회전 자취 생성 함수
-function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisPosition) {
+function createRotationTrace(tStart, tEnd, tStep, rotationAxis, relativeAxisPosition) {
     if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
         alert('먼저 점을 선택해주세요!');
         return;
@@ -96,6 +96,24 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisPosition) {
 
     // 선택된 점의 원본 좌표
     const originalPoint = selectedGroupData.points[selectedPointIndex];
+    
+    // 상대 좌표를 절대 좌표로 변환
+    const axisPosition = {
+        x: (originalPoint.x || 0) + relativeAxisPosition.x,
+        y: (originalPoint.y || 0) + relativeAxisPosition.y,
+        z: (originalPoint.z || 0) + relativeAxisPosition.z
+    };
+    
+    // 선택된 점으로부터 회전축까지의 거리 경고
+    const dx = relativeAxisPosition.x;
+    const dy = relativeAxisPosition.y;
+    const dz = relativeAxisPosition.z;
+    const distanceFromPoint = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    
+    if (distanceFromPoint >= 100) {
+        alert(`경고: 회전축이 선택된 점으로부터 ${distanceFromPoint.toFixed(1)} 떨어져 있습니다. (100 이상)`);
+        return; // 자취 생성 중단
+    }
     
     // 데이터 중심 계산 (현재 렌더링과 동일하게)
     const groups = currentJsonData.groups;
@@ -1003,10 +1021,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        const point = selectedGroupData.points[selectedPointIndex];
-        document.getElementById('axisXInput').value = point.x.toFixed(1);
-        document.getElementById('axisYInput').value = point.y.toFixed(1);
-        document.getElementById('axisZInput').value = (point.z || 0).toFixed(1);
+        // 상대 좌표로 0,0,0으로 초기화 (선택된 점 위치가 기준)
+        document.getElementById('axisXInput').value = '0';
+        document.getElementById('axisYInput').value = '0';
+        document.getElementById('axisZInput').value = '0';
     });
 
     // 회전 자취 생성 버튼
