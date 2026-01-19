@@ -88,7 +88,7 @@ function animate() {
 }
 
 // 회전 자취 생성 함수
-function createRotationTrace(tStart, tEnd, tStep, rotationAxis, relativeAxisPosition) {
+function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues, isRelativeMode) {
     if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
         alert('먼저 점을 선택해주세요!');
         return;
@@ -97,18 +97,32 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, relativeAxisPosi
     // 선택된 점의 원본 좌표
     const originalPoint = selectedGroupData.points[selectedPointIndex];
     
-    // 상대 좌표를 절대 좌표로 변환
-    const axisPosition = {
-        x: (originalPoint.x || 0) + relativeAxisPosition.x,
-        y: (originalPoint.y || 0) + relativeAxisPosition.y,
-        z: (originalPoint.z || 0) + relativeAxisPosition.z
-    };
+    // 모드에 따라 절대 좌표 계산
+    let axisPosition;
+    let distanceFromPoint;
     
-    // 선택된 점으로부터 회전축까지의 거리 경고
-    const dx = relativeAxisPosition.x;
-    const dy = relativeAxisPosition.y;
-    const dz = relativeAxisPosition.z;
-    const distanceFromPoint = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (isRelativeMode) {
+        // 상대 모드: 선택된 점 + 입력값
+        axisPosition = {
+            x: (originalPoint.x || 0) + axisInputValues.x,
+            y: (originalPoint.y || 0) + axisInputValues.y,
+            z: (originalPoint.z || 0) + axisInputValues.z
+        };
+        // 거리는 상대 좌표 자체
+        distanceFromPoint = Math.sqrt(
+            axisInputValues.x * axisInputValues.x + 
+            axisInputValues.y * axisInputValues.y + 
+            axisInputValues.z * axisInputValues.z
+        );
+    } else {
+        // 절대 모드: 입력값 그대로 사용
+        axisPosition = axisInputValues;
+        // 거리는 선택된 점에서 축 위치까지
+        const dx = (originalPoint.x || 0) - axisPosition.x;
+        const dy = (originalPoint.y || 0) - axisPosition.y;
+        const dz = (originalPoint.z || 0) - axisPosition.z;
+        distanceFromPoint = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
     
     if (distanceFromPoint >= 100) {
         alert(`경고: 회전축이 선택된 점으로부터 ${distanceFromPoint.toFixed(1)} 떨어져 있습니다. (100 이상)`);
@@ -1014,6 +1028,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 좌표 모드 변경 시 레이블 업데이트
+    function updateCoordModeLabels() {
+        const isRelative = document.getElementById('relativeModeRadio').checked;
+        document.getElementById('axisXLabel').textContent = isRelative ? 'dx=' : 'x=';
+        document.getElementById('axisYLabel').textContent = isRelative ? 'dy=' : 'y=';
+        document.getElementById('axisZLabel').textContent = isRelative ? 'dz=' : 'z=';
+    }
+
+    document.getElementById('relativeModeRadio').addEventListener('change', updateCoordModeLabels);
+    document.getElementById('absoluteModeRadio').addEventListener('change', updateCoordModeLabels);
+
     // 선택된 점의 좌표를 축 위치로 복사
     document.getElementById('copyToAxisBtn').addEventListener('click', () => {
         if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
@@ -1021,10 +1046,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // 상대 좌표로 0,0,0으로 초기화 (선택된 점 위치가 기준)
-        document.getElementById('axisXInput').value = '0';
-        document.getElementById('axisYInput').value = '0';
-        document.getElementById('axisZInput').value = '0';
+        const isRelative = document.getElementById('relativeModeRadio').checked;
+        const point = selectedGroupData.points[selectedPointIndex];
+        
+        if (isRelative) {
+            // 상대 모드: 0,0,0으로 초기화 (선택된 점 위치가 기준)
+            document.getElementById('axisXInput').value = '0';
+            document.getElementById('axisYInput').value = '0';
+            document.getElementById('axisZInput').value = '0';
+        } else {
+            // 절대 모드: 선택된 점의 절대 좌표
+            document.getElementById('axisXInput').value = point.x.toFixed(1);
+            document.getElementById('axisYInput').value = point.y.toFixed(1);
+            document.getElementById('axisZInput').value = (point.z || 0).toFixed(1);
+        }
     });
 
     // 회전 자취 생성 버튼
@@ -1036,6 +1071,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const axisX = parseFloat(document.getElementById('axisXInput').value);
         const axisY = parseFloat(document.getElementById('axisYInput').value);
         const axisZ = parseFloat(document.getElementById('axisZInput').value);
+        const isRelative = document.getElementById('relativeModeRadio').checked;
         
         if (isNaN(tStart) || isNaN(tEnd) || isNaN(tStep)) {
             alert('유효한 숫자를 입력해주세요.');
@@ -1057,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        createRotationTrace(tStart, tEnd, tStep, rotationAxis, { x: axisX, y: axisY, z: axisZ });
+        createRotationTrace(tStart, tEnd, tStep, rotationAxis, { x: axisX, y: axisY, z: axisZ }, isRelative);
     });
 
     // 클립보드에서 붙여넣기
