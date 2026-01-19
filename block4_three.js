@@ -225,6 +225,76 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
     });
 }
 
+// 원 그리기 함수 (두 점으로 원 생성)
+function createCircle(pointB, centerA) {
+    // centerA의 y 좌표를 pointB의 y로 강제 조정
+    const adjustedCenterA = {
+        x: centerA.x,
+        y: pointB.y,
+        z: centerA.z
+    };
+    
+    // 반지름 계산 (XZ 평면에서의 거리)
+    const dx = pointB.x - adjustedCenterA.x;
+    const dz = (pointB.z || 0) - adjustedCenterA.z;
+    const radius = Math.sqrt(dx * dx + dz * dz);
+    
+    if (radius < 0.1) {
+        alert('중심점과 원 위의 점이 너무 가깝습니다. (반지름 < 0.1)');
+        return;
+    }
+    
+    console.log('원 생성:', {
+        pointB: pointB,
+        centerA: adjustedCenterA,
+        radius: radius
+    });
+    
+    // t 범위 가져오기
+    const tStart = parseFloat(document.getElementById('tStartInput').value) || 0;
+    const tEnd = parseFloat(document.getElementById('tEndInput').value) || 6.28;
+    const tStep = parseFloat(document.getElementById('tStepInput').value) || 0.3;
+    
+    // 원 위의 점들 생성
+    const circlePoints = [];
+    for (let t = tStart; t <= tEnd; t += tStep) {
+        const x = adjustedCenterA.x + dx * Math.cos(t) - dz * Math.sin(t);
+        const y = adjustedCenterA.y;
+        const z = adjustedCenterA.z + dx * Math.sin(t) + dz * Math.cos(t);
+        circlePoints.push({ x, y, z });
+    }
+    
+    // 새 그룹 생성
+    const newGroup = {
+        color: '#00ff00', // 녹색으로 구분
+        points: circlePoints,
+        visible: true,
+        metadata: {
+            type: 'circle',
+            center: adjustedCenterA,
+            radius: radius,
+            pointB: pointB
+        }
+    };
+    
+    // JSON 데이터에 추가
+    currentJsonData.groups.push(newGroup);
+    
+    // 자동 재렌더링
+    const canvas = document.getElementById('canvas');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const pointSizeSlider = document.getElementById('pointSizeSlider');
+    const lineWidthSlider = document.getElementById('lineWidthSlider');
+    
+    renderSavedGroups(currentJsonData, canvas, {
+        scalePercent: parseInt(scaleSlider.value),
+        pointSize: parseInt(pointSizeSlider.value),
+        lineWidth: parseInt(lineWidthSlider.value)
+    });
+    
+    console.log(`원 생성 완료! (${circlePoints.length}개 점, 반지름: ${radius.toFixed(2)})`);
+}
+
 // 회전 제약 적용
 function applyRotationConstraints() {
     if (!controls) return;
@@ -582,6 +652,67 @@ function updateSelection() {
 
 // 마우스 클릭으로 그룹 선택
 function onCanvasClick(event, canvas) {
+    // 원 그리기 모드 체크
+    const circleDrawMode = document.getElementById('circleDrawModeCheck');
+    if (circleDrawMode && circleDrawMode.checked) {
+        // 원 그리기 모드가 켜져 있고 점이 선택되어 있으면
+        if (selectedPoint && selectedPointIndex !== null && selectedGroupData) {
+            const pointB = selectedGroupData.points[selectedPointIndex];
+            
+            // 캔버스 내 마우스 위치 계산
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            // pointB와 같은 높이(Y)의 평면과 교차점 찾기
+            const planeY = pointB.y;
+            const planeNormal = new THREE.Vector3(0, 1, 0);
+            const plane = new THREE.Plane(planeNormal, -planeY);
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, intersectPoint);
+            
+            if (intersectPoint) {
+                // 데이터 중심 및 스케일 계산
+                const groups = currentJsonData.groups;
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                groups.forEach(group => {
+                    if (group.visible !== false && group.points && group.points.length > 0) {
+                        group.points.forEach(point => {
+                            minX = Math.min(minX, point.x);
+                            minY = Math.min(minY, point.y);
+                            maxX = Math.max(maxX, point.x);
+                            maxY = Math.max(maxY, point.y);
+                        });
+                    }
+                });
+                const dataCenterX = (minX + maxX) / 2;
+                const dataCenterY = (minY + maxY) / 2;
+                const scaleSlider = document.getElementById('scaleSlider');
+                const scale = parseInt(scaleSlider.value) / 100;
+                
+                // 3D 좌표를 원본 데이터 좌표로 변환
+                const centerA = {
+                    x: intersectPoint.x / scale + dataCenterX,
+                    y: intersectPoint.y / scale + dataCenterY,
+                    z: intersectPoint.z / scale
+                };
+                
+                createCircle(pointB, centerA);
+                
+                // 모드 자동 해제
+                circleDrawMode.checked = false;
+            } else {
+                alert('평면과의 교차점을 찾을 수 없습니다.');
+            }
+            return; // 원 그리기 모드에서는 일반 선택 무시
+        } else {
+            alert('먼저 원 위의 점을 선택해주세요!');
+            return;
+        }
+    }
+    
     // 캔버스 내 마우스 위치 계산 (정규화된 좌표: -1 ~ 1)
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
