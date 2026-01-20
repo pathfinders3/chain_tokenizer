@@ -720,6 +720,15 @@ function onCanvasClick(event, canvas) {
                     z: intersectPoint.z / scale
                 };
                 
+                // 콘솔에 정보 출력
+                console.log('=== 원 그리기 모드 ===');
+                console.log('선택된 점 (점 B - 원 위의 점):', pointB);
+                console.log('원의 중심 (점 A):', centerA);
+                console.log('반지름:', Math.sqrt(
+                    Math.pow(pointB.x - centerA.x, 2) + 
+                    Math.pow((pointB.z || 0) - centerA.z, 2)
+                ).toFixed(2));
+                
                 createCircle(pointB, centerA);
                 
                 // 모드 자동 해제
@@ -887,13 +896,6 @@ function renderSavedGroups(jsonData, canvas, options = {}) {
         const color = group.color || '#667eea';
         const points = group.points;
 
-        console.log(`그룹 ${groupIndex + 1}:`, {
-            color,
-            pointCount: points.length,
-            visible: group.visible,
-            firstPoint: points[0]
-        });
-
         if (!points || points.length === 0) {
             console.log(`그룹 ${groupIndex + 1}: 점이 없음`);
             return;
@@ -1059,6 +1061,73 @@ document.addEventListener('DOMContentLoaded', () => {
     // 캔버스 클릭 이벤트 (그룹 선택)
     canvas.addEventListener('click', (event) => {
         onCanvasClick(event, canvas);
+    });
+    
+    // 원 그리기 모드에서 마우스 움직임 추적
+    canvas.addEventListener('mousemove', (event) => {
+        const circleDrawMode = document.getElementById('circleDrawModeCheck');
+        const radiusSpan = document.getElementById('predictedRadiusValue');
+        
+        // 원 그리기 모드가 켜져있고, 점이 선택되어 있을 때만
+        if (circleDrawMode && circleDrawMode.checked && 
+            selectedPoint && selectedPointIndex !== null && selectedGroupData && radiusSpan) {
+            
+            const pointB = selectedGroupData.points[selectedPointIndex];
+            
+            // 마우스 위치 계산
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            // pointB와 같은 높이(Y)의 평면과 교차점 찾기
+            const planeY = pointB.y;
+            const planeNormal = new THREE.Vector3(0, 1, 0);
+            const plane = new THREE.Plane(planeNormal, -planeY);
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, intersectPoint);
+            
+            if (intersectPoint) {
+                // 데이터 중심 및 스케일 계산
+                const groups = currentJsonData.groups;
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                groups.forEach(group => {
+                    if (group.visible !== false && group.points && group.points.length > 0) {
+                        group.points.forEach(point => {
+                            minX = Math.min(minX, point.x);
+                            minY = Math.min(minY, point.y);
+                            maxX = Math.max(maxX, point.x);
+                            maxY = Math.max(maxY, point.y);
+                        });
+                    }
+                });
+                const dataCenterX = (minX + maxX) / 2;
+                const dataCenterY = (minY + maxY) / 2;
+                const scaleSlider = document.getElementById('scaleSlider');
+                const scale = parseInt(scaleSlider.value) / 100;
+                
+                // 3D 좌표를 원본 데이터 좌표로 변환
+                const centerA = {
+                    x: intersectPoint.x / scale + dataCenterX,
+                    y: intersectPoint.y / scale + dataCenterY,
+                    z: intersectPoint.z / scale
+                };
+                
+                // 반지름 계산 (Y 좌표는 같으므로 XZ 평면에서의 거리)
+                const dx = pointB.x - centerA.x;
+                const dz = (pointB.z || 0) - centerA.z;
+                const radius = Math.sqrt(dx * dx + dz * dz);
+                
+                // 예상 반지름 표시
+                radiusSpan.textContent = radius.toFixed(2);
+                if (radius > 50) {
+                    radiusSpan.style.color = '#ff6b6b'; // 빨간색 경고
+                } else {
+                    radiusSpan.style.color = '#00ff00'; // 녹색 (원 그리기 모드)
+                }
+            }
+        }
     });
 
     // 키보드 이벤트 (격자선 강조 추가)
