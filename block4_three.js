@@ -370,8 +370,15 @@ function setCameraViewXY() {
         return;
     }
     
+    // 회전 제약 해제
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    savedPolarAngle = null;
+    savedAzimuthAngle = null;
+    
     camera.position.set(0, 0, 500);
-    camera.rotation.set(0, 0, 0);
     controls.target.set(0, 0, 0);
     controls.update();
     
@@ -385,8 +392,15 @@ function setCameraViewXZ() {
         return;
     }
     
+    // 회전 제약 해제
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    savedPolarAngle = null;
+    savedAzimuthAngle = null;
+    
     camera.position.set(0, 500, 0);
-    camera.rotation.set(-Math.PI / 2, 0, 0);
     controls.target.set(0, 0, 0);
     controls.update();
     
@@ -400,8 +414,15 @@ function setCameraViewYZ() {
         return;
     }
     
+    // 회전 제약 해제
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    savedPolarAngle = null;
+    savedAzimuthAngle = null;
+    
     camera.position.set(500, 0, 0);
-    camera.rotation.set(0, Math.PI / 2, 0);
     controls.target.set(0, 0, 0);
     controls.update();
     
