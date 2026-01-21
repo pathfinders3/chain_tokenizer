@@ -255,12 +255,16 @@ function createCircle(pointB, centerA) {
     const tEnd = parseFloat(document.getElementById('tEndInput').value) || 6.28;
     const tStep = parseFloat(document.getElementById('tStepInput').value) || 0.3;
     
+    // pointB의 초기 각도 계산 (중심에서 pointB로의 벡터 각도)
+    const initialAngle = Math.atan2(dz, dx);
+    
     // 원 위의 점들 생성
     const circlePoints = [];
     for (let t = tStart; t <= tEnd; t += tStep) {
-        const x = adjustedCenterA.x + dx * Math.cos(t) - dz * Math.sin(t);
+        const angle = initialAngle + t;
+        const x = adjustedCenterA.x + radius * Math.cos(angle);
         const y = adjustedCenterA.y;
-        const z = adjustedCenterA.z + dx * Math.sin(t) + dz * Math.cos(t);
+        const z = adjustedCenterA.z + radius * Math.sin(angle);
         circlePoints.push({ x, y, z });
     }
     
