@@ -189,8 +189,15 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
         tracePoints.push(rotatedPoint);
     }
 
+    // 반지름 계산
+    const dx = originalPoint.x - axisPosition.x;
+    const dy = originalPoint.y - axisPosition.y;
+    const dz = (originalPoint.z || 0) - axisPosition.z;
+    const radius = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    
     console.log(`회전 자취 생성: ${tracePoints.length}개 점, 축: ${rotationAxis}, t: ${tStart} ~ ${tEnd}, step: ${tStep}`);
-    console.log('축 위치:', axisPosition);
+    console.log('축 위치 (원의 중심):', axisPosition);
+    console.log('반지름:', radius.toFixed(3));
     console.log('원본 점:', originalPoint);
     console.log('생성된 첫 점:', tracePoints[0]);
     console.log('생성된 마지막 점:', tracePoints[tracePoints.length - 1]);
@@ -458,6 +465,64 @@ function updateSelectedPointDisplay() {
         selectedPointCoordsSpan.textContent = `(${x}, ${y}, ${z})`;
     } else {
         selectedPointCoordsSpan.textContent = '-';
+    }
+}
+
+// 선택된 자취 삭제 함수
+function deleteSelectedTrace() {
+    if (!selectedGroupData || !currentJsonData) {
+        alert('먼저 자취 상의 점을 선택해주세요!');
+        return;
+    }
+    
+    // 선택된 그룹이 자취인지 확인
+    if (!selectedGroupData.metadata || selectedGroupData.metadata.type !== 'rotation_trace') {
+        alert('선택된 점이 자취 그룹에 속하지 않습니다.');
+        return;
+    }
+    
+    // 삭제 확인
+    const confirmDelete = confirm(`자취를 삭제하시겠습니까?\n(점 개수: ${selectedGroupData.points.length}개)`);
+    if (!confirmDelete) return;
+    
+    // currentJsonData에서 해당 그룹 찾아서 삭제
+    const groupIndex = currentJsonData.groups.indexOf(selectedGroupData);
+    if (groupIndex !== -1) {
+        currentJsonData.groups.splice(groupIndex, 1);
+        console.log(`자취 삭제 완료 (인덱스: ${groupIndex})`);
+        
+        // 텍스트 입력창도 업데이트
+        const jsonInput = document.getElementById('jsonInput');
+        if (jsonInput) {
+            jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+        }
+        
+        // 선택 해제
+        selectedGroup = null;
+        selectedPoint = null;
+        selectedPointIndex = null;
+        selectedGroupData = null;
+        
+        // 재렌더링
+        const canvas = document.getElementById('canvas');
+        const scaleSlider = document.getElementById('scaleSlider');
+        const pointSizeSlider = document.getElementById('pointSizeSlider');
+        const lineWidthSlider = document.getElementById('lineWidthSlider');
+        const showPointsCheck = document.getElementById('showPointsCheck');
+        const showLinesCheck = document.getElementById('showLinesCheck');
+        
+        renderSavedGroups(currentJsonData, canvas, {
+            scalePercent: parseInt(scaleSlider.value),
+            pointSize: parseInt(pointSizeSlider.value),
+            lineWidth: parseInt(lineWidthSlider.value),
+            showPoints: showPointsCheck.checked,
+            showLines: showLinesCheck.checked
+        });
+        
+        updateSelectedPointDisplay();
+        updateNextPointDistance();
+    } else {
+        alert('자취를 찾을 수 없습니다.');
     }
 }
 
@@ -1203,6 +1268,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         createRotationTrace(tStart, tEnd, tStep, rotationAxis, { x: axisX, y: axisY, z: axisZ }, isRelative);
+    });
+
+    // 자취 삭제 버튼
+    document.getElementById('deleteTraceBtn').addEventListener('click', () => {
+        deleteSelectedTrace();
     });
 
     // 클립보드에서 붙여넣기
