@@ -212,6 +212,12 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
     // JSON 데이터에 추가
     currentJsonData.groups.push(newGroup);
     
+    // 텍스트 입력창도 업데이트 (자취가 저장되도록)
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
+    
     // 자동 재렌더링
     const canvas = document.getElementById('canvas');
     const scaleSlider = document.getElementById('scaleSlider');
@@ -283,6 +289,12 @@ function createCircle(pointB, centerA) {
     
     // JSON 데이터에 추가
     currentJsonData.groups.push(newGroup);
+    
+    // 텍스트 입력창도 업데이트 (원이 저장되도록)
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
     
     // 자동 재렌더링
     const canvas = document.getElementById('canvas');
@@ -1034,21 +1046,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 실시간 렌더링 함수
     function reRender() {
-        if (!jsonInput.value.trim()) return;
-        
-        try {
-            const jsonData = JSON.parse(jsonInput.value);
-            const options = {
-                scalePercent: parseInt(scaleSlider.value),
-                pointSize: parseInt(pointSizeSlider.value),
-                lineWidth: parseInt(lineWidthSlider.value),
-                showPoints: showPointsCheck.checked,
-                showLines: showLinesCheck.checked
-            };
-            renderSavedGroups(jsonData, canvas, options);
-        } catch (err) {
-            console.error('렌더링 오류:', err);
+        // currentJsonData가 있으면 그것을 사용 (자취 포함)
+        // 없으면 jsonInput에서 파싱
+        let jsonData;
+        if (currentJsonData) {
+            jsonData = currentJsonData;
+        } else if (jsonInput.value.trim()) {
+            try {
+                jsonData = JSON.parse(jsonInput.value);
+            } catch (err) {
+                console.error('JSON 파싱 오류:', err);
+                return;
+            }
+        } else {
+            return;
         }
+        
+        const options = {
+            scalePercent: parseInt(scaleSlider.value),
+            pointSize: parseInt(pointSizeSlider.value),
+            lineWidth: parseInt(lineWidthSlider.value),
+            showPoints: showPointsCheck.checked,
+            showLines: showLinesCheck.checked
+        };
+        renderSavedGroups(jsonData, canvas, options);
     }
 
     // 슬라이더 값 표시 업데이트 + 실시간 렌더링
