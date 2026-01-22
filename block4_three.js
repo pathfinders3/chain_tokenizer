@@ -88,7 +88,7 @@ function animate() {
 }
 
 // 회전 자취 생성 함수
-function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues, isRelativeMode) {
+function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues, isRelativeMode, ellipseMode, radiusX, radiusZ) {
     if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
         alert('먼저 점을 선택해주세요!');
         return;
@@ -152,16 +152,28 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
         let rotatedPoint;
         
         if (rotationAxis === 'Y') {
-            // Y축 중심 회전 (좌우)
-            const dx = originalPoint.x - axisPosition.x;
-            const dz = (originalPoint.z || 0) - axisPosition.z;
-            const rotatedX = dx * Math.cos(t) - dz * Math.sin(t) + axisPosition.x;
-            const rotatedZ = dx * Math.sin(t) + dz * Math.cos(t) + axisPosition.z;
-            rotatedPoint = {
-                x: rotatedX,
-                y: originalPoint.y,
-                z: rotatedZ
-            };
+            // Y축 중심 회전 (좌우) - XZ 평면
+            if (ellipseMode) {
+                // 타원 모드: 절대 길이 사용
+                const rotatedX = radiusX * Math.cos(t) + axisPosition.x;
+                const rotatedZ = radiusZ * Math.sin(t) + axisPosition.z;
+                rotatedPoint = {
+                    x: rotatedX,
+                    y: originalPoint.y,
+                    z: rotatedZ
+                };
+            } else {
+                // 원형 모드
+                const dx = originalPoint.x - axisPosition.x;
+                const dz = (originalPoint.z || 0) - axisPosition.z;
+                const rotatedX = dx * Math.cos(t) - dz * Math.sin(t) + axisPosition.x;
+                const rotatedZ = dx * Math.sin(t) + dz * Math.cos(t) + axisPosition.z;
+                rotatedPoint = {
+                    x: rotatedX,
+                    y: originalPoint.y,
+                    z: rotatedZ
+                };
+            }
         } else if (rotationAxis === 'X') {
             // X축 중심 회전 (전후)
             const dy = originalPoint.y - axisPosition.y;
@@ -196,9 +208,27 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
     const radius = Math.sqrt(dx * dx + dy * dy + dz * dz);
     
     console.log(`회전 자취 생성: ${tracePoints.length}개 점, 축: ${rotationAxis}, t: ${tStart} ~ ${tEnd}, step: ${tStep}`);
-    console.log('축 위치 (원의 중심):', axisPosition);
-    console.log('반지름:', radius.toFixed(3));
-    console.log('원본 점:', originalPoint);
+    console.log('축 위치 (중심):', axisPosition);
+    
+    if (ellipseMode) {
+        const majorAxis = Math.max(radiusX, radiusZ);
+        const minorAxis = Math.min(radiusX, radiusZ);
+        const eccentricity = minorAxis > 0 ? Math.sqrt(1 - (minorAxis * minorAxis) / (majorAxis * majorAxis)) : 0;
+        console.log('타원 모드 - XZ 평면');
+        console.log(`  X방향 반지름: ${radiusX.toFixed(3)}`);
+        console.log(`  Z방향 반지름: ${radiusZ.toFixed(3)}`);
+        console.log(`  장축: ${majorAxis.toFixed(3)}, 단축: ${minorAxis.toFixed(3)}`);
+        console.log(`  이심률: ${eccentricity.toFixed(4)}`);
+    } else {
+        const dx = originalPoint.x - axisPosition.x;
+        const dy = originalPoint.y - axisPosition.y;
+        const dz = (originalPoint.z || 0) - axisPosition.z;
+        const radius = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        console.log('원형 모드');
+        console.log('반지름:', radius.toFixed(3));
+        console.log('원본 점:', originalPoint);
+    }
+    
     console.log('생성된 첫 점:', tracePoints[0]);
     console.log('생성된 마지막 점:', tracePoints[tracePoints.length - 1]);
 
@@ -1267,13 +1297,51 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        createRotationTrace(tStart, tEnd, tStep, rotationAxis, { x: axisX, y: axisY, z: axisZ }, isRelative);
+        // 타원 모드 파라미터
+        const ellipseMode = document.getElementById('ellipseModeCheck').checked;
+        const radiusX = ellipseMode ? parseFloat(document.getElementById('ellipseRadiusXInput').value) : 0;
+        const radiusZ = ellipseMode ? parseFloat(document.getElementById('ellipseRadiusZInput').value) : 0;
+        
+        if (ellipseMode) {
+            if (isNaN(radiusX) || isNaN(radiusZ) || radiusX <= 0 || radiusZ <= 0) {
+                alert('타원 반지름은 0보다 큰 숫자여야 합니다.');
+                return;
+            }
+            if (rotationAxis !== 'Y') {
+                alert('타원 모드는 Y축 회전(XZ 평면)만 지원합니다.');
+                return;
+            }
+        }
+        
+        createRotationTrace(tStart, tEnd, tStep, rotationAxis, { x: axisX, y: axisY, z: axisZ }, isRelative, ellipseMode, radiusX, radiusZ);
     });
 
     // 자취 삭제 버튼
     document.getElementById('deleteTraceBtn').addEventListener('click', () => {
         deleteSelectedTrace();
     });
+
+    // 타원 모드 체크박스 토글
+    document.getElementById('ellipseModeCheck').addEventListener('change', (e) => {
+        const ellipseControls = document.getElementById('ellipseControls');
+        ellipseControls.style.display = e.target.checked ? 'flex' : 'none';
+        updateEllipseDisplay();
+    });
+
+    // 타원 반지름 입력 시 실시간 업데이트
+    document.getElementById('ellipseRadiusXInput').addEventListener('input', updateEllipseDisplay);
+    document.getElementById('ellipseRadiusZInput').addEventListener('input', updateEllipseDisplay);
+
+    // 타원 표시 업데이트 함수
+    function updateEllipseDisplay() {
+        const radiusX = parseFloat(document.getElementById('ellipseRadiusXInput').value) || 0;
+        const radiusZ = parseFloat(document.getElementById('ellipseRadiusZInput').value) || 0;
+        const majorAxis = Math.max(radiusX, radiusZ);
+        const minorAxis = Math.min(radiusX, radiusZ);
+        
+        document.getElementById('majorAxisValue').textContent = majorAxis.toFixed(1);
+        document.getElementById('minorAxisValue').textContent = minorAxis.toFixed(1);
+    }
 
     // 클립보드에서 붙여넣기
     document.getElementById('pasteBtn').addEventListener('click', async () => {
