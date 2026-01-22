@@ -1354,6 +1354,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 클립보드에 복사
+    document.getElementById('copyBtn').addEventListener('click', async () => {
+        try {
+            if (currentJsonData && currentJsonData.groups && currentJsonData.groups.length > 0) {
+                const jsonText = JSON.stringify(currentJsonData, null, 2);
+                await navigator.clipboard.writeText(jsonText);
+                alert(`클립보드에 복사되었습니다!\n(그룹 ${currentJsonData.groups.length}개, 자취 포함)`);
+            } else {
+                alert('복사할 데이터가 없습니다. 먼저 데이터를 불러오거나 자취를 생성해주세요.');
+            }
+        } catch (err) {
+            alert('클립보드 복사 실패: ' + err.message);
+        }
+    });
+
     // localStorage에서 불러오기
     document.getElementById('loadFromStorageBtn').addEventListener('click', () => {
         const text = localStorage.getItem('block3_savedGroups');
