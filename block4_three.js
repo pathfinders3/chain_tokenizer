@@ -524,6 +524,19 @@ function updateSelectedPointDisplay() {
     }
 }
 
+// 선택된 그룹 정보 표시 업데이트
+function updateSelectedGroupDisplay() {
+    const selectedGroupValueSpan = document.getElementById('selectedGroupValue');
+    if (!selectedGroupValueSpan) return;
+    
+    if (selectedGroupData && selectedGroupIndex !== null) {
+        const groupType = selectedGroupData.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
+        selectedGroupValueSpan.textContent = `그룹 ${selectedGroupIndex + 1} (${groupType})`;
+    } else {
+        selectedGroupValueSpan.textContent = '-';
+    }
+}
+
 // 선택된 자취 삭제 함수
 function deleteSelectedTrace() {
     if (!selectedGroupData || !currentJsonData) {
@@ -865,6 +878,7 @@ function onCanvasClick(event, canvas) {
                 selectedGroupIndex = null;
                 console.log('선택 해제');
                 updateSelectedPointDisplay();
+                updateSelectedGroupDisplay();
             } else {
                 selectedGroup = clickedGroup;
                 
@@ -887,6 +901,7 @@ function onCanvasClick(event, canvas) {
                     
                     // 선택된 점의 좌표 표시
                     updateSelectedPointDisplay();
+                    updateSelectedGroupDisplay();
                 } else {
                     // 선을 클릭한 경우
                     selectedPoint = null;
@@ -900,6 +915,7 @@ function onCanvasClick(event, canvas) {
                         });
                     }
                     updateSelectedPointDisplay();
+                    updateSelectedGroupDisplay();
                     console.log('그룹 선택:', selectedGroupIndex);
                 }
             }
@@ -922,6 +938,7 @@ function onCanvasClick(event, canvas) {
             updateSelection();
             updateNextPointDistance();
             updateSelectedPointDisplay();
+            updateSelectedGroupDisplay();
         }
     }
 }
