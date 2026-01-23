@@ -29,6 +29,7 @@ let selectedGroupData = null; // 선택된 그룹의 원본 데이터
 let rotationMode = 'horizontal'; // 회전 모드: 'horizontal' (좌우) 또는 'vertical' (위아래)
 let savedPolarAngle = null; // 저장된 수직 각도
 let savedAzimuthAngle = null; // 저장된 수평 각도
+let axesPreviewGroup = null; // 축 미리보기 Three.js 객체
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -1342,6 +1343,176 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('majorAxisValue').textContent = majorAxis.toFixed(1);
         document.getElementById('minorAxisValue').textContent = minorAxis.toFixed(1);
     }
+
+    // 축 미리보기 생성 함수
+    function createAxesPreview() {
+        if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
+            alert('먼저 점을 선택해주세요!');
+            return;
+        }
+
+        const ellipseMode = document.getElementById('ellipseModeCheck').checked;
+        if (!ellipseMode) {
+            alert('타원 모드를 먼저 활성화해주세요!');
+            return;
+        }
+
+        const rotationAxis = document.getElementById('rotationAxisSelect').value;
+        if (rotationAxis !== 'Y') {
+            alert('타원 모드는 Y축 회전(XZ 평면)만 지원합니다.');
+            return;
+        }
+
+        const radiusX = parseFloat(document.getElementById('ellipseRadiusXInput').value) || 0;
+        const radiusZ = parseFloat(document.getElementById('ellipseRadiusZInput').value) || 0;
+
+        if (radiusX <= 0 || radiusZ <= 0) {
+            alert('타원 반지름은 0보다 큰 값이어야 합니다.');
+            return;
+        }
+
+        // 기존 미리보기 제거
+        clearAxesPreview();
+
+        // 축 위치 계산
+        const originalPoint = selectedGroupData.points[selectedPointIndex];
+        const isRelative = document.getElementById('relativeModeRadio').checked;
+        const axisX = parseFloat(document.getElementById('axisXInput').value) || 0;
+        const axisY = parseFloat(document.getElementById('axisYInput').value) || 0;
+        const axisZ = parseFloat(document.getElementById('axisZInput').value) || 0;
+
+        let axisPosition;
+        if (isRelative) {
+            axisPosition = {
+                x: (originalPoint.x || 0) + axisX,
+                y: (originalPoint.y || 0) + axisY,
+                z: (originalPoint.z || 0) + axisZ
+            };
+        } else {
+            axisPosition = { x: axisX, y: axisY, z: axisZ };
+        }
+
+        // 데이터 중심 계산
+        const groups = currentJsonData.groups;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        groups.forEach(group => {
+            if (group.visible !== false && group.points && group.points.length > 0) {
+                group.points.forEach(point => {
+                    minX = Math.min(minX, point.x);
+                    minY = Math.min(minY, point.y);
+                    maxX = Math.max(maxX, point.x);
+                    maxY = Math.max(maxY, point.y);
+                });
+            }
+        });
+        const dataCenterX = (minX + maxX) / 2;
+        const dataCenterY = (minY + maxY) / 2;
+
+        const scalePercent = parseInt(document.getElementById('scaleSlider').value);
+        const scale = scalePercent / 100;
+
+        // Three.js 그룹 생성
+        axesPreviewGroup = new THREE.Group();
+
+        // X축 (장축) - 빨간색
+        const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(
+                (axisPosition.x - radiusX - dataCenterX) * scale,
+                (axisPosition.y - dataCenterY) * scale,
+                (axisPosition.z || 0) * scale
+            ),
+            new THREE.Vector3(
+                (axisPosition.x + radiusX - dataCenterX) * scale,
+                (axisPosition.y - dataCenterY) * scale,
+                (axisPosition.z || 0) * scale
+            )
+        ]);
+        const xAxisMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xff0000, 
+            linewidth: 3,
+            transparent: true,
+            opacity: 0.8
+        });
+        const xAxisLine = new THREE.Line(xAxisGeometry, xAxisMaterial);
+        axesPreviewGroup.add(xAxisLine);
+
+        // Z축 (단축) - 파란색
+        const zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(
+                (axisPosition.x - dataCenterX) * scale,
+                (axisPosition.y - dataCenterY) * scale,
+                ((axisPosition.z || 0) - radiusZ) * scale
+            ),
+            new THREE.Vector3(
+                (axisPosition.x - dataCenterX) * scale,
+                (axisPosition.y - dataCenterY) * scale,
+                ((axisPosition.z || 0) + radiusZ) * scale
+            )
+        ]);
+        const zAxisMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x0000ff, 
+            linewidth: 3,
+            transparent: true,
+            opacity: 0.8
+        });
+        const zAxisLine = new THREE.Line(zAxisGeometry, zAxisMaterial);
+        axesPreviewGroup.add(zAxisLine);
+
+        // 중심점 표시 - 노란색
+        const centerGeometry = new THREE.SphereGeometry(5, 16, 16);
+        const centerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.9
+        });
+        const centerSphere = new THREE.Mesh(centerGeometry, centerMaterial);
+        centerSphere.position.set(
+            (axisPosition.x - dataCenterX) * scale,
+            (axisPosition.y - dataCenterY) * scale,
+            (axisPosition.z || 0) * scale
+        );
+        axesPreviewGroup.add(centerSphere);
+
+        scene.add(axesPreviewGroup);
+
+        // 버튼 상태 변경
+        document.getElementById('previewAxesBtn').style.display = 'none';
+        document.getElementById('clearPreviewBtn').style.display = 'inline-block';
+
+        console.log('축 미리보기 생성:', {
+            center: axisPosition,
+            radiusX: radiusX,
+            radiusZ: radiusZ,
+            majorAxis: Math.max(radiusX, radiusZ),
+            minorAxis: Math.min(radiusX, radiusZ)
+        });
+    }
+
+    // 축 미리보기 제거 함수
+    function clearAxesPreview() {
+        if (axesPreviewGroup) {
+            scene.remove(axesPreviewGroup);
+            axesPreviewGroup.traverse((object) => {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) object.material.dispose();
+            });
+            axesPreviewGroup = null;
+        }
+
+        // 버튼 상태 복원
+        document.getElementById('previewAxesBtn').style.display = 'inline-block';
+        document.getElementById('clearPreviewBtn').style.display = 'none';
+    }
+
+    // 축 미리보기 버튼
+    document.getElementById('previewAxesBtn').addEventListener('click', () => {
+        createAxesPreview();
+    });
+
+    // 미리보기 제거 버튼
+    document.getElementById('clearPreviewBtn').addEventListener('click', () => {
+        clearAxesPreview();
+    });
 
     // 클립보드에서 붙여넣기
     document.getElementById('pasteBtn').addEventListener('click', async () => {
