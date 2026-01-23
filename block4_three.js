@@ -26,10 +26,12 @@ let gridHelper = null; // 격자 객체
 let highlightedLines = []; // 강조된 격자선들 (배열)
 let gridPlane = null; // 현재 격자 평면 (교차 계산용)
 let selectedGroupData = null; // 선택된 그룹의 원본 데이터
+let selectedGroupIndex = null; // 선택된 그룹의 인덱스
 let rotationMode = 'horizontal'; // 회전 모드: 'horizontal' (좌우) 또는 'vertical' (위아래)
 let savedPolarAngle = null; // 저장된 수직 각도
 let savedAzimuthAngle = null; // 저장된 수평 각도
 let axesPreviewGroup = null; // 축 미리보기 Three.js 객체
+let pointToTracesMap = {}; // 점 → 자취 매핑: "groupIndex-pointIndex" → [자취그룹들]
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -90,13 +92,18 @@ function animate() {
 
 // 회전 자취 생성 함수
 function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues, isRelativeMode, ellipseMode, radiusX, radiusZ) {
-    if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
+    if (!selectedPoint || selectedPointIndex === null || !selectedGroupData || selectedGroupIndex === null) {
         alert('먼저 점을 선택해주세요!');
         return;
     }
 
-    // 선택된 점의 원본 좌표
-    const originalPoint = selectedGroupData.points[selectedPointIndex];
+    // 선택된 점의 원본 좌표 (값 복사)
+    const originalPointRef = selectedGroupData.points[selectedPointIndex];
+    const originalPoint = {
+        x: originalPointRef.x,
+        y: originalPointRef.y,
+        z: originalPointRef.z || 0
+    };
     
     // 모드에 따라 절대 좌표 계산
     let axisPosition;
@@ -233,6 +240,18 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
     console.log('생성된 첫 점:', tracePoints[0]);
     console.log('생성된 마지막 점:', tracePoints[tracePoints.length - 1]);
 
+    // 기존 자취 삭제 (같은 점에서 생성된 자취가 있다면)
+    const mapKey = `${selectedGroupIndex}-${selectedPointIndex}`;
+    if (pointToTracesMap[mapKey]) {
+        console.log(`기존 자취 삭제: ${pointToTracesMap[mapKey].length}개`);
+        pointToTracesMap[mapKey].forEach(oldTraceGroup => {
+            const index = currentJsonData.groups.indexOf(oldTraceGroup);
+            if (index !== -1) {
+                currentJsonData.groups.splice(index, 1);
+            }
+        });
+    }
+
     // 새 그룹 생성 (z 좌표 포함)
     const newGroup = {
         color: '#f093fb', // 분홍색으로 구분
@@ -240,7 +259,9 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
         visible: true,
         metadata: {
             type: 'rotation_trace',
-            originalPoint: originalPoint,
+            sourceGroupIndex: selectedGroupIndex,
+            sourcePointIndex: selectedPointIndex,
+            originalPoint: originalPoint,  // 값 복사본
             tStart: tStart,
             tEnd: tEnd,
             tStep: tStep
@@ -249,6 +270,10 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
 
     // JSON 데이터에 추가
     currentJsonData.groups.push(newGroup);
+    
+    // 맵에 새 자취 등록
+    pointToTracesMap[mapKey] = [newGroup];
+    console.log(`자취 맵 업데이트: ${mapKey} → 1개 자취`);
     
     // 텍스트 입력창도 업데이트 (자취가 저장되도록)
     const jsonInput = document.getElementById('jsonInput');
@@ -521,6 +546,19 @@ function deleteSelectedTrace() {
     if (groupIndex !== -1) {
         currentJsonData.groups.splice(groupIndex, 1);
         console.log(`자취 삭제 완료 (인덱스: ${groupIndex})`);
+        
+        // 맵에서도 제거
+        if (selectedGroupData.metadata?.sourceGroupIndex !== undefined && 
+            selectedGroupData.metadata?.sourcePointIndex !== undefined) {
+            const mapKey = `${selectedGroupData.metadata.sourceGroupIndex}-${selectedGroupData.metadata.sourcePointIndex}`;
+            if (pointToTracesMap[mapKey]) {
+                pointToTracesMap[mapKey] = pointToTracesMap[mapKey].filter(g => g !== selectedGroupData);
+                if (pointToTracesMap[mapKey].length === 0) {
+                    delete pointToTracesMap[mapKey];
+                }
+                console.log(`맵에서 자취 제거: ${mapKey}`);
+            }
+        }
         
         // 텍스트 입력창도 업데이트
         const jsonInput = document.getElementById('jsonInput');
@@ -831,11 +869,12 @@ function onCanvasClick(event, canvas) {
                     // 점의 인덱스 찾기
                     const pointObjects = clickedGroup.children.filter(child => child.userData.isDataPoint);
                     selectedPointIndex = pointObjects.indexOf(clickedObject);
-                    // 선택된 그룹의 원본 데이터 저장
+                    // 선택된 그룹의 원본 데이터 및 인덱스 저장
                     if (currentJsonData && currentJsonData.groups) {
-                        selectedGroupData = currentJsonData.groups[clickedGroup.userData.groupIndex];
+                        selectedGroupIndex = clickedGroup.userData.groupIndex;
+                        selectedGroupData = currentJsonData.groups[selectedGroupIndex];
                     }
-                    console.log('그룹 및 점 선택:', clickedGroup.userData.groupIndex, '점 인덱스:', selectedPointIndex);
+                    console.log('그룹 및 점 선택:', selectedGroupIndex, '점 인덱스:', selectedPointIndex);
                     
                     // 선택된 점의 좌표 표시
                     updateSelectedPointDisplay();
@@ -1428,7 +1467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             )
         ]);
         const xAxisMaterial = new THREE.LineBasicMaterial({ 
-            color: 0xff0000, 
+            color: 0xDA70D6, 
             linewidth: 3,
             transparent: true,
             opacity: 0.8
@@ -1436,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const xAxisLine = new THREE.Line(xAxisGeometry, xAxisMaterial);
         axesPreviewGroup.add(xAxisLine);
 
-        // Z축 (단축) - 파란색
+        // Z축 (단축) - 밝은 시안색
         const zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(
                 (axisPosition.x - dataCenterX) * scale,
@@ -1450,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', () => {
             )
         ]);
         const zAxisMaterial = new THREE.LineBasicMaterial({ 
-            color: 0x0000ff, 
+            color: 0x20B2AA, 
             linewidth: 3,
             transparent: true,
             opacity: 0.8
