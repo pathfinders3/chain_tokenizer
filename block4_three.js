@@ -854,10 +854,15 @@ function onCanvasClick(event, canvas) {
         if (clickedGroup) {
             // 같은 그룹을 다시 클릭하면 선택 해제
             if (selectedGroup === clickedGroup && selectedPoint === clickedObject) {
+                // JSON 데이터의 selected 속성도 업데이트
+                if (currentJsonData && currentJsonData.groups) {
+                    currentJsonData.groups.forEach(g => g.selected = false);
+                }
                 selectedGroup = null;
                 selectedPoint = null;
                 selectedPointIndex = null;
                 selectedGroupData = null;
+                selectedGroupIndex = null;
                 console.log('선택 해제');
                 updateSelectedPointDisplay();
             } else {
@@ -873,6 +878,10 @@ function onCanvasClick(event, canvas) {
                     if (currentJsonData && currentJsonData.groups) {
                         selectedGroupIndex = clickedGroup.userData.groupIndex;
                         selectedGroupData = currentJsonData.groups[selectedGroupIndex];
+                        // JSON 데이터의 selected 속성 업데이트
+                        currentJsonData.groups.forEach((g, i) => {
+                            g.selected = (i === selectedGroupIndex);
+                        });
                     }
                     console.log('그룹 및 점 선택:', selectedGroupIndex, '점 인덱스:', selectedPointIndex);
                     
@@ -882,9 +891,16 @@ function onCanvasClick(event, canvas) {
                     // 선을 클릭한 경우
                     selectedPoint = null;
                     selectedPointIndex = null;
-                    selectedGroupData = null;
+                    if (currentJsonData && currentJsonData.groups) {
+                        selectedGroupIndex = clickedGroup.userData.groupIndex;
+                        selectedGroupData = currentJsonData.groups[selectedGroupIndex];
+                        // JSON 데이터의 selected 속성 업데이트
+                        currentJsonData.groups.forEach((g, i) => {
+                            g.selected = (i === selectedGroupIndex);
+                        });
+                    }
                     updateSelectedPointDisplay();
-                    console.log('그룹 선택:', clickedGroup.userData.groupIndex);
+                    console.log('그룹 선택:', selectedGroupIndex);
                 }
             }
             updateSelection();
@@ -893,10 +909,15 @@ function onCanvasClick(event, canvas) {
     } else {
         // 빈 공간 클릭 시 선택 해제
         if (selectedGroup) {
+            // JSON 데이터의 selected 속성도 업데이트
+            if (currentJsonData && currentJsonData.groups) {
+                currentJsonData.groups.forEach(g => g.selected = false);
+            }
             selectedGroup = null;
             selectedPoint = null;
             selectedPointIndex = null;
             selectedGroupData = null;
+            selectedGroupIndex = null;
             console.log('선택 해제');
             updateSelection();
             updateNextPointDistance();
@@ -1664,9 +1685,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 정보 출력
     document.getElementById('infoBtn').addEventListener('click', () => {
         try {
-            const jsonData = JSON.parse(jsonInput.value);
-            printGroupInfo(jsonData);
-            alert('그룹 정보를 콘솔에 출력했습니다. F12를 눌러 확인하세요.');
+            // currentJsonData를 직접 사용 (선택 상태가 반영됨)
+            if (currentJsonData) {
+                printGroupInfo(currentJsonData);
+                alert('그룹 정보를 콘솔에 출력했습니다. F12를 눌러 확인하세요.');
+            } else {
+                // currentJsonData가 없으면 텍스트 필드에서 파싱
+                const jsonData = JSON.parse(jsonInput.value);
+                printGroupInfo(jsonData);
+                alert('그룹 정보를 콘솔에 출력했습니다. F12를 눌러 확인하세요.');
+            }
         } catch (err) {
             alert('JSON 파싱 오류: ' + err.message);
         }
