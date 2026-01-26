@@ -90,6 +90,60 @@ function animate() {
     updateCameraDistanceDisplay();
 }
 
+// 자취 분석 함수
+function analyzeTraces() {
+    if (!currentJsonData || !currentJsonData.groups) {
+        console.log('❌ 데이터가 없습니다.');
+        alert('먼저 데이터를 로드해주세요!');
+        return;
+    }
+
+    // 모든 자취 그룹 필터링
+    const traceGroups = currentJsonData.groups.filter(g => g.metadata?.type === 'rotation_trace');
+    
+    if (traceGroups.length === 0) {
+        console.log('❌ 자취 그룹이 없습니다.');
+        alert('자취 그룹이 없습니다!');
+        return;
+    }
+
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 타원 자취 분석 결과');
+    console.log('='.repeat(60));
+    console.log(`전체 자취 그룹 개수: ${traceGroups.length}개\n`);
+
+    traceGroups.forEach((group, index) => {
+        const pointCount = group.points ? group.points.length : 0;
+        const metadata = group.metadata || {};
+        const sourceInfo = `그룹${metadata.sourceGroupIndex}-점${metadata.sourcePointIndex}`;
+        
+        console.log(`[자취 ${index + 1}]`);
+        console.log(`  점 개수: ${pointCount}개`);
+        console.log(`  원본 위치: ${sourceInfo}`);
+        console.log(`  색상: ${group.color}`);
+        console.log(`  가시성: ${group.visible ? '표시됨' : '숨김'}`);
+        if (metadata.tStart !== undefined && metadata.tEnd !== undefined) {
+            console.log(`  t 범위: ${metadata.tStart.toFixed(2)} ~ ${metadata.tEnd.toFixed(2)} (간격: ${metadata.tStep})`);
+        }
+        console.log('');
+    });
+
+    // 통계 정보
+    const totalPoints = traceGroups.reduce((sum, g) => sum + (g.points?.length || 0), 0);
+    const avgPoints = totalPoints / traceGroups.length;
+    const minPoints = Math.min(...traceGroups.map(g => g.points?.length || 0));
+    const maxPoints = Math.max(...traceGroups.map(g => g.points?.length || 0));
+
+    console.log('='.repeat(60));
+    console.log('📈 통계');
+    console.log('='.repeat(60));
+    console.log(`총 점 개수: ${totalPoints}개`);
+    console.log(`평균 점 개수: ${avgPoints.toFixed(1)}개`);
+    console.log(`최소 점 개수: ${minPoints}개`);
+    console.log(`최대 점 개수: ${maxPoints}개`);
+    console.log('='.repeat(60) + '\n');
+}
+
 // 회전 자취 생성 함수
 function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues, isRelativeMode, ellipseMode, radiusX, radiusZ) {
     if (!selectedPoint || selectedPointIndex === null || !selectedGroupData || selectedGroupIndex === null) {
@@ -1298,6 +1352,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 강조된 격자선 모두 지우기 버튼
     document.getElementById('clearHighlightedLinesBtn').addEventListener('click', () => {
         clearAllHighlightedLines();
+    });
+
+    // 자취 분석 버튼
+    document.getElementById('analyzeTracesBtn').addEventListener('click', () => {
+        analyzeTraces();
     });
 
     // Textarea 토글
