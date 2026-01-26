@@ -1602,11 +1602,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Textarea 토글
     document.getElementById('toggleTextareaBtn').addEventListener('click', () => {
         const textarea = document.getElementById('jsonInput');
-        if (textarea.style.display === 'none') {
-            textarea.style.display = 'block';
-        } else {
-            textarea.style.display = 'none';
-        }
+        const isNowOn = textarea.style.display === 'none' ? true : false;
+        textarea.style.display = isNowOn ? 'block' : 'none';
+        setToggleButtonState('toggleTextareaBtn', isNowOn);
+    });
+
+    // 뷰 설정 토글
+    document.getElementById('toggleViewControlsBtn').addEventListener('click', () => {
+        const viewControls = document.getElementById('viewControls');
+        const isNowOn = viewControls.style.display === 'none' ? true : false;
+        viewControls.style.display = isNowOn ? 'flex' : 'none';
+        setToggleButtonState('toggleViewControlsBtn', isNowOn);
+    });
+
+    // 격자 설정 토글
+    document.getElementById('toggleGridControlsBtn').addEventListener('click', () => {
+        const gridControls = document.getElementById('gridControls');
+        const isNowOn = gridControls.style.display === 'none' ? true : false;
+        gridControls.style.display = isNowOn ? 'flex' : 'none';
+        setToggleButtonState('toggleGridControlsBtn', isNowOn);
     });
 
     // 좌표 모드 변경 시 레이블 업데이트
@@ -2033,3 +2047,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// 초기 버튼 상태 설정 (뷰 ON, 격자 OFF, 입력창 OFF)
+window.addEventListener('DOMContentLoaded', () => {
+    setToggleButtonState('toggleViewControlsBtn', true);
+    setToggleButtonState('toggleGridControlsBtn', false);
+    setToggleButtonState('toggleTextareaBtn', false);
+});
+
+function setToggleButtonState(btnId, isOn) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.style.background = isOn ? '#3F4E7D' : '#2a2a2a';
+}
