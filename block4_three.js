@@ -249,6 +249,52 @@ function deleteAllMeshes() {
     document.getElementById('deleteMeshBtn').style.display = 'none';
 }
 
+// 선택된 그룹 이동 함수
+function moveSelectedGroup(dx, dy, dz) {
+    if (!selectedGroupData || selectedGroupIndex === null) {
+        alert('먼저 그룹을 선택해주세요!');
+        return;
+    }
+
+    if (!selectedGroupData.points || selectedGroupData.points.length === 0) {
+        alert('선택된 그룹에 점이 없습니다!');
+        return;
+    }
+
+    // 모든 점의 좌표 이동
+    selectedGroupData.points.forEach(point => {
+        point.x += dx;
+        point.y += dy;
+        if (dz !== 0) {
+            point.z = (point.z || 0) + dz;
+        }
+    });
+
+    console.log(`그룹 ${selectedGroupIndex + 1} 이동: dx=${dx}, dy=${dy}, dz=${dz}`);
+
+    // JSON 입력창 업데이트
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
+
+    // 화면 다시 그리기
+    const canvas = document.getElementById('canvas');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const pointSizeSlider = document.getElementById('pointSizeSlider');
+    const lineWidthSlider = document.getElementById('lineWidthSlider');
+    const showPointsCheck = document.getElementById('showPointsCheck');
+    const showLinesCheck = document.getElementById('showLinesCheck');
+    
+    renderSavedGroups(currentJsonData, canvas, {
+        scalePercent: parseInt(scaleSlider.value),
+        pointSize: parseInt(pointSizeSlider.value),
+        lineWidth: parseInt(lineWidthSlider.value),
+        showPoints: showPointsCheck.checked,
+        showLines: showLinesCheck.checked
+    });
+}
+
 // 자취 분석 함수
 function analyzeTraces() {
     if (!currentJsonData || !currentJsonData.groups) {
@@ -1526,6 +1572,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // 메쉬 삭제 버튼
     document.getElementById('deleteMeshBtn').addEventListener('click', () => {
         deleteAllMeshes();
+    });
+
+    // 그룹 이동 버튼들
+    document.getElementById('moveXPlusBtn').addEventListener('click', () => {
+        moveSelectedGroup(100, 0, 0);
+    });
+
+    document.getElementById('moveXMinusBtn').addEventListener('click', () => {
+        moveSelectedGroup(-100, 0, 0);
+    });
+
+    document.getElementById('moveYPlusBtn').addEventListener('click', () => {
+        moveSelectedGroup(0, 100, 0);
+    });
+
+    document.getElementById('moveYMinusBtn').addEventListener('click', () => {
+        moveSelectedGroup(0, -100, 0);
+    });
+
+    document.getElementById('moveZPlusBtn').addEventListener('click', () => {
+        moveSelectedGroup(0, 0, 100);
+    });
+
+    document.getElementById('moveZMinusBtn').addEventListener('click', () => {
+        moveSelectedGroup(0, 0, -100);
     });
 
     // Textarea 토글
