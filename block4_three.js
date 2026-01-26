@@ -32,6 +32,7 @@ let savedPolarAngle = null; // 저장된 수직 각도
 let savedAzimuthAngle = null; // 저장된 수평 각도
 let axesPreviewGroup = null; // 축 미리보기 Three.js 객체
 let pointToTracesMap = {}; // 점 → 자취 매핑: "groupIndex-pointIndex" → [자취그룹들]
+let traceMeshes = []; // 자취로 생성된 3D 메쉬들
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -88,6 +89,164 @@ function animate() {
     
     // 카메라 거리 UI 업데이트
     updateCameraDistanceDisplay();
+}
+
+// 자취로부터 3D 메쉬 생성 함수
+function createMeshFromTraces() {
+    if (!currentJsonData || !currentJsonData.groups) {
+        console.log('❌ 데이터가 없습니다.');
+        alert('먼저 데이터를 로드해주세요!');
+        return;
+    }
+
+    // 모든 자취 그룹 필터링 및 정렬
+    const traceGroups = currentJsonData.groups.filter(g => g.metadata?.type === 'rotation_trace');
+    
+    if (traceGroups.length < 2) {
+        alert('메쉬를 생성하려면 최소 2개 이상의 자취 그룹이 필요합니다!');
+        return;
+    }
+
+    // 점 개수 확인
+    const pointCount = traceGroups[0].points.length;
+    const allSameCount = traceGroups.every(g => g.points.length === pointCount);
+    
+    if (!allSameCount) {
+        alert('모든 자취 그룹의 점 개수가 동일해야 합니다!\n\n각 그룹의 점 개수를 "자취 분석" 버튼으로 확인해주세요.');
+        return;
+    }
+
+    console.log('\n' + '='.repeat(60));
+    console.log('🎭 메쉬 생성 시작');
+    console.log('='.repeat(60));
+    console.log(`자취 그룹 개수: ${traceGroups.length}개`);
+    console.log(`각 그룹 점 개수: ${pointCount}개`);
+    console.log(`생성될 면 개수: ${(traceGroups.length - 1) * (pointCount - 1) * 2}개 (삼각형)`);
+
+    // 데이터 중심 및 스케일 계산 (렌더링과 동일하게)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    currentJsonData.groups.forEach(group => {
+        if (group.points) {
+            group.points.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+        }
+    });
+    const dataCenter = {
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2
+    };
+    const scalePercent = parseInt(document.getElementById('scaleSlider').value);
+    const scale = scalePercent / 100;
+    
+    console.log(`데이터 중심: (${dataCenter.x.toFixed(1)}, ${dataCenter.y.toFixed(1)}), 스케일: ${scale}`);
+
+    // 인접한 자취 쌍마다 메쉬 생성
+    for (let groupIdx = 0; groupIdx < traceGroups.length - 1; groupIdx++) {
+        const group1 = traceGroups[groupIdx];
+        const group2 = traceGroups[groupIdx + 1];
+        
+        createMeshBetweenTraces(group1, group2, groupIdx, dataCenter, scale);
+    }
+
+    console.log('✅ 메쉬 생성 완료!');
+    console.log('='.repeat(60) + '\n');
+
+    // 버튼 상태 변경
+    document.getElementById('createMeshBtn').style.display = 'none';
+    document.getElementById('deleteMeshBtn').style.display = 'inline-block';
+}
+
+// 두 자취 그룹 사이에 메쉬 생성
+function createMeshBetweenTraces(group1, group2, pairIndex, dataCenter, scale) {
+    const points1 = group1.points;
+    const points2 = group2.points;
+    const n = points1.length;
+
+    // 정점 배열 생성 (스케일과 중심 이동 적용)
+    const vertices = [];
+    
+    // group1의 모든 점 추가
+    points1.forEach(p => {
+        vertices.push(
+            (p.x - dataCenter.x) * scale,
+            (p.y - dataCenter.y) * scale,
+            (p.z || 0) * scale
+        );
+    });
+    
+    // group2의 모든 점 추가
+    points2.forEach(p => {
+        vertices.push(
+            (p.x - dataCenter.x) * scale,
+            (p.y - dataCenter.y) * scale,
+            (p.z || 0) * scale
+        );
+    });
+
+    // 인덱스 배열 생성 (삼각형)
+    const indices = [];
+    
+    for (let i = 0; i < n - 1; i++) {
+        // 사각형을 2개의 삼각형으로 분할
+        // 삼각형 1: [i, i+1, n+i]
+        indices.push(i, i + 1, n + i);
+        
+        // 삼각형 2: [i+1, n+i+1, n+i]
+        indices.push(i + 1, n + i + 1, n + i);
+    }
+
+    // BufferGeometry 생성
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals(); // 조명 효과를 위한 법선 벡터 계산
+
+    // Material 생성
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xff6b6b, // 더 선명한 빨간색
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8,
+        flatShading: false,
+        wireframe: false
+    });
+
+    // Mesh 생성
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    
+    // 메쉬 저장
+    traceMeshes.push(mesh);
+
+    // 바운딩 박스 계산 및 디버깅 정보
+    geometry.computeBoundingBox();
+    const bbox = geometry.boundingBox;
+    
+    console.log(`  메쉬 ${pairIndex + 1} 생성: ${n}개 점, ${indices.length / 3}개 삼각형`);
+    console.log(`    첫 점1: (${points1[0].x}, ${points1[0].y}, ${points1[0].z || 0})`);
+    console.log(`    첫 점2: (${points2[0].x}, ${points2[0].y}, ${points2[0].z || 0})`);
+    console.log(`    바운딩 박스: min(${bbox.min.x.toFixed(1)}, ${bbox.min.y.toFixed(1)}, ${bbox.min.z.toFixed(1)}) ~ max(${bbox.max.x.toFixed(1)}, ${bbox.max.y.toFixed(1)}, ${bbox.max.z.toFixed(1)})`);
+}
+
+// 생성된 메쉬 모두 삭제
+function deleteAllMeshes() {
+    traceMeshes.forEach(mesh => {
+        scene.remove(mesh);
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+    });
+    
+    traceMeshes = [];
+    
+    console.log('✅ 모든 메쉬가 삭제되었습니다.');
+    
+    // 버튼 상태 변경
+    document.getElementById('createMeshBtn').style.display = 'inline-block';
+    document.getElementById('deleteMeshBtn').style.display = 'none';
 }
 
 // 자취 분석 함수
@@ -1357,6 +1516,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 자취 분석 버튼
     document.getElementById('analyzeTracesBtn').addEventListener('click', () => {
         analyzeTraces();
+    });
+
+    // 메쉬 생성 버튼
+    document.getElementById('createMeshBtn').addEventListener('click', () => {
+        createMeshFromTraces();
+    });
+
+    // 메쉬 삭제 버튼
+    document.getElementById('deleteMeshBtn').addEventListener('click', () => {
+        deleteAllMeshes();
     });
 
     // Textarea 토글
