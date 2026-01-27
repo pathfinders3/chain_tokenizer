@@ -144,12 +144,38 @@ function createMeshFromTraces() {
     
     console.log(`데이터 중심: (${dataCenter.x.toFixed(1)}, ${dataCenter.y.toFixed(1)}), 스케일: ${scale}`);
 
+
+    // 순환 연결 여부 판단 (t 구간이 2pi와 충분히 가까운지)
+    let isCyclic = false;
+    let tStep = null;
+    if (traceGroups.length > 1) {
+        const meta1 = traceGroups[0].metadata || {};
+        const meta2 = traceGroups[traceGroups.length - 1].metadata || {};
+        if (meta1.tStart !== undefined && meta1.tEnd !== undefined && meta1.tStep !== undefined) {
+            tStep = meta1.tStep;
+            const tRange = Math.abs(meta1.tEnd - meta1.tStart);
+            const diff = Math.abs(tRange - 2 * Math.PI);
+            if (diff <= tStep) {
+                isCyclic = true;
+            } else {
+                console.log(`⚠️ t 구간이 2π와 충분히 가깝지 않습니다. (차이: ${diff.toFixed(3)})`);
+                if (diff > tStep) {
+                    alert(`t 구간이 2π와 간격(${tStep})보다 큽니다. (차이: ${diff.toFixed(3)})`);
+                }
+            }
+        }
+    }
+
     // 인접한 자취 쌍마다 메쉬 생성
     for (let groupIdx = 0; groupIdx < traceGroups.length - 1; groupIdx++) {
         const group1 = traceGroups[groupIdx];
         const group2 = traceGroups[groupIdx + 1];
-        
         createMeshBetweenTraces(group1, group2, groupIdx, dataCenter, scale);
+    }
+    // 순환 연결: 마지막과 첫번째 자취도 연결
+    if (isCyclic) {
+        createMeshBetweenTraces(traceGroups[traceGroups.length - 1], traceGroups[0], traceGroups.length - 1, dataCenter, scale, true);
+        console.log('🔄 마지막-처음 자취 순환 연결!');
     }
 
     console.log('✅ 메쉬 생성 완료!');
@@ -161,7 +187,7 @@ function createMeshFromTraces() {
 }
 
 // 두 자취 그룹 사이에 메쉬 생성
-function createMeshBetweenTraces(group1, group2, pairIndex, dataCenter, scale) {
+function createMeshBetweenTraces(group1, group2, pairIndex, dataCenter, scale, isCyclicEdge = false) {
     const points1 = group1.points;
     const points2 = group2.points;
     const n = points1.length;
@@ -190,13 +216,21 @@ function createMeshBetweenTraces(group1, group2, pairIndex, dataCenter, scale) {
     // 인덱스 배열 생성 (삼각형)
     const indices = [];
     
+
+    // 일반 연결
     for (let i = 0; i < n - 1; i++) {
         // 사각형을 2개의 삼각형으로 분할
         // 삼각형 1: [i, i+1, n+i]
         indices.push(i, i + 1, n + i);
-        
         // 삼각형 2: [i+1, n+i+1, n+i]
         indices.push(i + 1, n + i + 1, n + i);
+    }
+    // 순환 연결(마지막-처음)
+    if (isCyclicEdge) {
+        // 삼각형 1: [n-1, 0, n+(n-1)]
+        indices.push(n - 1, 0, n + (n - 1));
+        // 삼각형 2: [0, n, n+(n-1)]
+        indices.push(0, n, n + (n - 1));
     }
 
     // BufferGeometry 생성
