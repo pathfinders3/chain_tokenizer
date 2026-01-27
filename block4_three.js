@@ -1798,23 +1798,62 @@ document.addEventListener('DOMContentLoaded', () => {
         // 기존 미리보기 제거
         clearAxesPreview();
 
-        // 축 위치 계산
+        // 축 위치 계산: 선택된 점을 장축의 한 끝점으로 보고, 사용자가 선택한 끝점(A/B)에 따라 중심을 계산합니다.
         const originalPoint = selectedGroupData.points[selectedPointIndex];
-        const isRelative = document.getElementById('relativeModeRadio').checked;
-        const axisX = parseFloat(document.getElementById('axisXInput').value) || 0;
-        const axisY = parseFloat(document.getElementById('axisYInput').value) || 0;
-        const axisZ = parseFloat(document.getElementById('axisZInput').value) || 0;
-
+        // radiusX, radiusZ는 위에서 이미 가져왔습니다.
+        const endpointChoice = document.querySelector('input[name="ellipseEndpoint"]:checked').value; // 'A' 또는 'B'
         let axisPosition;
-        if (isRelative) {
-            axisPosition = {
-                x: (originalPoint.x || 0) + axisX,
-                y: (originalPoint.y || 0) + axisY,
-                z: (originalPoint.z || 0) + axisZ
-            };
+        let otherEndpoint = null;
+        if (radiusX >= radiusZ) {
+            // 장축이 X 방향
+            if (endpointChoice === 'A') {
+                axisPosition = {
+                    x: (originalPoint.x || 0) - radiusX,
+                    y: originalPoint.y || 0,
+                    z: originalPoint.z || 0
+                };
+                otherEndpoint = { x: axisPosition.x + radiusX * 2, y: axisPosition.y, z: axisPosition.z };
+            } else {
+                axisPosition = {
+                    x: (originalPoint.x || 0) + radiusX,
+                    y: originalPoint.y || 0,
+                    z: originalPoint.z || 0
+                };
+                otherEndpoint = { x: axisPosition.x - radiusX * 2, y: axisPosition.y, z: axisPosition.z };
+            }
         } else {
-            axisPosition = { x: axisX, y: axisY, z: axisZ };
+            // 장축이 Z 방향
+            if (endpointChoice === 'A') {
+                axisPosition = {
+                    x: originalPoint.x || 0,
+                    y: originalPoint.y || 0,
+                    z: (originalPoint.z || 0) - radiusZ
+                };
+                otherEndpoint = { x: axisPosition.x, y: axisPosition.y, z: axisPosition.z + radiusZ * 2 };
+            } else {
+                axisPosition = {
+                    x: originalPoint.x || 0,
+                    y: originalPoint.y || 0,
+                    z: (originalPoint.z || 0) + radiusZ
+                };
+                otherEndpoint = { x: axisPosition.x, y: axisPosition.y, z: axisPosition.z - radiusZ * 2 };
+            }
         }
+
+        // 선택된 점(장축 끝점)을 시각적으로 표시 (파란색)
+        const endpointGeometry = new THREE.SphereGeometry(3, 12, 12);
+        const endpointMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, opacity: 0.95 });
+        const endpointSphere = new THREE.Mesh(endpointGeometry, endpointMaterial);
+
+        // 다른 끝점(회색)도 시각적으로 표시
+        const otherGeometry = new THREE.SphereGeometry(3, 12, 12);
+        const otherMaterial = new THREE.MeshBasicMaterial({ color: 0x999999, transparent: true, opacity: 0.9 });
+        const otherSphere = new THREE.Mesh(otherGeometry, otherMaterial);
+        // 위치는 데이터 중심과 스케일 계산 이후에 설정됩니다.
+        // endpointSphere, otherSphere는 axesPreviewGroup에 추가됩니다 (아래에서 그룹에 추가)
+        
+        // 디버그 로그에 중심과 끝점 정보 출력
+        console.log('축 미리보기: center', axisPosition, 'endpoint', originalPoint);
 
         // 데이터 중심 계산
         const groups = currentJsonData.groups;
@@ -1896,6 +1935,22 @@ document.addEventListener('DOMContentLoaded', () => {
             (axisPosition.z || 0) * scale
         );
         axesPreviewGroup.add(centerSphere);
+        // 선택된 점(장축 끝점) 위치 설정 및 추가
+        endpointSphere.position.set(
+            (originalPoint.x - dataCenterX) * scale,
+            (originalPoint.y - dataCenterY) * scale,
+            ((originalPoint.z || 0) - 0) * scale
+        );
+        axesPreviewGroup.add(endpointSphere);
+        // 다른 끝점 위치 설정 및 추가
+        if (otherEndpoint) {
+            otherSphere.position.set(
+                (otherEndpoint.x - dataCenterX) * scale,
+                (otherEndpoint.y - dataCenterY) * scale,
+                ((otherEndpoint.z || 0) - 0) * scale
+            );
+            axesPreviewGroup.add(otherSphere);
+        }
 
         scene.add(axesPreviewGroup);
 

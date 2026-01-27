@@ -123,6 +123,15 @@
             <span id="minorAxisValue" style="font-size: 12px; color: #ffd93d; font-weight: bold;">5.0</span>
             <button id="previewAxesBtn" title="타원의 장축과 단축을 직선으로 미리보기" style="padding: 5px 10px; font-size: 12px; background: #667eea; margin-left: 15px;">👁️ 축 미리보기</button>
             <button id="clearPreviewBtn" title="축 미리보기 제거" style="padding: 5px 10px; font-size: 12px; background: #ff4757; display: none;">❌ 미리보기 제거</button>
+            
+            <!-- 장축 끝점 선택 라디오 추가 -->
+            <div style="display: inline-block; margin-left: 15px; color: #b0b0b0;">
+                <label style="font-size: 12px; color: #ffd93d; margin-right: 8px;">장축 끝점:</label>
+                <input type="radio" id="ellipseEndpointA" name="ellipseEndpoint" value="A" checked>
+                <label for="ellipseEndpointA" style="font-size: 12px; color: #b0b0b0; margin-right: 6px;">끝점 A</label>
+                <input type="radio" id="ellipseEndpointB" name="ellipseEndpoint" value="B">
+                <label for="ellipseEndpointB" style="font-size: 12px; color: #b0b0b0;">끝점 B</label>
+            </div>
         </div>
 
         <div class="controls">
