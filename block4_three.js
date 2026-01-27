@@ -33,6 +33,10 @@ let savedAzimuthAngle = null; // 저장된 수평 각도
 let axesPreviewGroup = null; // 축 미리보기 Three.js 객체
 let pointToTracesMap = {}; // 점 → 자취 매핑: "groupIndex-pointIndex" → [자취그룹들]
 let traceMeshes = []; // 자취로 생성된 3D 메쉬들
+let isSettingMajorAxis = false; // 장축 설정 모드 활성화 여부
+let majorAxisFirstPoint = null; // 장축 설정 시 첫 번째 점
+let majorAxisSecondPointMarker = null; // 두 번째 점 마커 (시각적 표시)
+let majorAxisFirstPointMarker = null; // 첫 번째 점 마커 (시각적 표시)
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -1144,6 +1148,12 @@ function onCanvasClick(event, canvas) {
     // Raycaster로 광선 쏘기
     raycaster.setFromCamera(mouse, camera);
 
+    // 장축 설정 모드가 활성화된 경우
+    if (isSettingMajorAxis) {
+        handleMajorAxisSecondPointClick();
+        return;
+    }
+
     // 모든 그룹의 자식 객체들과 교차 검사 (테두리는 제외)
     const allObjects = [];
     groupObjects.forEach(group => {
@@ -1775,6 +1785,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('minorAxisValue').textContent = minorAxis.toFixed(1);
     }
 
+    // 마우스로 장축 설정 버튼
+    document.getElementById('setMajorAxisByMouseBtn').addEventListener('click', () => {
+        startMajorAxisSettingMode();
+    });
+
+    // ESC 키로 장축 설정 모드 취소
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && isSettingMajorAxis) {
+            cancelMajorAxisSettingMode();
+        }
+    });
+
     // 축 미리보기 생성 함수
     function createAxesPreview() {
         if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
@@ -1985,6 +2007,16 @@ document.addEventListener('DOMContentLoaded', () => {
             axesPreviewGroup = null;
         }
 
+        // 장축 설정 마커들도 함께 제거
+        if (majorAxisFirstPointMarker) {
+            scene.remove(majorAxisFirstPointMarker);
+            majorAxisFirstPointMarker = null;
+        }
+        if (majorAxisSecondPointMarker) {
+            scene.remove(majorAxisSecondPointMarker);
+            majorAxisSecondPointMarker = null;
+        }
+
         // 버튼 상태 복원
         document.getElementById('previewAxesBtn').style.display = 'inline-block';
         document.getElementById('clearPreviewBtn').style.display = 'none';
@@ -2143,6 +2175,236 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// ============================================================
+// 장축 설정 모드 관련 함수들
+// ============================================================
+
+// 장축 설정 모드 시작
+function startMajorAxisSettingMode() {
+    if (!selectedPoint || selectedPointIndex === null || !selectedGroupData) {
+        alert('먼저 점을 선택해주세요!');
+        return;
+    }
+
+    const ellipseMode = document.getElementById('ellipseModeCheck').checked;
+    if (!ellipseMode) {
+        alert('타원 모드를 먼저 활성화해주세요!');
+        return;
+    }
+
+    // 첫 번째 점 저장 (선택된 점)
+    majorAxisFirstPoint = {
+        x: selectedGroupData.points[selectedPointIndex].x || 0,
+        y: selectedGroupData.points[selectedPointIndex].y || 0,
+        z: selectedGroupData.points[selectedPointIndex].z || 0
+    };
+
+    isSettingMajorAxis = true;
+
+    // 첫 번째 점을 시각적으로 마킹
+    visualizeFirstPoint();
+
+    // 버튼 스타일 변경 (활성화 상태)
+    const btn = document.getElementById('setMajorAxisByMouseBtn');
+    btn.style.background = 'linear-gradient(135deg, #00ff88 0%, #00cc66 100%)';
+    btn.textContent = '🎯 XY 평면에서 두 번째 점을 클릭하세요...';
+    
+    console.log('장축 설정 모드 시작. 첫 번째 점:', majorAxisFirstPoint);
+    console.log('XY 평면에서 두 번째 점을 클릭하세요. (ESC로 취소)');
+}
+
+// 장축 설정 모드 취소
+function cancelMajorAxisSettingMode() {
+    isSettingMajorAxis = false;
+    majorAxisFirstPoint = null;
+
+    // 첫 번째 점 마커 제거
+    if (majorAxisFirstPointMarker) {
+        scene.remove(majorAxisFirstPointMarker);
+        majorAxisFirstPointMarker = null;
+    }
+
+    // 두 번째 점 마커 제거
+    if (majorAxisSecondPointMarker) {
+        scene.remove(majorAxisSecondPointMarker);
+        majorAxisSecondPointMarker = null;
+    }
+
+    // 버튼 스타일 복원
+    const btn = document.getElementById('setMajorAxisByMouseBtn');
+    btn.style.background = '#667eea';
+    btn.textContent = '📏 마우스로 장축 설정';
+    
+    console.log('장축 설정 모드 취소됨');
+}
+
+// 두 번째 점 클릭 처리
+function handleMajorAxisSecondPointClick() {
+    if (!majorAxisFirstPoint) {
+        console.error('첫 번째 점이 설정되지 않았습니다.');
+        cancelMajorAxisSettingMode();
+        return;
+    }
+
+    // XY 평면 (Z = majorAxisFirstPoint.z) 생성
+    const planeZ = majorAxisFirstPoint.z;
+    const xyPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -planeZ);
+
+    // Raycaster와 평면의 교차점 계산
+    const intersectionPoint = new THREE.Vector3();
+    const ray = raycaster.ray;
+    const hasIntersection = ray.intersectPlane(xyPlane, intersectionPoint);
+
+    if (!hasIntersection) {
+        alert('XY 평면과 교차하지 않습니다. 다시 시도하세요.');
+        return;
+    }
+
+    // Three.js 좌표를 원본 데이터 좌표로 변환
+    const scalePercent = parseInt(document.getElementById('scaleSlider').value);
+    const scale = scalePercent / 100;
+
+    // 데이터 중심 계산 (현재 데이터 기준)
+    const groups = currentJsonData.groups;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    groups.forEach(group => {
+        if (group.visible !== false && group.points && group.points.length > 0) {
+            group.points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                minY = Math.min(minY, point.y);
+                maxX = Math.max(maxX, point.x);
+                maxY = Math.max(maxY, point.y);
+            });
+        }
+    });
+    const dataCenterX = (minX + maxX) / 2;
+    const dataCenterY = (minY + maxY) / 2;
+
+    // 역변환: Three.js 좌표 → 원본 데이터 좌표
+    const secondPoint = {
+        x: intersectionPoint.x / scale + dataCenterX,
+        y: intersectionPoint.y / scale + dataCenterY,
+        z: planeZ
+    };
+
+    // 두 점 사이 거리 계산 (XY 평면에서)
+    const dx = secondPoint.x - majorAxisFirstPoint.x;
+    const dy = secondPoint.y - majorAxisFirstPoint.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    console.log('두 번째 점:', secondPoint);
+    console.log('두 점 사이 거리 (장축 전체 길이):', distance.toFixed(3));
+    
+    // 반지름 = 거리 / 2
+    const radius = distance / 2;
+    console.log('반지름 (입력값):', radius.toFixed(3));
+
+    // 반지름을 입력 필드에 설정
+    // 장축이 X 방향인지 Y 방향인지 판단 (dx와 dy 비교)
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    
+    if (absX >= absY) {
+        // X 방향이 주축
+        document.getElementById('ellipseRadiusXInput').value = radius.toFixed(1);
+    } else {
+        // Y 방향이 주축 (하지만 타원은 XZ 평면이므로 Z로 설정)
+        document.getElementById('ellipseRadiusZInput').value = radius.toFixed(1);
+    }
+
+    // 타원 표시 업데이트
+    const radiusX = parseFloat(document.getElementById('ellipseRadiusXInput').value) || 0;
+    const radiusZ = parseFloat(document.getElementById('ellipseRadiusZInput').value) || 0;
+    const majorAxis = Math.max(radiusX, radiusZ);
+    const minorAxis = Math.min(radiusX, radiusZ);
+    document.getElementById('majorAxisValue').textContent = majorAxis.toFixed(1);
+    document.getElementById('minorAxisValue').textContent = minorAxis.toFixed(1);
+
+    // 두 번째 점 마커 시각화 (선택 사항)
+    visualizeSecondPoint(intersectionPoint);
+
+    // 성공 메시지
+    alert(`장축 반지름이 ${radius.toFixed(1)}로 설정되었습니다!\n(두 점 사이 거리: ${distance.toFixed(1)})`);
+
+    // 모드 종료 (마커는 유지하고 모드 상태만 해제)
+    isSettingMajorAxis = false;
+    majorAxisFirstPoint = null;
+    
+    // 버튼 스타일 복원
+    const btn = document.getElementById('setMajorAxisByMouseBtn');
+    btn.style.background = '#667eea';
+    btn.textContent = '📏 마우스로 장축 설정';
+}
+
+// 첫 번째 점 시각화 (파란색 마커)
+function visualizeFirstPoint() {
+    // 기존 마커 제거
+    if (majorAxisFirstPointMarker) {
+        scene.remove(majorAxisFirstPointMarker);
+    }
+
+    // 데이터 중심 계산 (현재 데이터 기준)
+    const groups = currentJsonData.groups;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    groups.forEach(group => {
+        if (group.visible !== false && group.points && group.points.length > 0) {
+            group.points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                minY = Math.min(minY, point.y);
+                maxX = Math.max(maxX, point.x);
+                maxY = Math.max(maxY, point.y);
+            });
+        }
+    });
+    const dataCenterX = (minX + maxX) / 2;
+    const dataCenterY = (minY + maxY) / 2;
+
+    const scalePercent = parseInt(document.getElementById('scaleSlider').value);
+    const scale = scalePercent / 100;
+
+    // Three.js 좌표로 변환
+    const position = new THREE.Vector3(
+        (majorAxisFirstPoint.x - dataCenterX) * scale,
+        (majorAxisFirstPoint.y - dataCenterY) * scale,
+        majorAxisFirstPoint.z * scale
+    );
+
+    // 파란색 구체 생성 (크기를 좀 더 크게)
+    const geometry = new THREE.SphereGeometry(5, 16, 16);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0x0088ff, 
+        transparent: true, 
+        opacity: 0.9 
+    });
+    majorAxisFirstPointMarker = new THREE.Mesh(geometry, material);
+    majorAxisFirstPointMarker.position.copy(position);
+    scene.add(majorAxisFirstPointMarker);
+
+    console.log('첫 번째 점 마커 표시됨 (파란색)');
+}
+
+// 두 번째 점 시각화 (임시 마커)
+function visualizeSecondPoint(position) {
+    // 기존 마커 제거
+    if (majorAxisSecondPointMarker) {
+        scene.remove(majorAxisSecondPointMarker);
+    }
+
+    // 초록색 구체 생성
+    const geometry = new THREE.SphereGeometry(5, 16, 16);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0x00ff00, 
+        transparent: true, 
+        opacity: 0.9 
+    });
+    majorAxisSecondPointMarker = new THREE.Mesh(geometry, material);
+    majorAxisSecondPointMarker.position.copy(position);
+    scene.add(majorAxisSecondPointMarker);
+
+    console.log('두 번째 점 마커 표시됨 (초록색)');
+    // 마커는 clearAxesPreview()를 통해서만 제거됨 (자동 제거 안 함)
+}
 
 // 초기 버튼 상태 설정 (뷰 ON, 격자 OFF, 입력창 OFF)
 window.addEventListener('DOMContentLoaded', () => {
