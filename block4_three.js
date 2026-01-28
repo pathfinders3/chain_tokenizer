@@ -27,6 +27,10 @@ let highlightedLines = []; // 강조된 격자선들 (배열)
 let gridPlane = null; // 현재 격자 평면 (교차 계산용)
 let selectedGroupData = null; // 선택된 그룹의 원본 데이터
 let selectedGroupIndex = null; // 선택된 그룹의 인덱스
+// 두 번째 선택 지원 (Ctrl+클릭 시 추가 선택)
+let secondSelectedGroup = null;
+let secondSelectedGroupData = null;
+let secondSelectedGroupIndex = null;
 let rotationMode = 'vertical'; // 회전 모드: 'horizontal' (좌우) 또는 'vertical' (위아래)
 let savedPolarAngle = null; // 저장된 수직 각도
 let savedAzimuthAngle = null; // 저장된 수평 각도
@@ -37,6 +41,10 @@ let isSettingMajorAxis = false; // 장축 설정 모드 활성화 여부
 let majorAxisFirstPoint = null; // 장축 설정 시 첫 번째 점
 let majorAxisSecondPointMarker = null; // 두 번째 점 마커 (시각적 표시)
 let majorAxisFirstPointMarker = null; // 첫 번째 점 마커 (시각적 표시)
+// Undo/Redo 스택
+let undoStack = []; // 이전 상태들
+let redoStack = []; // 재실행 상태들
+const MAX_UNDO_STEPS = 50; // 최대 undo 단계
 
 function initThreeJS(canvas) {
     // Scene 생성
@@ -93,6 +101,120 @@ function animate() {
     
     // 카메라 거리 UI 업데이트
     updateCameraDistanceDisplay();
+}
+
+// 두 선택된 그룹에서 대응 점 쌍을 장축으로 하는 타원들 생성
+function createEllipsesFromTwoGroups() {
+    // 두 그룹이 선택되어 있는지 확인
+    if (!selectedGroupData || !secondSelectedGroupData || 
+        selectedGroupIndex === null || secondSelectedGroupIndex === null) {
+        alert('Ctrl+클릭으로 2개의 그룹을 선택해주세요!');
+        return;
+    }
+
+    const groupA = selectedGroupData;
+    const groupB = secondSelectedGroupData;
+
+    // 점 개수가 같은지 확인
+    if (!groupA.points || !groupB.points || groupA.points.length !== groupB.points.length) {
+        alert(`두 그룹의 점 개수가 달라 타원을 생성할 수 없습니다!\n그룹 ${selectedGroupIndex + 1}: ${groupA.points?.length || 0}개\n그룹 ${secondSelectedGroupIndex + 1}: ${groupB.points?.length || 0}개`);
+        return;
+    }
+
+    const pointCount = groupA.points.length;
+    
+    // 타원 파라미터 입력받기
+    const tStart = parseFloat(document.getElementById('tStartInput').value);
+    const tEnd = parseFloat(document.getElementById('tEndInput').value);
+    const tStep = parseFloat(document.getElementById('tStepInput').value);
+
+    if (isNaN(tStart) || isNaN(tEnd) || isNaN(tStep) || tStep <= 0) {
+        alert('올바른 t 범위와 간격을 입력해주세요!');
+        return;
+    }
+
+    console.log(`\n🎯 쌍타원 생성 시작`);
+    console.log(`그룹 A: ${selectedGroupIndex + 1}, 그룹 B: ${secondSelectedGroupIndex + 1}`);
+    console.log(`점 개수: ${pointCount}개`);
+    console.log(`t 범위: ${tStart} ~ ${tEnd}, 간격: ${tStep}`);
+
+    // Undo를 위해 현재 상태 저장
+    saveStateToUndo();
+
+    let createdCount = 0;
+
+    // 각 대응 점 쌍에 대해 타원 생성
+    for (let i = 0; i < pointCount; i++) {
+        const pointA = groupA.points[i];
+        const pointB = groupB.points[i];
+
+        // 두 점 사이의 중점 계산 (타원의 중심)
+        const centerX = ((pointA.x || 0) + (pointB.x || 0)) / 2;
+        const centerY = ((pointA.y || 0) + (pointB.y || 0)) / 2;
+        const centerZ = ((pointA.z || 0) + (pointB.z || 0)) / 2;
+
+        // 장축 반지름 계산 (두 점 사이 거리의 절반)
+        const dx = (pointB.x || 0) - (pointA.x || 0);
+        const dy = (pointB.y || 0) - (pointA.y || 0);
+        const dz = (pointB.z || 0) - (pointA.z || 0);
+        const majorRadius = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2;
+
+        // XZ 평면에서의 거리만 사용 (Y축 회전 타원)
+        const dxz = Math.sqrt(dx * dx + dz * dz) / 2;
+
+        // 단축 반지름 설정 (기본값 또는 사용자 입력)
+        const minorRadiusInput = parseFloat(document.getElementById('ellipseRadiusZInput').value) || (dxz * 0.5);
+        const minorRadius = Math.min(minorRadiusInput, dxz); // 단축은 장축보다 작아야 함
+
+        // XZ 평면에서의 장축 방향 각도 계산
+        const angle = Math.atan2(dz, dx);
+
+        // 타원 점들 생성 (XZ 평면, Y축 회전)
+        const ellipsePoints = [];
+        for (let t = tStart; t <= tEnd; t += tStep) {
+            // 타원의 매개변수 방정식
+            const localX = dxz * Math.cos(t);
+            const localZ = minorRadius * Math.sin(t);
+
+            // 장축 방향으로 회전
+            const rotatedX = localX * Math.cos(angle) - localZ * Math.sin(angle);
+            const rotatedZ = localX * Math.sin(angle) + localZ * Math.cos(angle);
+
+            // 중심점 기준으로 이동
+            ellipsePoints.push({
+                x: centerX + rotatedX,
+                y: centerY,
+                z: centerZ + rotatedZ
+            });
+        }
+
+        // 타원 그룹을 JSON 데이터에 추가
+        const newGroup = {
+            points: ellipsePoints,
+            color: `hsl(${(i * 360 / pointCount)}, 70%, 60%)`, // 점마다 다른 색상
+            visible: true,
+            selected: false,
+            metadata: {
+                type: 'paired_ellipse',
+                sourceGroupA: selectedGroupIndex,
+                sourceGroupB: secondSelectedGroupIndex,
+                pointIndexInSource: i,
+                majorRadius: dxz,
+                minorRadius: minorRadius,
+                center: { x: centerX, y: centerY, z: centerZ },
+                angle: angle
+            }
+        };
+
+        currentJsonData.groups.push(newGroup);
+        createdCount++;
+    }
+
+    console.log(`✅ ${createdCount}개의 타원이 생성되었습니다.`);
+    alert(`${createdCount}개의 타원이 생성되었습니다!`);
+
+    // 화면 다시 렌더링
+    reRender();
 }
 
 // 자취로부터 3D 메쉬 생성 함수
@@ -266,6 +388,9 @@ function moveSelectedGroup(dx, dy, dz) {
         alert('선택된 그룹에 점이 없습니다!');
         return;
     }
+
+    // Undo를 위해 현재 상태 저장
+    saveStateToUndo();
 
     // 모든 점의 좌표 이동
     selectedGroupData.points.forEach(point => {
@@ -521,6 +646,9 @@ function createRotationTrace(tStart, tEnd, tStep, rotationAxis, axisInputValues,
     
     console.log(`회전 자취 생성: ${tracePoints.length}개 점, 축: ${rotationAxis}, t: ${tStart} ~ ${tEnd}, step: ${tStep}`);
     console.log('축 위치 (중심):', axisPosition);
+    
+    // Undo를 위해 현재 상태 저장
+    saveStateToUndo();
     
     if (ellipseMode) {
         const majorAxis = Math.max(radiusX, radiusZ);
@@ -833,12 +961,194 @@ function updateSelectedGroupDisplay() {
     const selectedGroupValueSpan = document.getElementById('selectedGroupValue');
     if (!selectedGroupValueSpan) return;
     
-    if (selectedGroupData && selectedGroupIndex !== null) {
-        const groupType = selectedGroupData.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
+    if (selectedGroupIndex !== null && secondSelectedGroupIndex !== null) {
+        const type1 = selectedGroupData?.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
+        const type2 = secondSelectedGroupData?.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
+        selectedGroupValueSpan.textContent = `그룹 ${selectedGroupIndex + 1} & ${secondSelectedGroupIndex + 1} (${type1}, ${type2})`;
+    } else if (selectedGroupIndex !== null) {
+        const groupType = selectedGroupData?.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
         selectedGroupValueSpan.textContent = `그룹 ${selectedGroupIndex + 1} (${groupType})`;
     } else {
         selectedGroupValueSpan.textContent = '-';
     }
+}
+
+// 전역 렌더링 함수 (reRender 대체용)
+function renderCurrentData() {
+    const canvas = document.getElementById('canvas');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const pointSizeSlider = document.getElementById('pointSizeSlider');
+    const lineWidthSlider = document.getElementById('lineWidthSlider');
+    const showPointsCheck = document.getElementById('showPointsCheck');
+    const showLinesCheck = document.getElementById('showLinesCheck');
+    
+    if (canvas && currentJsonData) {
+        renderSavedGroups(currentJsonData, canvas, {
+            scalePercent: parseInt(scaleSlider?.value || 60),
+            pointSize: parseInt(pointSizeSlider?.value || 4),
+            lineWidth: parseInt(lineWidthSlider?.value || 2),
+            showPoints: showPointsCheck?.checked !== false,
+            showLines: showLinesCheck?.checked !== false
+        });
+    }
+}
+
+// 현재 상태를 Undo 스택에 저장
+function saveStateToUndo() {
+    if (!currentJsonData) return;
+    
+    // 깊은 복사로 현재 상태 저장
+    const stateCopy = JSON.parse(JSON.stringify(currentJsonData));
+    undoStack.push(stateCopy);
+    
+    // 최대 개수 제한
+    if (undoStack.length > MAX_UNDO_STEPS) {
+        undoStack.shift();
+    }
+    
+    // 새로운 작업을 하면 redo 스택은 초기화
+    redoStack = [];
+}
+
+// Undo 실행
+function performUndo() {
+    if (undoStack.length === 0) {
+        console.log('더 이상 되돌릴 수 없습니다.');
+        return;
+    }
+    
+    // 현재 상태를 redo 스택에 저장
+    if (currentJsonData) {
+        const stateCopy = JSON.parse(JSON.stringify(currentJsonData));
+        redoStack.push(stateCopy);
+    }
+    
+    // undo 스택에서 이전 상태 복원
+    currentJsonData = undoStack.pop();
+    
+    // 텍스트 입력창 업데이트
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
+    
+    // 선택 해제
+    selectedGroup = null;
+    selectedPoint = null;
+    selectedPointIndex = null;
+    selectedGroupData = null;
+    selectedGroupIndex = null;
+    secondSelectedGroup = null;
+    secondSelectedGroupData = null;
+    secondSelectedGroupIndex = null;
+    
+    console.log('✅ Undo 실행됨');
+    renderCurrentData();
+}
+
+// Redo 실행
+function performRedo() {
+    if (redoStack.length === 0) {
+        console.log('더 이상 다시 실행할 수 없습니다.');
+        return;
+    }
+    
+    // 현재 상태를 undo 스택에 저장
+    if (currentJsonData) {
+        const stateCopy = JSON.parse(JSON.stringify(currentJsonData));
+        undoStack.push(stateCopy);
+    }
+    
+    // redo 스택에서 상태 복원
+    currentJsonData = redoStack.pop();
+    
+    // 텍스트 입력창 업데이트
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
+    
+    console.log('✅ Redo 실행됨');
+    renderCurrentData();
+}
+
+// 선택된 그룹(들) 삭제 함수 (일반 그룹, 자취, 타원 모두 가능)
+function deleteSelectedGroups() {
+    if (!currentJsonData || !currentJsonData.groups) {
+        alert('데이터가 없습니다.');
+        return;
+    }
+    
+    const groupsToDelete = [];
+    
+    // 선택된 그룹들 수집
+    if (selectedGroupData && selectedGroupIndex !== null) {
+        groupsToDelete.push({ data: selectedGroupData, index: selectedGroupIndex });
+    }
+    if (secondSelectedGroupData && secondSelectedGroupIndex !== null) {
+        groupsToDelete.push({ data: secondSelectedGroupData, index: secondSelectedGroupIndex });
+    }
+    
+    if (groupsToDelete.length === 0) {
+        alert('먼저 삭제할 그룹을 선택해주세요!');
+        return;
+    }
+    
+    // 삭제 확인
+    const groupNames = groupsToDelete.map((g, i) => {
+        const type = g.data.metadata?.type === 'rotation_trace' ? '자취' : 
+                     g.data.metadata?.type === 'paired_ellipse' ? '타원' : '데이터';
+        return `그룹 ${g.index + 1} (${type}, ${g.data.points?.length || 0}점)`;
+    }).join('\n');
+    
+    const confirmDelete = confirm(`다음 그룹을 삭제하시겠습니까?\n\n${groupNames}`);
+    if (!confirmDelete) return;
+    
+    // Undo를 위해 현재 상태 저장
+    saveStateToUndo();
+    
+    // 인덱스 높은 순으로 정렬 (뒤에서부터 삭제)
+    groupsToDelete.sort((a, b) => b.index - a.index);
+    
+    // 삭제 실행
+    for (const group of groupsToDelete) {
+        currentJsonData.groups.splice(group.index, 1);
+        console.log(`그룹 삭제 완료 (인덱스: ${group.index})`);
+        
+        // 자취인 경우 맵에서도 제거
+        if (group.data.metadata?.type === 'rotation_trace' &&
+            group.data.metadata?.sourceGroupIndex !== undefined && 
+            group.data.metadata?.sourcePointIndex !== undefined) {
+            const mapKey = `${group.data.metadata.sourceGroupIndex}-${group.data.metadata.sourcePointIndex}`;
+            if (pointToTracesMap[mapKey]) {
+                pointToTracesMap[mapKey] = pointToTracesMap[mapKey].filter(g => g !== group.data);
+                if (pointToTracesMap[mapKey].length === 0) {
+                    delete pointToTracesMap[mapKey];
+                }
+            }
+        }
+    }
+    
+    // 텍스트 입력창 업데이트
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
+    
+    // 선택 해제
+    selectedGroup = null;
+    selectedPoint = null;
+    selectedPointIndex = null;
+    selectedGroupData = null;
+    selectedGroupIndex = null;
+    secondSelectedGroup = null;
+    secondSelectedGroupData = null;
+    secondSelectedGroupIndex = null;
+    
+    console.log(`✅ ${groupsToDelete.length}개 그룹 삭제됨`);
+    renderCurrentData();
+    updateSelectedPointDisplay();
+    updateSelectedGroupDisplay();
 }
 
 // 선택된 자취 삭제 함수
@@ -857,6 +1167,9 @@ function deleteSelectedTrace() {
     // 삭제 확인
     const confirmDelete = confirm(`자취를 삭제하시겠습니까?\n(점 개수: ${selectedGroupData.points.length}개)`);
     if (!confirmDelete) return;
+    
+    // Undo를 위해 현재 상태 저장
+    saveStateToUndo();
     
     // currentJsonData에서 해당 그룹 찾아서 삭제
     const groupIndex = currentJsonData.groups.indexOf(selectedGroupData);
@@ -1087,7 +1400,7 @@ function clearAllHighlightedLines() {
 // 선택된 그룹 하이라이트 업데이트
 function updateSelection() {
     groupObjects.forEach(groupObj => {
-        const isSelected = groupObj === selectedGroup;
+        const isSelected = groupObj === selectedGroup || groupObj === secondSelectedGroup;
         
         // 그룹 내 모든 객체 순회
         groupObj.children.forEach(child => {
@@ -1175,62 +1488,138 @@ function onCanvasClick(event, canvas) {
         );
 
         if (clickedGroup) {
-            // 같은 그룹을 다시 클릭하면 선택 해제
-            if (selectedGroup === clickedGroup && selectedPoint === clickedObject) {
-                // JSON 데이터의 selected 속성도 업데이트
-                if (currentJsonData && currentJsonData.groups) {
-                    currentJsonData.groups.forEach(g => g.selected = false);
+            // Ctrl 키를 누른 채 클릭하면 선택 집합에 추가/제거 (최대 2개: primary + secondary)
+            if (event.ctrlKey) {
+                const clickedIdx = clickedGroup.userData.groupIndex;
+
+                // 이미 선택된 그룹이면 토글(제거)
+                if (selectedGroup === clickedGroup || secondSelectedGroup === clickedGroup) {
+                    if (secondSelectedGroup === clickedGroup) {
+                        secondSelectedGroup = null;
+                        secondSelectedGroupIndex = null;
+                        secondSelectedGroupData = null;
+                    } else {
+                        // primary가 클릭된 경우, secondary가 있으면 승격하고, 없으면 해제
+                        if (secondSelectedGroup) {
+                            selectedGroup = secondSelectedGroup;
+                            selectedGroupIndex = secondSelectedGroupIndex;
+                            selectedGroupData = secondSelectedGroupData;
+                            secondSelectedGroup = null;
+                            secondSelectedGroupIndex = null;
+                            secondSelectedGroupData = null;
+                        } else {
+                            selectedGroup = null;
+                            selectedGroupIndex = null;
+                            selectedGroupData = null;
+                            selectedPoint = null;
+                            selectedPointIndex = null;
+                        }
+                    }
+                } else {
+                    // 새 그룹 추가 (primary가 없다면 primary로, 있으면 secondary로)
+                    if (!selectedGroup) {
+                        selectedGroup = clickedGroup;
+                        selectedGroupIndex = clickedIdx;
+                        selectedGroupData = currentJsonData?.groups?.[clickedIdx] || null;
+                    } else if (!secondSelectedGroup) {
+                        secondSelectedGroup = clickedGroup;
+                        secondSelectedGroupIndex = clickedIdx;
+                        secondSelectedGroupData = currentJsonData?.groups?.[clickedIdx] || null;
+                    } else {
+                        // 이미 두 개가 선택되어 있으면 secondary 교체
+                        secondSelectedGroup = clickedGroup;
+                        secondSelectedGroupIndex = clickedIdx;
+                        secondSelectedGroupData = currentJsonData?.groups?.[clickedIdx] || null;
+                    }
                 }
-                selectedGroup = null;
-                selectedPoint = null;
-                selectedPointIndex = null;
-                selectedGroupData = null;
-                selectedGroupIndex = null;
-                console.log('선택 해제');
+
+                // JSON 데이터의 selected 속성 업데이트 (두 선택 모두 true)
+                if (currentJsonData && currentJsonData.groups) {
+                    currentJsonData.groups.forEach((g, i) => {
+                        g.selected = (i === selectedGroupIndex || i === secondSelectedGroupIndex);
+                    });
+                }
+
+                // 클릭한 객체가 점이면 primary의 점 선택만 처리 (기존 UX 유지)
+                if (clickedObject.userData.isDataPoint) {
+                    if (selectedGroup === clickedGroup) {
+                        selectedPoint = clickedObject;
+                        const pointObjects = clickedGroup.children.filter(child => child.userData.isDataPoint);
+                        selectedPointIndex = pointObjects.indexOf(clickedObject);
+                    } else {
+                        // secondary로 추가된 경우 점 선택은 하지 않음
+                        selectedPoint = null;
+                        selectedPointIndex = null;
+                    }
+                }
+
                 updateSelectedPointDisplay();
                 updateSelectedGroupDisplay();
+                updateSelection();
+                updateNextPointDistance();
             } else {
-                selectedGroup = clickedGroup;
-                
-                // 점을 클릭했는지 확인
-                if (clickedObject.userData.isDataPoint) {
-                    selectedPoint = clickedObject;
-                    // 점의 인덱스 찾기
-                    const pointObjects = clickedGroup.children.filter(child => child.userData.isDataPoint);
-                    selectedPointIndex = pointObjects.indexOf(clickedObject);
-                    // 선택된 그룹의 원본 데이터 및 인덱스 저장
+                // Ctrl을 누르지 않으면 기존 동작(단일 선택)
+                // 같은 그룹을 다시 클릭하면 선택 해제
+                if (selectedGroup === clickedGroup && selectedPoint === clickedObject) {
+                    // JSON 데이터의 selected 속성도 업데이트
                     if (currentJsonData && currentJsonData.groups) {
-                        selectedGroupIndex = clickedGroup.userData.groupIndex;
-                        selectedGroupData = currentJsonData.groups[selectedGroupIndex];
-                        // JSON 데이터의 selected 속성 업데이트
-                        currentJsonData.groups.forEach((g, i) => {
-                            g.selected = (i === selectedGroupIndex);
-                        });
+                        currentJsonData.groups.forEach(g => g.selected = false);
                     }
-                    console.log('그룹 및 점 선택:', selectedGroupIndex, '점 인덱스:', selectedPointIndex);
-                    
-                    // 선택된 점의 좌표 표시
+                    selectedGroup = null;
+                    selectedPoint = null;
+                    selectedPointIndex = null;
+                    selectedGroupData = null;
+                    selectedGroupIndex = null;
+                    console.log('선택 해제');
                     updateSelectedPointDisplay();
                     updateSelectedGroupDisplay();
                 } else {
-                    // 선을 클릭한 경우
-                    selectedPoint = null;
-                    selectedPointIndex = null;
-                    if (currentJsonData && currentJsonData.groups) {
-                        selectedGroupIndex = clickedGroup.userData.groupIndex;
-                        selectedGroupData = currentJsonData.groups[selectedGroupIndex];
-                        // JSON 데이터의 selected 속성 업데이트
-                        currentJsonData.groups.forEach((g, i) => {
-                            g.selected = (i === selectedGroupIndex);
-                        });
+                    selectedGroup = clickedGroup;
+                    // 두 번째 선택은 초기화
+                    secondSelectedGroup = null;
+                    secondSelectedGroupData = null;
+                    secondSelectedGroupIndex = null;
+                    
+                    // 점을 클릭했는지 확인
+                    if (clickedObject.userData.isDataPoint) {
+                        selectedPoint = clickedObject;
+                        // 점의 인덱스 찾기
+                        const pointObjects = clickedGroup.children.filter(child => child.userData.isDataPoint);
+                        selectedPointIndex = pointObjects.indexOf(clickedObject);
+                        // 선택된 그룹의 원본 데이터 및 인덱스 저장
+                        if (currentJsonData && currentJsonData.groups) {
+                            selectedGroupIndex = clickedGroup.userData.groupIndex;
+                            selectedGroupData = currentJsonData.groups[selectedGroupIndex];
+                            // JSON 데이터의 selected 속성 업데이트
+                            currentJsonData.groups.forEach((g, i) => {
+                                g.selected = (i === selectedGroupIndex);
+                            });
+                        }
+                        console.log('그룹 및 점 선택:', selectedGroupIndex, '점 인덱스:', selectedPointIndex);
+                        
+                        // 선택된 점의 좌표 표시
+                        updateSelectedPointDisplay();
+                        updateSelectedGroupDisplay();
+                    } else {
+                        // 선을 클릭한 경우
+                        selectedPoint = null;
+                        selectedPointIndex = null;
+                        if (currentJsonData && currentJsonData.groups) {
+                            selectedGroupIndex = clickedGroup.userData.groupIndex;
+                            selectedGroupData = currentJsonData.groups[selectedGroupIndex];
+                            // JSON 데이터의 selected 속성 업데이트
+                            currentJsonData.groups.forEach((g, i) => {
+                                g.selected = (i === selectedGroupIndex);
+                            });
+                        }
+                        updateSelectedPointDisplay();
+                        updateSelectedGroupDisplay();
+                        console.log('그룹 선택:', selectedGroupIndex);
                     }
-                    updateSelectedPointDisplay();
-                    updateSelectedGroupDisplay();
-                    console.log('그룹 선택:', selectedGroupIndex);
                 }
+                updateSelection();
+                updateNextPointDistance();
             }
-            updateSelection();
-            updateNextPointDistance();
         }
     } else {
         // 빈 공간 클릭 시 선택 해제
@@ -1240,10 +1629,13 @@ function onCanvasClick(event, canvas) {
                 currentJsonData.groups.forEach(g => g.selected = false);
             }
             selectedGroup = null;
+            secondSelectedGroup = null;
             selectedPoint = null;
             selectedPointIndex = null;
             selectedGroupData = null;
+            secondSelectedGroupData = null;
             selectedGroupIndex = null;
+            secondSelectedGroupIndex = null;
             console.log('선택 해제');
             updateSelection();
             updateNextPointDistance();
@@ -1499,7 +1891,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'F7' && lastMouseEvent) {
+        // Delete 키로 선택된 그룹 삭제
+        if (event.key === 'Delete') {
+            event.preventDefault();
+            deleteSelectedGroups();
+        }
+        // Ctrl+Z: Undo
+        else if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+            event.preventDefault();
+            performUndo();
+        }
+        // Ctrl+Shift+Z 또는 Ctrl+Y: Redo
+        else if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+            event.preventDefault();
+            performRedo();
+        }
+        else if (event.key === 'F7' && lastMouseEvent) {
             event.preventDefault();
             const gridSizeValue = parseInt(document.getElementById('gridSizeSlider').value);
             const gridSpacingValue = parseInt(document.getElementById('gridDivisionsSlider').value);
@@ -1613,6 +2020,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 자취 분석 버튼
     document.getElementById('analyzeTracesBtn').addEventListener('click', () => {
         analyzeTraces();
+    });
+
+    // 쌍타원 생성 버튼
+    document.getElementById('createEllipsesFromTwoGroupsBtn').addEventListener('click', () => {
+        createEllipsesFromTwoGroups();
     });
 
     // 메쉬 생성 버튼
