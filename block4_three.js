@@ -214,7 +214,7 @@ function createEllipsesFromTwoGroups() {
     alert(`${createdCount}개의 타원이 생성되었습니다!`);
 
     // 화면 다시 렌더링
-    reRender();
+    renderCurrentData();
 }
 
 // 자취로부터 3D 메쉬 생성 함수
