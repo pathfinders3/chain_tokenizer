@@ -225,11 +225,13 @@ function createMeshFromTraces() {
         return;
     }
 
-    // 모든 자취 그룹 필터링 및 정렬
-    const traceGroups = currentJsonData.groups.filter(g => g.metadata?.type === 'rotation_trace');
+    // 모든 자취 그룹 및 타원 그룹 필터링 (메쉬 생성 가능한 그룹들)
+    const traceGroups = currentJsonData.groups.filter(g => 
+        g.metadata?.type === 'rotation_trace' || g.metadata?.type === 'paired_ellipse'
+    );
     
     if (traceGroups.length < 2) {
-        alert('메쉬를 생성하려면 최소 2개 이상의 자취 그룹이 필요합니다!');
+        alert('메쉬를 생성하려면 최소 2개 이상의 자취/타원 그룹이 필요합니다!');
         return;
     }
 
@@ -238,14 +240,14 @@ function createMeshFromTraces() {
     const allSameCount = traceGroups.every(g => g.points.length === pointCount);
     
     if (!allSameCount) {
-        alert('모든 자취 그룹의 점 개수가 동일해야 합니다!\n\n각 그룹의 점 개수를 "자취 분석" 버튼으로 확인해주세요.');
+        alert('모든 자취/타원 그룹의 점 개수가 동일해야 합니다!\n\n각 그룹의 점 개수를 "자취 분석" 버튼으로 확인해주세요.');
         return;
     }
 
     console.log('\n' + '='.repeat(60));
     console.log('🎭 메쉬 생성 시작');
     console.log('='.repeat(60));
-    console.log(`자취 그룹 개수: ${traceGroups.length}개`);
+    console.log(`자취/타원 그룹 개수: ${traceGroups.length}개`);
     console.log(`각 그룹 점 개수: ${pointCount}개`);
     console.log(`생성될 면 개수: ${(traceGroups.length - 1) * (pointCount - 1) * 2}개 (삼각형)`);
 
