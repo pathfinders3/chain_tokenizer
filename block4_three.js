@@ -968,12 +968,116 @@ function updateSelectedGroupDisplay() {
         const type2 = secondSelectedGroupData?.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
         selectedGroupValueSpan.textContent = `그룹 ${selectedGroupIndex + 1} & ${secondSelectedGroupIndex + 1} (${type1}, ${type2})`;
     } else if (selectedGroupIndex !== null) {
-        const groupType = selectedGroupData?.metadata?.type === 'rotation_trace' ? '자취' : '데이터';
+        const groupType = selectedGroupData?.metadata?.type === 'rotation_trace' ? '자취' : 
+                          selectedGroupData?.metadata?.type === 'paired_ellipse' ? '타원' : '데이터';
         selectedGroupValueSpan.textContent = `그룹 ${selectedGroupIndex + 1} (${groupType})`;
     } else {
         selectedGroupValueSpan.textContent = '-';
     }
+    
+    // 타원 단축 조정 UI 표시/숨김
+    updateEllipseMinorAxisControls();
 }
+
+// 타원 단축 조정 UI 업데이트
+function updateEllipseMinorAxisControls() {
+    const ellipseControls = document.getElementById('ellipseMinorAxisControls');
+    const minorAxisSlider = document.getElementById('ellipseMinorAxisSlider');
+    const minorAxisValue = document.getElementById('ellipseMinorAxisValue');
+    const majorAxisDisplay = document.getElementById('ellipseMajorAxisDisplay');
+    
+    if (!ellipseControls) return;
+    
+    // 선택된 그룹이 타원인지 확인
+    if (selectedGroupData && selectedGroupIndex !== null && 
+        selectedGroupData.metadata?.type === 'paired_ellipse' && !secondSelectedGroup) {
+        
+        // UI 표시
+        ellipseControls.style.display = 'flex';
+        
+        // 현재 값 설정
+        const currentMinorRadius = selectedGroupData.metadata.minorRadius || 20;
+        const currentMajorRadius = selectedGroupData.metadata.majorRadius || 50;
+        
+        if (minorAxisSlider) {
+            minorAxisSlider.value = currentMinorRadius;
+            minorAxisSlider.max = currentMajorRadius * 2; // 최대값은 장축의 2배
+        }
+        if (minorAxisValue) {
+            minorAxisValue.textContent = currentMinorRadius.toFixed(1);
+        }
+        if (majorAxisDisplay) {
+            majorAxisDisplay.textContent = currentMajorRadius.toFixed(1);
+        }
+    } else {
+        // UI 숨김
+        ellipseControls.style.display = 'none';
+    }
+}
+
+// 선택된 타원의 단축 조정 및 점 재계산
+function adjustEllipseMinorAxis(newMinorRadius) {
+    if (!selectedGroupData || selectedGroupIndex === null || 
+        selectedGroupData.metadata?.type !== 'paired_ellipse') {
+        return;
+    }
+    
+    // Undo를 위해 현재 상태 저장 (첫 조정 시에만)
+    if (!adjustEllipseMinorAxis.isAdjusting) {
+        saveStateToUndo();
+        adjustEllipseMinorAxis.isAdjusting = true;
+    }
+    
+    const metadata = selectedGroupData.metadata;
+    const centerX = metadata.center.x;
+    const centerY = metadata.center.y;
+    const centerZ = metadata.center.z;
+    const majorRadius = metadata.majorRadius;
+    const angle = metadata.angle;
+    
+    // 메타데이터 업데이트
+    metadata.minorRadius = newMinorRadius;
+    
+    // t 범위 가져오기 (기존 점 개수 유지)
+    const pointCount = selectedGroupData.points.length;
+    const tStart = parseFloat(document.getElementById('tStartInput')?.value || 0);
+    const tEnd = parseFloat(document.getElementById('tEndInput')?.value || 6.28);
+    const tStep = (tEnd - tStart) / (pointCount - 1);
+    
+    // 타원 점들 재생성
+    const newPoints = [];
+    for (let i = 0; i < pointCount; i++) {
+        const t = tStart + i * tStep;
+        
+        // 타원의 매개변수 방정식
+        const localX = majorRadius * Math.cos(t);
+        const localZ = newMinorRadius * Math.sin(t);
+        
+        // 장축 방향으로 회전
+        const rotatedX = localX * Math.cos(angle) - localZ * Math.sin(angle);
+        const rotatedZ = localX * Math.sin(angle) + localZ * Math.cos(angle);
+        
+        // 중심점 기준으로 이동
+        newPoints.push({
+            x: centerX + rotatedX,
+            y: centerY,
+            z: centerZ + rotatedZ
+        });
+    }
+    
+    // 점 좌표 업데이트
+    selectedGroupData.points = newPoints;
+    
+    // JSON 텍스트 업데이트
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(currentJsonData, null, 2);
+    }
+    
+    // 화면 재렌더링
+    renderCurrentData();
+}
+
 
 // 전역 렌더링 함수 (reRender 대체용)
 function renderCurrentData() {
@@ -2063,6 +2167,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('moveZMinusBtn').addEventListener('click', () => {
         moveSelectedGroup(0, 0, -100);
     });
+
+    // 타원 단축 조정 슬라이더
+    const ellipseMinorAxisSlider = document.getElementById('ellipseMinorAxisSlider');
+    const ellipseMinorAxisValue = document.getElementById('ellipseMinorAxisValue');
+    
+    if (ellipseMinorAxisSlider && ellipseMinorAxisValue) {
+        ellipseMinorAxisSlider.addEventListener('input', (e) => {
+            const newMinorRadius = parseFloat(e.target.value);
+            ellipseMinorAxisValue.textContent = newMinorRadius.toFixed(1);
+            adjustEllipseMinorAxis(newMinorRadius);
+        });
+        
+        // 슬라이더를 놓았을 때 조정 상태 초기화
+        ellipseMinorAxisSlider.addEventListener('change', () => {
+            adjustEllipseMinorAxis.isAdjusting = false;
+        });
+    }
 
     // Textarea 토글
     document.getElementById('toggleTextareaBtn').addEventListener('click', () => {

@@ -160,6 +160,15 @@
             <button id="copyToAxisBtn" title="선택된 점의 좌표를 축 위치로 복사" style="padding: 5px 10px; font-size: 12px;">📍 축 위치로 복사</button>
         </div>
 
+        <!-- 타원 단축 조정 컨트롤 (타원 선택 시만 표시) -->
+        <div class="controls" id="ellipseMinorAxisControls" style="display: none; background: linear-gradient(135deg, #f093fb 0%, #667eea 100%); padding: 10px; border-radius: 5px;">
+            <label style="font-weight: bold; color: #fff;">⭕ 선택된 타원 단축 조정:</label>
+            <input type="range" id="ellipseMinorAxisSlider" min="1" max="200" value="20" step="0.5" style="width: 300px; margin: 0 10px;">
+            <span id="ellipseMinorAxisValue" style="color: #fff; font-weight: bold; min-width: 60px; display: inline-block;">20.0</span>
+            <label style="color: #fff; margin-left: 10px;">장축:</label>
+            <span id="ellipseMajorAxisDisplay" style="color: #ffd93d; font-weight: bold; min-width: 60px; display: inline-block;">-</span>
+        </div>
+
         <div class="controls">
             <label style="font-weight: bold; color: #ffd93d;">선택된 그룹 이동:</label>
             <button id="moveXPlusBtn" title="X 방향으로 +100 이동" style="padding: 5px 10px; font-size: 12px; background: #667eea;">X +100</button>
