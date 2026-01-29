@@ -1341,21 +1341,29 @@ const canvas = document.getElementById('canvas');
                 return;
             }
             
+            // 체크박스로 선택된 (visible=true) 그룹만 필터링
+            const selectedGroups = savedGroups.filter(group => group.visible);
+            
+            if (selectedGroups.length === 0) {
+                alert('체크된 그룹이 없습니다. 저장할 그룹을 체크해주세요.');
+                return;
+            }
+            
             const dataToSave = {
-                groups: savedGroups,
+                groups: selectedGroups,
                 timestamp: new Date().toISOString(),
                 version: '1.0',
-                totalGroups: savedGroups.length
+                totalGroups: selectedGroups.length
             };
             const jsonStr = JSON.stringify(dataToSave, null, 2);
             
-            // localStorage에 저장
+            // localStorage에 저장 (전체 그룹)
             saveToLocalStorage();
             
-            // 클립보드에 복사
+            // 클립보드에 복사 (선택된 그룹만)
             navigator.clipboard.writeText(jsonStr)
-                .then(() => alert(`모든 그룹 저장 완료!\n- ${savedGroups.length}개 그룹\n- localStorage에 저장됨\n- 클립보드에 복사됨`))
-                .catch(() => alert(`localStorage에 저장됨 (${savedGroups.length}개 그룹)\n클립보드 복사는 실패했습니다.`));
+                .then(() => alert(`선택된 그룹 저장 완료!\n- ${selectedGroups.length}개 그룹 (전체 ${savedGroups.length}개 중)\n- localStorage에 저장됨\n- 클립보드에 복사됨`))
+                .catch(() => alert(`localStorage에 저장됨 (${selectedGroups.length}개 그룹)\n클립보드 복사는 실패했습니다.`));
         });
         
         // 창 닫을 때 자동 저장
