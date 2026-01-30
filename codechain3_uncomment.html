@@ -172,24 +172,7 @@
         <div class="editor-container">
             <div class="editor-section">
                 <h2>입력 (주석 포함)</h2>
-                <textarea id="input" placeholder="여기에 JavaScript 코드를 입력하세요...">// 이것은 한줄 주석입니다
-function hello() {
-    /* 
-     * 이것은 여러줄 주석입니다
-     * 함수 설명을 작성합니다
-     */
-    console.log("Hello, World!"); // 인라인 주석
-    
-    /**
-     * JSDoc 주석도 제거됩니다
-     * @param {string} name
-     */
-    const greet = (name) => {
-        return `안녕하세요, ${name}님!`; // 인사 메시지 반환
-    };
-    
-    return greet;
-}</textarea>
+                <textarea id="input" placeholder="여기에 JavaScript 코드를 입력하세요..."></textarea>
             </div>
 
             <div class="editor-section">
@@ -200,6 +183,7 @@ function hello() {
 
         <div class="button-container">
             <button id="removeBtn">주석 제거</button>
+            <button id="restoreBtn">원본 불러오기</button>
             <button id="copyBtn">결과 복사</button>
             <button id="clearBtn">초기화</button>
         </div>
@@ -219,6 +203,7 @@ function hello() {
             var inputTextarea = document.getElementById('input');
             var outputTextarea = document.getElementById('output');
             var removeBtn = document.getElementById('removeBtn');
+            var restoreBtn = document.getElementById('restoreBtn');
             var clearBtn = document.getElementById('clearBtn');
             var copyBtn = document.getElementById('copyBtn');
             var statusDiv = document.getElementById('status');
@@ -277,6 +262,7 @@ function hello() {
             }
 
             removeBtn.addEventListener('click', removeComments);
+            restoreBtn.addEventListener('click', loadOriginalFromStorage);
             clearBtn.addEventListener('click', clearAll);
             copyBtn.addEventListener('click', copyOutput);
 
@@ -285,6 +271,24 @@ function hello() {
                     removeComments();
                 }
             });
+
+            // 페이지 로드 시 LocalStorage에 저장된 원본이 있으면 불러옵니다.
+            function loadOriginalFromStorage() {
+                try {
+                    var saved = localStorage.getItem('codechain3_originalSource');
+                    var ts = localStorage.getItem('codechain3_originalSource_ts');
+                    if (saved) {
+                        // 하드코딩된 샘플 대신 저장된 코드를 로드
+                        inputTextarea.value = saved;
+                        showStatus('🔄 저장된 원본 불러옴' + (ts ? ' (' + ts + ')' : ''));
+                    }
+                } catch (e) {
+                    console.warn('LocalStorage 읽기 실패:', e);
+                }
+            }
+
+            // 초기 로드 호출
+            loadOriginalFromStorage();
         })();
     </script>
 </body>
