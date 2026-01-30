@@ -1,0 +1,157 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    padding: 30px;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.description {
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.editor-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.editor-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-section h2 {
+    color: #444;
+    font-size: 18px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #667eea;
+}
+
+textarea {
+    width: 100%;
+    height: 400px;
+    padding: 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color 0.3s;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+#output {
+    background-color: #f8f9fa;
+}
+
+.button-container {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+button {
+    padding: 12px 30px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 600;
+}
+
+#removeBtn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+#removeBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#clearBtn {
+    background-color: #6c757d;
+    color: white;
+}
+
+#clearBtn:hover {
+    background-color: #5a6268;
+}
+
+#copyBtn {
+    background-color: #28a745;
+    color: white;
+}
+
+#copyBtn:hover {
+    background-color: #218838;
+}
+
+.status {
+    text-align: center;
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 15px;
+    font-size: 14px;
+    display: none;
+}
+
+.status.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    display: block;
+}
+
+.status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .editor-container {
+        grid-template-columns: 1fr;
+    }
+
+    .container {
+        padding: 20px;
+    }
+
+    textarea {
+        height: 300px;
+    }
+}
