@@ -167,7 +167,7 @@
 <body>
     <div class="container">
         <h1>🧹 JavaScript 주석 제거기</h1>
-        <p class="description">Esprima를 사용하여 JavaScript 코드에서 주석을 제거합니다</p>
+        <p class="description">Esprima를 사용하여 JavaScript 코드에서 주석을 제거합니다 (줄 구조 유지)</p>
 
         <div class="editor-container">
             <div class="editor-section">
@@ -208,108 +208,84 @@ function hello() {
     </div>
 
     <!-- Esprima CDN -->
-	<script src="https://cdn.jsdelivr.net/npm/esprima@4.0.1/dist/esprima.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/esprima@4.0.1/dist/esprima.min.js"></script>
+
     
-<script>
-    console.log("esprima:", window.esprima);
-</script>
+    <!-- Comment Remover Library -->
+    <script src="codechain3_uncomment.js"></script>
 
-	
-	<script src="codechain3_uncomment.js"></script>
-	
     <script>
-        const inputTextarea = document.getElementById('input');
-        const outputTextarea = document.getElementById('output');
-        const removeBtn = document.getElementById('removeBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const copyBtn = document.getElementById('copyBtn');
-        const statusDiv = document.getElementById('status');
+        (function() {
+            var inputTextarea = document.getElementById('input');
+            var outputTextarea = document.getElementById('output');
+            var removeBtn = document.getElementById('removeBtn');
+            var clearBtn = document.getElementById('clearBtn');
+            var copyBtn = document.getElementById('copyBtn');
+            var statusDiv = document.getElementById('status');
 
-        function showStatus(message, isError = false) {
-            statusDiv.textContent = message;
-            statusDiv.className = 'status ' + (isError ? 'error' : 'success');
-            
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, 3000);
-        }
-
-        function removeComments() {
-            const sourceCode = inputTextarea.value.trim();
-            
-            if (!sourceCode) {
-                showStatus('입력된 코드가 없습니다.', true);
-                return;
+            function showStatus(message, isError) {
+                statusDiv.textContent = message;
+                statusDiv.className = 'status ' + (isError ? 'error' : 'success');
+                
+                setTimeout(function() {
+                    statusDiv.style.display = 'none';
+                }, 3000);
             }
 
-            try {
-                // Esprima로 코드 파싱 (위치 정보와 주석 포함)
-                const tokens = esprima.tokenize(sourceCode, { 
-                    range: true,
-                    comment: false  // 주석은 토큰에서 제외
-                });
+            function removeComments() {
+                var sourceCode = inputTextarea.value.trim();
+                
+                if (!sourceCode) {
+                    showStatus('입력된 코드가 없습니다.', true);
+                    return;
+                }
 
-                // 토큰들을 다시 코드로 재구성
-                let result = '';
-                let lastEnd = 0;
+                try {
+                    var result = CommentRemover.remove(sourceCode);
+                    outputTextarea.value = result;
 
-                tokens.forEach((token, index) => {
-                    const [start, end] = token.range;
-                    
-                    // 토큰 사이의 공백 처리 (주석이 있던 자리는 공백으로)
-                    if (start > lastEnd) {
-                        const between = sourceCode.substring(lastEnd, start);
-                        // 줄바꿈은 유지, 나머지 공백은 단일 공백으로
-                        const whitespace = between.replace(/[^\n]/g, '').length > 0 ? 
-                            between.replace(/[^\n]+/g, ' ') : ' ';
-                        result += whitespace;
+                    // 원본을 LocalStorage에 저장 (복구/감사 용)
+                    try {
+                        localStorage.setItem('codechain3_originalSource', sourceCode);
+                        localStorage.setItem('codechain3_originalSource_ts', new Date().toISOString());
+                        showStatus('✅ 주석이 성공적으로 제거되었습니다! (원본을 LocalStorage에 저장했습니다)');
+                    } catch (e) {
+                        console.warn('LocalStorage 저장 실패:', e);
+                        showStatus('✅ 주석 제거됨. (원본을 LocalStorage에 저장하지 못했습니다)', true);
                     }
-                    
-                    // 실제 토큰 추가
-                    result += sourceCode.substring(start, end);
-                    lastEnd = end;
-                });
-
-                // 결과 정리 (연속된 빈 줄 제거)
-                result = result.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-
-                outputTextarea.value = result;
-                showStatus('✅ 주석이 성공적으로 제거되었습니다!');
-
-            } catch (error) {
-                showStatus('❌ 파싱 오류: ' + error.message, true);
-                console.error('Error:', error);
-            }
-        }
-
-        function clearAll() {
-            inputTextarea.value = '';
-            outputTextarea.value = '';
-            statusDiv.style.display = 'none';
-        }
-
-        function copyOutput() {
-            if (!outputTextarea.value) {
-                showStatus('복사할 내용이 없습니다.', true);
-                return;
+                } catch (error) {
+                    showStatus('❌ ' + error.message, true);
+                    console.error('Error:', error);
+                }
             }
 
-            outputTextarea.select();
-            document.execCommand('copy');
-            showStatus('📋 클립보드에 복사되었습니다!');
-        }
-
-        // 이벤트 리스너
-        removeBtn.addEventListener('click', removeComments);
-        clearBtn.addEventListener('click', clearAll);
-        copyBtn.addEventListener('click', copyOutput);
-
-        // Enter 키로도 실행 가능 (Ctrl+Enter)
-        inputTextarea.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                removeComments();
+            function clearAll() {
+                inputTextarea.value = '';
+                outputTextarea.value = '';
+                statusDiv.style.display = 'none';
             }
-        });
+
+            function copyOutput() {
+                if (!outputTextarea.value) {
+                    showStatus('복사할 내용이 없습니다.', true);
+                    return;
+                }
+
+                outputTextarea.select();
+                document.execCommand('copy');
+                showStatus('📋 클립보드에 복사되었습니다!');
+            }
+
+            removeBtn.addEventListener('click', removeComments);
+            clearBtn.addEventListener('click', clearAll);
+            copyBtn.addEventListener('click', copyOutput);
+
+            inputTextarea.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    removeComments();
+                }
+            });
+        })();
     </script>
 </body>
 </html>
