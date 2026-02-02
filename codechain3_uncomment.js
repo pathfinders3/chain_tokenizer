@@ -13,6 +13,9 @@
 var CommentRemover = (function() {
     'use strict';
 
+    // 여러 줄 주석 저장용 전역 배열
+    var multiLineComments = [];
+
     /**
      * 인용부호 내의 슬래시와 백슬래시를 별표로 치환합니다
      * @param {string} str - 처리할 문자열
@@ -69,7 +72,7 @@ var CommentRemover = (function() {
     }
 
     /**
-     * JavaScript 코드에서 주석을 제거합니다 (여러 줄 주석은 백틱 문자열로 변환, 줄 구조 유지)
+     * JavaScript 코드에서 주석을 제거합니다 (여러 줄 주석은 multi-NNN 형식으로 치환, 줄 구조 유지)
      * @param {string} sourceCode - 원본 JavaScript 코드
      * @returns {string} 주석이 제거/변환된 코드
      * @throws {Error} 파싱 오류 발생 시
@@ -82,6 +85,9 @@ var CommentRemover = (function() {
         if (!sourceCode || typeof sourceCode !== 'string') {
             throw new Error('유효한 문자열을 입력해주세요.');
         }
+
+        // 배열 초기화
+        multiLineComments = [];
 
         try {
             // Esprima로 코드 파싱 (주석 포함)
@@ -140,18 +146,19 @@ var CommentRemover = (function() {
                         if (comment && !processedComments.has(comment)) {
                             processedComments.add(comment);
                             
-                            // 여러 줄 주석인 경우 백틱 문자열로 변환
+                            // 여러 줄 주석인 경우 multi-NNN 형식으로 치환
                             if (comment.type === 'Block') {
                                 var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
                                 // /* */ 제거하고 내용만 추출
                                 var content = commentText.substring(2, commentText.length - 2);
-                                // 특수 문자를 다른 문자로 치환
-                                content = content.replace(/'/g, '*');        // 작은따옴표 → *
-                                content = content.replace(/"/g, '*');        // 큰따옴표 → *
-                                content = content.replace(/\\/g, '*');       // 백슬래시 → *
-                                content = content.replace(/`/g, '*');        // 백틱 → *
-                                content = content.replace(/\$\{/g, 'S{');    // ${ → S{
-                                processed += '`**' + content + '**`';
+                                
+                                // 배열에 저장
+                                var index = multiLineComments.length;
+                                multiLineComments.push(content);
+                                
+                                // multi-001 형식으로 치환
+                                var placeholder = '`multi-' + String(index + 1).padStart(3, '0') + '`';
+                                processed += placeholder;
                                 i = comment.range[1] - 1;
                             } else {
                                 // 한 줄 주석은 삭제
@@ -192,12 +199,14 @@ var CommentRemover = (function() {
                         if (comment.type === 'Block') {
                             var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
                             var content = commentText.substring(2, commentText.length - 2);
-                            content = content.replace(/'/g, '*');
-                            content = content.replace(/"/g, '*');
-                            content = content.replace(/\\/g, '*');
-                            content = content.replace(/`/g, '*');
-                            content = content.replace(/\$\{/g, 'S{');
-                            processed += '`**' + content + '**`';
+                            
+                            // 배열에 저장
+                            var index = multiLineComments.length;
+                            multiLineComments.push(content);
+                            
+                            // multi-001 형식으로 치환
+                            var placeholder = '`multi-' + String(index + 1).padStart(3, '0') + '`';
+                            processed += placeholder;
                             i = comment.range[1] - 1;
                         } else {
                             i = comment.range[1] - 1;
@@ -249,6 +258,12 @@ var CommentRemover = (function() {
     return {
         remove: removeComments,
         removeFromFile: removeCommentsFromFile,
+        getMultiLineComments: function() {
+            return multiLineComments;
+        },
+        getMultiLineComment: function(index) {
+            return multiLineComments[index] || null;
+        },
         version: '1.0.0'
     };
 })();

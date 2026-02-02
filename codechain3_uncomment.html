@@ -32,6 +32,16 @@
         </div>
 
         <div id="status" class="status"></div>
+
+        <!-- 여러 줄 주석 보기 영역 -->
+        <div class="comments-section" id="commentsSection" style="display: none;">
+            <h2>여러 줄 주석 목록</h2>
+            <div class="comments-list" id="commentsList"></div>
+            <div class="comment-detail">
+                <h3>주석 상세</h3>
+                <textarea id="commentDetail" readonly placeholder="주석을 선택하세요..."></textarea>
+            </div>
+        </div>
     </div>
 
     <!-- Esprima CDN -->
@@ -72,6 +82,9 @@
                     var result = CommentRemover.remove(sourceCode);
                     outputTextarea.value = result;
 
+                    // 여러 줄 주석 목록 표시
+                    displayMultiLineComments();
+
                     // 원본을 LocalStorage에 저장 (복구/감사 용)
                     try {
                         localStorage.setItem('codechain3_originalSource', sourceCode);
@@ -87,10 +100,45 @@
                 }
             }
 
+            function displayMultiLineComments() {
+                var comments = CommentRemover.getMultiLineComments();
+                var commentsSection = document.getElementById('commentsSection');
+                var commentsList = document.getElementById('commentsList');
+                
+                if (comments.length === 0) {
+                    commentsSection.style.display = 'none';
+                    return;
+                }
+                
+                commentsSection.style.display = 'block';
+                commentsList.innerHTML = '';
+                
+                comments.forEach(function(comment, index) {
+                    var btn = document.createElement('button');
+                    btn.className = 'comment-item';
+                    btn.textContent = 'multi-' + String(index + 1).padStart(3, '0');
+                    btn.onclick = function() {
+                        showCommentDetail(index);
+                    };
+                    commentsList.appendChild(btn);
+                });
+            }
+
+            function showCommentDetail(index) {
+                var comment = CommentRemover.getMultiLineComment(index);
+                var commentDetail = document.getElementById('commentDetail');
+                
+                if (comment !== null) {
+                    commentDetail.value = comment;
+                }
+            }
+
             function clearAll() {
                 inputTextarea.value = '';
                 outputTextarea.value = '';
                 statusDiv.style.display = 'none';
+                document.getElementById('commentsSection').style.display = 'none';
+                document.getElementById('commentDetail').value = '';
             }
 
             function copyOutput() {

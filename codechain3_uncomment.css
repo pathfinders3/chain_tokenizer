@@ -144,6 +144,65 @@ button {
     display: block;
 }
 
+/* 여러 줄 주석 섹션 */
+.comments-section {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #444;
+}
+
+.comments-section h2,
+.comments-section h3 {
+    color: #e0e0e0;
+    font-size: 18px;
+    margin-bottom: 15px;
+}
+
+.comments-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #1e1e2e;
+    border-radius: 8px;
+    min-height: 60px;
+}
+
+.comment-item {
+    padding: 8px 16px;
+    font-size: 14px;
+    background-color: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Courier New', monospace;
+}
+
+.comment-item:hover {
+    background-color: #764ba2;
+    transform: translateY(-1px);
+}
+
+.comment-detail {
+    margin-top: 15px;
+}
+
+#commentDetail {
+    height: 200px;
+}
+
+#restoreBtn {
+    background-color: #17a2b8;
+    color: white;
+}
+
+#restoreBtn:hover {
+    background-color: #138496;
+}
+
 @media (max-width: 768px) {
     .editor-container {
         grid-template-columns: 1fr;
