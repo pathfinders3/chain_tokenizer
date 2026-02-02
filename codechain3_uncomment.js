@@ -69,9 +69,9 @@ var CommentRemover = (function() {
     }
 
     /**
-     * JavaScript 코드에서 주석을 제거합니다 (줄 구조 유지)
+     * JavaScript 코드에서 주석을 제거합니다 (여러 줄 주석은 백틱 문자열로 변환, 줄 구조 유지)
      * @param {string} sourceCode - 원본 JavaScript 코드
-     * @returns {string} 주석이 제거된 코드
+     * @returns {string} 주석이 제거/변환된 코드
      * @throws {Error} 파싱 오류 발생 시
      */
     function removeComments(sourceCode) {
@@ -84,25 +84,86 @@ var CommentRemover = (function() {
         }
 
         try {
-            // Esprima로 코드 파싱 (주석 제외)
+            // Esprima로 코드 파싱 (주석 포함)
             var tokens = esprima.tokenize(sourceCode, { 
                 range: true,
                 comment: false
             });
 
+            var comments = [];
+            try {
+                esprima.tokenize(sourceCode, {
+                    range: true,
+                    comment: true,
+                    tolerant: true
+                }, function(node, meta) {
+                    // 주석 콜백
+                });
+                
+                // 주석 정보 추출
+                var parsed = esprima.parseScript(sourceCode, {
+                    range: true,
+                    comment: true,
+                    tolerant: true
+                });
+                comments = parsed.comments || [];
+            } catch (e) {
+                // 주석 파싱 실패 시 무시
+                console.warn('주석 파싱 실패:', e);
+            }
+
+            // 주석 위치를 맵으로 저장
+            var commentMap = {};
+            comments.forEach(function(comment) {
+                for (var i = comment.range[0]; i < comment.range[1]; i++) {
+                    commentMap[i] = comment;
+                }
+            });
+
             var result = '';
             var lastEnd = 0;
+            var processedComments = new Set();
 
             tokens.forEach(function(token) {
                 var start = token.range[0];
                 var end = token.range[1];
                 
-                // 토큰 사이의 공백 처리 (줄바꿈 유지, 주석 내용만 제거)
+                // 토큰 사이의 공백 및 주석 처리
                 if (start > lastEnd) {
                     var between = sourceCode.substring(lastEnd, start);
-                    // 줄바꿈과 공백은 유지, 다른 문자만 제거
-                    var whitespace = between.replace(/[^\n\s]/g, '');
-                    result += whitespace;
+                    var processed = '';
+                    
+                    for (var i = lastEnd; i < start; i++) {
+                        var char = sourceCode[i];
+                        var comment = commentMap[i];
+                        
+                        if (comment && !processedComments.has(comment)) {
+                            processedComments.add(comment);
+                            
+                            // 여러 줄 주석인 경우 백틱 문자열로 변환
+                            if (comment.type === 'Block') {
+                                var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
+                                // /* */ 제거하고 내용만 추출
+                                var content = commentText.substring(2, commentText.length - 2);
+                                // 백틱 문자열로 변환 (백틱이 있으면 이스케이프)
+                                content = content.replace(/`/g, '\\`');
+                                // 템플릿 리터럴 내의 ${ 이스케이프
+                                content = content.replace(/\$\{/g, '\\${');
+                                processed += '`' + content + '`';
+                                i = comment.range[1] - 1;
+                            } else {
+                                // 한 줄 주석은 삭제
+                                i = comment.range[1] - 1;
+                            }
+                        } else if (!commentMap[i]) {
+                            // 주석이 아닌 공백/줄바꿈은 유지
+                            if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
+                                processed += char;
+                            }
+                        }
+                    }
+                    
+                    result += processed;
                 }
                 
                 // 실제 토큰 추가 (문자열 토큰인 경우 슬래시/백슬래시 치환)
@@ -114,10 +175,36 @@ var CommentRemover = (function() {
                 lastEnd = end;
             });
 
-            // 마지막 토큰 이후의 공백/줄바꿈 처리
+            // 마지막 토큰 이후의 공백/줄바꿈 및 주석 처리
             if (lastEnd < sourceCode.length) {
                 var remaining = sourceCode.substring(lastEnd);
-                result += remaining.replace(/[^\n\s]/g, '');
+                var processed = '';
+                
+                for (var i = lastEnd; i < sourceCode.length; i++) {
+                    var char = sourceCode[i];
+                    var comment = commentMap[i];
+                    
+                    if (comment && !processedComments.has(comment)) {
+                        processedComments.add(comment);
+                        
+                        if (comment.type === 'Block') {
+                            var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
+                            var content = commentText.substring(2, commentText.length - 2);
+                            content = content.replace(/`/g, '\\`');
+                            content = content.replace(/\$\{/g, '\\${');
+                            processed += '`' + content + '`';
+                            i = comment.range[1] - 1;
+                        } else {
+                            i = comment.range[1] - 1;
+                        }
+                    } else if (!commentMap[i]) {
+                        if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
+                            processed += char;
+                        }
+                    }
+                }
+                
+                result += processed;
             }
 
             return result;
