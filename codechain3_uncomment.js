@@ -14,6 +14,61 @@ var CommentRemover = (function() {
     'use strict';
 
     /**
+     * 인용부호 내의 슬래시와 백슬래시를 별표로 치환합니다
+     * @param {string} str - 처리할 문자열
+     * @returns {string} 치환된 문자열
+     */
+    function replaceSlashesInQuotes(str) {
+        var result = '';
+        var inSingleQuote = false;
+        var inDoubleQuote = false;
+        var inTemplateString = false;
+        var escaped = false;
+        
+        for (var i = 0; i < str.length; i++) {
+            var char = str[i];
+            var prevChar = i > 0 ? str[i - 1] : '';
+            
+            // 이스케이프 처리
+            if (escaped) {
+                result += char;
+                escaped = false;
+                continue;
+            }
+            
+            if (char === '\\') {
+                escaped = true;
+                // 인용부호 안에서는 백슬래시를 별표로 치환
+                if (inSingleQuote || inDoubleQuote || inTemplateString) {
+                    result += '*';
+                } else {
+                    result += char;
+                }
+                continue;
+            }
+            
+            // 인용부호 상태 토글
+            if (char === "'" && !inDoubleQuote && !inTemplateString) {
+                inSingleQuote = !inSingleQuote;
+                result += char;
+            } else if (char === '"' && !inSingleQuote && !inTemplateString) {
+                inDoubleQuote = !inDoubleQuote;
+                result += char;
+            } else if (char === '`' && !inSingleQuote && !inDoubleQuote) {
+                inTemplateString = !inTemplateString;
+                result += char;
+            } else if (char === '/' && (inSingleQuote || inDoubleQuote || inTemplateString)) {
+                // 인용부호 안에서 슬래시를 별표로 치환
+                result += '*';
+            } else {
+                result += char;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
      * JavaScript 코드에서 주석을 제거합니다 (줄 구조 유지)
      * @param {string} sourceCode - 원본 JavaScript 코드
      * @returns {string} 주석이 제거된 코드
@@ -50,8 +105,12 @@ var CommentRemover = (function() {
                     result += whitespace;
                 }
                 
-                // 실제 토큰 추가
-                result += sourceCode.substring(start, end);
+                // 실제 토큰 추가 (문자열 토큰인 경우 슬래시/백슬래시 치환)
+                var tokenValue = sourceCode.substring(start, end);
+                if (token.type === 'String' || token.type === 'Template') {
+                    tokenValue = replaceSlashesInQuotes(tokenValue);
+                }
+                result += tokenValue;
                 lastEnd = end;
             });
 
