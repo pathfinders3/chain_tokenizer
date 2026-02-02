@@ -98,24 +98,29 @@ var CommentRemover = (function() {
 
             var comments = [];
             try {
-                esprima.tokenize(sourceCode, {
-                    range: true,
-                    comment: true,
-                    tolerant: true
-                }, function(node, meta) {
-                    // 주석 콜백
-                });
-                
-                // 주석 정보 추출
+                // 주석 정보 추출 (tolerant 모드로 문법 오류 무시)
                 var parsed = esprima.parseScript(sourceCode, {
                     range: true,
                     comment: true,
-                    tolerant: true
+                    tolerant: true,
+                    loc: false
                 });
                 comments = parsed.comments || [];
             } catch (e) {
-                // 주석 파싱 실패 시 무시
-                console.warn('주석 파싱 실패:', e);
+                // parseScript 실패 시 Module로 재시도
+                try {
+                    var parsed = esprima.parseModule(sourceCode, {
+                        range: true,
+                        comment: true,
+                        tolerant: true,
+                        loc: false
+                    });
+                    comments = parsed.comments || [];
+                } catch (e2) {
+                    // 파싱 완전 실패 - 주석 없이 진행
+                    console.warn('주석 파싱 실패 (Script 및 Module 모두):', e2);
+                    comments = [];
+                }
             }
 
             // 주석 위치를 맵으로 저장
@@ -139,7 +144,8 @@ var CommentRemover = (function() {
                     var between = sourceCode.substring(lastEnd, start);
                     var processed = '';
                     
-                    for (var i = lastEnd; i < start; i++) {
+                    var i = lastEnd;
+                    while (i < start) {
                         var char = sourceCode[i];
                         var comment = commentMap[i];
                         
@@ -152,23 +158,31 @@ var CommentRemover = (function() {
                                 // /* */ 제거하고 내용만 추출
                                 var content = commentText.substring(2, commentText.length - 2);
                                 
-                                // 배열에 저장
-                                var index = multiLineComments.length;
-                                multiLineComments.push(content);
-                                
-                                // multi-001 형식으로 치환
-                                var placeholder = '`multi-' + String(index + 1).padStart(3, '0') + '`';
-                                processed += placeholder;
-                                i = comment.range[1] - 1;
+                                // 2줄 이상인 경우만 플레이스홀더로 치환 (1줄은 삭제)
+                                if (content.indexOf('\n') !== -1) {
+                                    // 배열에 저장
+                                    var index = multiLineComments.length;
+                                    multiLineComments.push(content);
+                                    
+                                    // `** multi-001 **` 형식으로 치환
+                                    var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
+                                    processed += placeholder;
+                                }
+                                // 주석 끝으로 이동 (1줄 주석은 아무것도 추가하지 않고 삭제)
+                                i = comment.range[1];
                             } else {
                                 // 한 줄 주석은 삭제
-                                i = comment.range[1] - 1;
+                                i = comment.range[1];
                             }
                         } else if (!commentMap[i]) {
                             // 주석이 아닌 공백/줄바꿈은 유지
                             if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
                                 processed += char;
                             }
+                            i++;
+                        } else {
+                            // commentMap[i]가 있지만 이미 처리된 경우
+                            i++;
                         }
                     }
                     
@@ -189,7 +203,8 @@ var CommentRemover = (function() {
                 var remaining = sourceCode.substring(lastEnd);
                 var processed = '';
                 
-                for (var i = lastEnd; i < sourceCode.length; i++) {
+                var i = lastEnd;
+                while (i < sourceCode.length) {
                     var char = sourceCode[i];
                     var comment = commentMap[i];
                     
@@ -200,21 +215,27 @@ var CommentRemover = (function() {
                             var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
                             var content = commentText.substring(2, commentText.length - 2);
                             
-                            // 배열에 저장
-                            var index = multiLineComments.length;
-                            multiLineComments.push(content);
-                            
-                            // multi-001 형식으로 치환
-                            var placeholder = '`multi-' + String(index + 1).padStart(3, '0') + '`';
-                            processed += placeholder;
-                            i = comment.range[1] - 1;
+                            // 2줄 이상인 경우만 플레이스홀더로 치환 (1줄은 삭제)
+                            if (content.indexOf('\n') !== -1) {
+                                // 배열에 저장
+                                var index = multiLineComments.length;
+                                multiLineComments.push(content);
+                                
+                                // `** multi-001 **` 형식으로 치환
+                                var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
+                                processed += placeholder;
+                            }
+                            i = comment.range[1];
                         } else {
-                            i = comment.range[1] - 1;
+                            i = comment.range[1];
                         }
                     } else if (!commentMap[i]) {
                         if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
                             processed += char;
                         }
+                        i++;
+                    } else {
+                        i++;
                     }
                 }
                 
