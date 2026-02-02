@@ -151,7 +151,7 @@ var CommentRemover = (function() {
                                 content = content.replace(/\\/g, '*');       // 백슬래시 → *
                                 content = content.replace(/`/g, '*');        // 백틱 → *
                                 content = content.replace(/\$\{/g, 'S{');    // ${ → S{
-                                processed += '`' + content + '`';
+                                processed += '`**' + content + '**`';
                                 i = comment.range[1] - 1;
                             } else {
                                 // 한 줄 주석은 삭제
@@ -197,7 +197,7 @@ var CommentRemover = (function() {
                             content = content.replace(/\\/g, '*');
                             content = content.replace(/`/g, '*');
                             content = content.replace(/\$\{/g, 'S{');
-                            processed += '`' + content + '`';
+                            processed += '`**' + content + '**`';
                             i = comment.range[1] - 1;
                         } else {
                             i = comment.range[1] - 1;
