@@ -145,10 +145,12 @@ var CommentRemover = (function() {
                                 var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
                                 // /* */ 제거하고 내용만 추출
                                 var content = commentText.substring(2, commentText.length - 2);
-                                // 백틱 문자열로 변환 (백틱이 있으면 이스케이프)
-                                content = content.replace(/`/g, '\\`');
-                                // 템플릿 리터럴 내의 ${ 이스케이프
-                                content = content.replace(/\$\{/g, '\\${');
+                                // 특수 문자를 다른 문자로 치환
+                                content = content.replace(/'/g, '*');        // 작은따옴표 → *
+                                content = content.replace(/"/g, '*');        // 큰따옴표 → *
+                                content = content.replace(/\\/g, '*');       // 백슬래시 → *
+                                content = content.replace(/`/g, '*');        // 백틱 → *
+                                content = content.replace(/\$\{/g, 'S{');    // ${ → S{
                                 processed += '`' + content + '`';
                                 i = comment.range[1] - 1;
                             } else {
@@ -190,8 +192,11 @@ var CommentRemover = (function() {
                         if (comment.type === 'Block') {
                             var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
                             var content = commentText.substring(2, commentText.length - 2);
-                            content = content.replace(/`/g, '\\`');
-                            content = content.replace(/\$\{/g, '\\${');
+                            content = content.replace(/'/g, '*');
+                            content = content.replace(/"/g, '*');
+                            content = content.replace(/\\/g, '*');
+                            content = content.replace(/`/g, '*');
+                            content = content.replace(/\$\{/g, 'S{');
                             processed += '`' + content + '`';
                             i = comment.range[1] - 1;
                         } else {
