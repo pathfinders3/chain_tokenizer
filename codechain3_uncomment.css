@@ -133,6 +133,7 @@ button {
 .status {
     text-align: left;
     padding: 15px;
+    padding-right: 45px;
     border-radius: 6px;
     margin-top: 15px;
     font-size: 13px;
@@ -142,6 +143,7 @@ button {
     font-family: 'Courier New', monospace;
     max-height: 200px;
     overflow-y: auto;
+    position: relative;
 }
 
 .status.success {
@@ -156,6 +158,38 @@ button {
     color: #f5a3a3;
     border: 1px solid #6d2c2c;
     display: block;
+}
+
+.status-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.status-close-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.status.success .status-close-btn:hover {
+    background-color: rgba(163, 217, 165, 0.2);
+}
+
+.status.error .status-close-btn:hover {
+    background-color: rgba(245, 163, 163, 0.2);
 }
 
 /* 여러 줄 주석 섹션 */

@@ -31,7 +31,10 @@
             <button id="clearBtn">초기화</button>
         </div>
 
-        <div id="status" class="status"></div>
+        <div id="status" class="status">
+            <span id="statusMessage"></span>
+            <button id="statusCloseBtn" class="status-close-btn">×</button>
+        </div>
 
         <!-- 여러 줄 주석 보기 영역 -->
         <div class="comments-section" id="commentsSection" style="display: none;">
@@ -60,7 +63,14 @@
             var clearBtn = document.getElementById('clearBtn');
             var copyBtn = document.getElementById('copyBtn');
             var statusDiv = document.getElementById('status');
+            var statusMessage = document.getElementById('statusMessage');
+            var statusCloseBtn = document.getElementById('statusCloseBtn');
             var lineInfo = document.getElementById('lineInfo');
+
+            // 닫기 버튼 클릭 이벤트
+            statusCloseBtn.addEventListener('click', function() {
+                statusDiv.style.display = 'none';
+            });
 
             // 줄 번호 업데이트 함수
             function updateLineNumber() {
@@ -88,12 +98,9 @@
             outputTextarea.addEventListener('focus', updateLineNumber);
 
             function showStatus(message, isError) {
-                statusDiv.textContent = message;
+                statusMessage.textContent = message;
                 statusDiv.className = 'status ' + (isError ? 'error' : 'success');
-                
-                setTimeout(function() {
-                    statusDiv.style.display = 'none';
-                }, 3000);
+                statusDiv.style.display = 'block';
             }
 
             function removeComments() {
