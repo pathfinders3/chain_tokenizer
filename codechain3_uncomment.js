@@ -123,6 +123,46 @@ var CommentRemover = (function() {
                 } catch (e2) {
                     // 파싱 완전 실패 - 주석 없이 진행
                     var warningMsg = '⚠️ 주석 파싱 실패 (Script 및 Module 모두): ' + e2.message;
+                    
+                    // 에러 위치 정보 추가
+                    if (e2.lineNumber) {
+                        warningMsg += '\n위치: ' + e2.lineNumber + '줄';
+                        
+                        // 해당 줄의 코드 추출
+                        var lines = sourceCode.split('\n');
+                        if (e2.lineNumber > 0 && e2.lineNumber <= lines.length) {
+                            var errorLine = lines[e2.lineNumber - 1];
+                            var preview = errorLine.trim();
+                            
+                            // 너무 길면 자르기
+                            if (preview.length > 80) {
+                                preview = preview.substring(0, 77) + '...';
+                            }
+                            
+                            warningMsg += '\n코드: ' + preview;
+                            
+                            // 컬럼 정보가 있으면 표시
+                            if (e2.column !== undefined) {
+                                warningMsg += '\n       ' + ' '.repeat(Math.min(e2.column, 80)) + '^';
+                            }
+                        }
+                    } else if (e2.index !== undefined) {
+                        // index만 있는 경우 줄 번호 계산
+                        var beforeError = sourceCode.substring(0, e2.index);
+                        var lineNum = (beforeError.match(/\n/g) || []).length + 1;
+                        warningMsg += '\n위치: ' + lineNum + '줄 (문자 위치 ' + e2.index + ')';
+                        
+                        var lines = sourceCode.split('\n');
+                        if (lineNum > 0 && lineNum <= lines.length) {
+                            var errorLine = lines[lineNum - 1];
+                            var preview = errorLine.trim();
+                            if (preview.length > 80) {
+                                preview = preview.substring(0, 77) + '...';
+                            }
+                            warningMsg += '\n코드: ' + preview;
+                        }
+                    }
+                    
                     console.warn(warningMsg, e2);
                     warningMessages.push(warningMsg);
                     comments = [];

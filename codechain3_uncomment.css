@@ -131,14 +131,17 @@ button {
 }
 
 .status {
-    text-align: center;
-    padding: 10px;
+    text-align: left;
+    padding: 15px;
     border-radius: 6px;
     margin-top: 15px;
-    font-size: 14px;
+    font-size: 13px;
     display: none;
     white-space: pre-wrap;
     word-wrap: break-word;
+    font-family: 'Courier New', monospace;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .status.success {
