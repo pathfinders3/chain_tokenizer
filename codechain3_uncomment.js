@@ -75,6 +75,149 @@ var CommentRemover = (function() {
     }
 
     /**
+     * Helper: Esprima로 토큰과 주석을 파싱합니다
+     */
+    function parseSource(sourceCode) {
+        var tokens = esprima.tokenize(sourceCode, { range: true, comment: false });
+        var comments = [];
+        try {
+            var parsed = esprima.parseScript(sourceCode, {
+                range: true,
+                comment: true,
+                tolerant: true,
+                loc: true
+            });
+            comments = parsed.comments || [];
+        } catch (e) {
+            try {
+                var parsed = esprima.parseModule(sourceCode, {
+                    range: true,
+                    comment: true,
+                    tolerant: true,
+                    loc: true
+                });
+                comments = parsed.comments || [];
+            } catch (e2) {
+                var warningMsg = '⚠️ 주석 파싱 실패 (Script 및 Module 모두): ' + e2.message;
+
+                if (e2.lineNumber) {
+                    warningMsg += '\n위치: ' + e2.lineNumber + '줄';
+                    var lines = sourceCode.split('\n');
+                    if (e2.lineNumber > 0 && e2.lineNumber <= lines.length) {
+                        var errorLine = lines[e2.lineNumber - 1];
+                        var preview = errorLine.trim();
+                        if (preview.length > 80) {
+                            preview = preview.substring(0, 77) + '...';
+                        }
+                        warningMsg += '\n코드: ' + preview;
+                        if (e2.column !== undefined) {
+                            warningMsg += '\n       ' + ' '.repeat(Math.min(e2.column, 80)) + '^';
+                        }
+                    }
+                } else if (e2.index !== undefined) {
+                    var beforeError = sourceCode.substring(0, e2.index);
+                    var lineNum = (beforeError.match(/\n/g) || []).length + 1;
+                    warningMsg += '\n위치: ' + lineNum + '줄 (문자 위치 ' + e2.index + ')';
+                    var lines = sourceCode.split('\n');
+                    if (lineNum > 0 && lineNum <= lines.length) {
+                        var errorLine = lines[lineNum - 1];
+                        var preview = errorLine.trim();
+                        if (preview.length > 80) {
+                            preview = preview.substring(0, 77) + '...';
+                        }
+                        warningMsg += '\n코드: ' + preview;
+                    }
+                }
+
+                console.warn(warningMsg, e2);
+                warningMessages.push(warningMsg);
+                comments = [];
+            }
+        }
+        return {
+            tokens: tokens,
+            comments: comments
+        };
+    }
+
+    /**
+     * Helper: 주석 위치를 맵으로 만듭니다
+     */
+    function buildCommentMap(comments) {
+        var map = {};
+        comments.forEach(function(comment) {
+            for (var i = comment.range[0]; i < comment.range[1]; i++) {
+                map[i] = comment;
+            }
+        });
+        return map;
+    }
+
+    /**
+     * Helper: 여러줄 주석을 저장하고 인덱스를 반환합니다
+     */
+    function addMultiLineComment(content, comment) {
+        var index = multiLineComments.length;
+        multiLineComments.push({
+            content: content,
+            startLine: comment.loc.start.line,
+            endLine: comment.loc.end.line
+        });
+        return index;
+    }
+
+    /**
+     * Helper: 토큰 사이의 영역(공백/주석)을 처리합니다
+     */
+    function processBetween(source, from, to, commentMap, processedComments) {
+        var processed = '';
+        var i = from;
+        while (i < to) {
+            var char = source[i];
+            var comment = commentMap[i];
+
+            if (comment && !processedComments.has(comment)) {
+                processedComments.add(comment);
+
+                if (comment.type === 'Block') {
+                    var commentText = source.substring(comment.range[0], comment.range[1]);
+                    var content = commentText.substring(2, commentText.length - 2);
+
+                    if (content.indexOf('\n') !== -1) {
+                        var index = addMultiLineComment(content, comment);
+                        var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
+                        processed += placeholder;
+                    }
+                    i = comment.range[1];
+                } else {
+                    i = comment.range[1];
+                }
+            } else if (!commentMap[i]) {
+                if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
+                    processed += char;
+                }
+                i++;
+            } else {
+                i++;
+            }
+        }
+        return processed;
+    }
+
+    /**
+     * Helper: 토큰을 변환합니다
+     */
+    function transformTokenValue(token, source) {
+        var tokenValue = source.substring(token.range[0], token.range[1]);
+        if (token.type === 'String' || token.type === 'Template') {
+            return replaceSlashesInQuotes(tokenValue);
+        } else if (token.type === 'RegularExpression') {
+            return tokenValue.replace(/\//g, '|');
+        }
+        return tokenValue;
+    }
+
+    /**
      * JavaScript 코드에서 주석을 제거합니다 (여러 줄 주석은 multi-NNN 형식으로 치환, 줄 구조 유지)
      * @param {string} sourceCode - 원본 JavaScript 코드
      * @returns {string} 주석이 제거/변환된 코드
@@ -94,88 +237,12 @@ var CommentRemover = (function() {
         warningMessages = [];
 
         try {
-            // Esprima로 코드 파싱 (주석 포함)
-            var tokens = esprima.tokenize(sourceCode, { 
-                range: true,
-                comment: false
-            });
-
-            var comments = [];
-            try {
-                // 주석 정보 추출 (tolerant 모드로 문법 오류 무시)
-                var parsed = esprima.parseScript(sourceCode, {
-                    range: true,
-                    comment: true,
-                    tolerant: true,
-                    loc: true
-                });
-                comments = parsed.comments || [];
-            } catch (e) {
-                // parseScript 실패 시 Module로 재시도
-                try {
-                    var parsed = esprima.parseModule(sourceCode, {
-                        range: true,
-                        comment: true,
-                        tolerant: true,
-                        loc: true
-                    });
-                    comments = parsed.comments || [];
-                } catch (e2) {
-                    // 파싱 완전 실패 - 주석 없이 진행
-                    var warningMsg = '⚠️ 주석 파싱 실패 (Script 및 Module 모두): ' + e2.message;
-                    
-                    // 에러 위치 정보 추가
-                    if (e2.lineNumber) {
-                        warningMsg += '\n위치: ' + e2.lineNumber + '줄';
-                        
-                        // 해당 줄의 코드 추출
-                        var lines = sourceCode.split('\n');
-                        if (e2.lineNumber > 0 && e2.lineNumber <= lines.length) {
-                            var errorLine = lines[e2.lineNumber - 1];
-                            var preview = errorLine.trim();
-                            
-                            // 너무 길면 자르기
-                            if (preview.length > 80) {
-                                preview = preview.substring(0, 77) + '...';
-                            }
-                            
-                            warningMsg += '\n코드: ' + preview;
-                            
-                            // 컬럼 정보가 있으면 표시
-                            if (e2.column !== undefined) {
-                                warningMsg += '\n       ' + ' '.repeat(Math.min(e2.column, 80)) + '^';
-                            }
-                        }
-                    } else if (e2.index !== undefined) {
-                        // index만 있는 경우 줄 번호 계산
-                        var beforeError = sourceCode.substring(0, e2.index);
-                        var lineNum = (beforeError.match(/\n/g) || []).length + 1;
-                        warningMsg += '\n위치: ' + lineNum + '줄 (문자 위치 ' + e2.index + ')';
-                        
-                        var lines = sourceCode.split('\n');
-                        if (lineNum > 0 && lineNum <= lines.length) {
-                            var errorLine = lines[lineNum - 1];
-                            var preview = errorLine.trim();
-                            if (preview.length > 80) {
-                                preview = preview.substring(0, 77) + '...';
-                            }
-                            warningMsg += '\n코드: ' + preview;
-                        }
-                    }
-                    
-                    console.warn(warningMsg, e2);
-                    warningMessages.push(warningMsg);
-                    comments = [];
-                }
-            }
+            var parsed = parseSource(sourceCode);
+            var tokens = parsed.tokens;
+            var comments = parsed.comments || [];
 
             // 주석 위치를 맵으로 저장
-            var commentMap = {};
-            comments.forEach(function(comment) {
-                for (var i = comment.range[0]; i < comment.range[1]; i++) {
-                    commentMap[i] = comment;
-                }
-            });
+            var commentMap = buildCommentMap(comments);
 
             var result = '';
             var lastEnd = 0;
@@ -187,116 +254,17 @@ var CommentRemover = (function() {
                 
                 // 토큰 사이의 공백 및 주석 처리
                 if (start > lastEnd) {
-                    var between = sourceCode.substring(lastEnd, start);
-                    var processed = '';
-                    
-                    var i = lastEnd;
-                    while (i < start) {
-                        var char = sourceCode[i];
-                        var comment = commentMap[i];
-                        
-                        if (comment && !processedComments.has(comment)) {
-                            processedComments.add(comment);
-                            
-                            // 여러 줄 주석인 경우 multi-NNN 형식으로 치환
-                            if (comment.type === 'Block') {
-                                var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
-                                // /* */ 제거하고 내용만 추출
-                                var content = commentText.substring(2, commentText.length - 2);
-                                
-                                // 2줄 이상인 경우만 플레이스홀더로 치환 (1줄은 삭제)
-                                if (content.indexOf('\n') !== -1) {
-                                    // 배열에 저장 (줄 번호 포함)
-                                    var index = multiLineComments.length;
-                                    multiLineComments.push({
-                                        content: content,
-                                        startLine: comment.loc.start.line,
-                                        endLine: comment.loc.end.line
-                                    });
-                                    
-                                    // `** multi-001 **` 형식으로 치환
-                                    var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
-                                    processed += placeholder;
-                                }
-                                // 주석 끝으로 이동 (1줄 주석은 아무것도 추가하지 않고 삭제)
-                                i = comment.range[1];
-                            } else {
-                                // 한 줄 주석은 삭제
-                                i = comment.range[1];
-                            }
-                        } else if (!commentMap[i]) {
-                            // 주석이 아닌 공백/줄바꿈은 유지
-                            if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
-                                processed += char;
-                            }
-                            i++;
-                        } else {
-                            // commentMap[i]가 있지만 이미 처리된 경우
-                            i++;
-                        }
-                    }
-                    
-                    result += processed;
+                    result += processBetween(sourceCode, lastEnd, start, commentMap, processedComments);
                 }
                 
-                // 실제 토큰 추가 (문자열 토큰인 경우 슬래시/백슬래시 치환, 정규식인 경우 / -> | 치환)
-                var tokenValue = sourceCode.substring(start, end);
-                if (token.type === 'String' || token.type === 'Template') {
-                    tokenValue = replaceSlashesInQuotes(tokenValue);
-                } else if (token.type === 'RegularExpression') {
-                    // 정규식의 / -> | 치환
-                    tokenValue = tokenValue.replace(/\//g, '|');
-                }
-                result += tokenValue;
+                // 토큰 변환 처리
+                result += transformTokenValue(token, sourceCode);
                 lastEnd = end;
             });
 
             // 마지막 토큰 이후의 공백/줄바꿈 및 주석 처리
             if (lastEnd < sourceCode.length) {
-                var remaining = sourceCode.substring(lastEnd);
-                var processed = '';
-                
-                var i = lastEnd;
-                while (i < sourceCode.length) {
-                    var char = sourceCode[i];
-                    var comment = commentMap[i];
-                    
-                    if (comment && !processedComments.has(comment)) {
-                        processedComments.add(comment);
-                        
-                        if (comment.type === 'Block') {
-                            var commentText = sourceCode.substring(comment.range[0], comment.range[1]);
-                            var content = commentText.substring(2, commentText.length - 2);
-                            
-                            // 2줄 이상인 경우만 플레이스홀더로 치환 (1줄은 삭제)
-                            if (content.indexOf('\n') !== -1) {
-                                // 배열에 저장 (줄 번호 포함)
-                                var index = multiLineComments.length;
-                                multiLineComments.push({
-                                    content: content,
-                                    startLine: comment.loc.start.line,
-                                    endLine: comment.loc.end.line
-                                });
-                                
-                                // `** multi-001 **` 형식으로 치환
-                                var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
-                                processed += placeholder;
-                            }
-                            i = comment.range[1];
-                        } else {
-                            i = comment.range[1];
-                        }
-                    } else if (!commentMap[i]) {
-                        if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
-                            processed += char;
-                        }
-                        i++;
-                    } else {
-                        i++;
-                    }
-                }
-                
-                result += processed;
+                result += processBetween(sourceCode, lastEnd, sourceCode.length, commentMap, processedComments);
             }
 
             return result;
