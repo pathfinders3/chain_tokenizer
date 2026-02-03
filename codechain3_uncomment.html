@@ -111,14 +111,24 @@
                     // 여러 줄 주석 목록 표시
                     displayMultiLineComments();
 
+                    // 경고 메시지 확인 및 표시
+                    var warnings = CommentRemover.getWarnings();
+                    var statusMessage = '✅ 주석이 성공적으로 제거되었습니다!';
+                    
+                    if (warnings && warnings.length > 0) {
+                        // 경고가 있으면 표시
+                        statusMessage = warnings.join('\n') + '\n\n' + statusMessage;
+                    }
+
                     // 원본을 LocalStorage에 저장 (복구/감사 용)
                     try {
                         localStorage.setItem('codechain3_originalSource', sourceCode);
                         localStorage.setItem('codechain3_originalSource_ts', new Date().toISOString());
-                        showStatus('✅ 주석이 성공적으로 제거되었습니다! (원본을 LocalStorage에 저장했습니다)');
+                        statusMessage += ' (원본을 LocalStorage에 저장했습니다)';
+                        showStatus(statusMessage, warnings && warnings.length > 0);
                     } catch (e) {
                         console.warn('LocalStorage 저장 실패:', e);
-                        showStatus('✅ 주석 제거됨. (원본을 LocalStorage에 저장하지 못했습니다)', true);
+                        showStatus(statusMessage + '\n(원본을 LocalStorage에 저장하지 못했습니다)', true);
                     }
                 } catch (error) {
                     showStatus('❌ ' + error.message, true);

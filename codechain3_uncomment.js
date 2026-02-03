@@ -15,6 +15,9 @@ var CommentRemover = (function() {
 
     // 여러 줄 주석 저장용 전역 배열
     var multiLineComments = [];
+    
+    // 경고 메시지 저장용
+    var warningMessages = [];
 
     /**
      * 인용부호 내의 슬래시와 백슬래시를 별표로 치환합니다
@@ -88,6 +91,7 @@ var CommentRemover = (function() {
 
         // 배열 초기화
         multiLineComments = [];
+        warningMessages = [];
 
         try {
             // Esprima로 코드 파싱 (주석 포함)
@@ -118,7 +122,9 @@ var CommentRemover = (function() {
                     comments = parsed.comments || [];
                 } catch (e2) {
                     // 파싱 완전 실패 - 주석 없이 진행
-                    console.warn('주석 파싱 실패 (Script 및 Module 모두):', e2);
+                    var warningMsg = '⚠️ 주석 파싱 실패 (Script 및 Module 모두): ' + e2.message;
+                    console.warn(warningMsg, e2);
+                    warningMessages.push(warningMsg);
                     comments = [];
                 }
             }
@@ -193,10 +199,13 @@ var CommentRemover = (function() {
                     result += processed;
                 }
                 
-                // 실제 토큰 추가 (문자열 토큰인 경우 슬래시/백슬래시 치환)
+                // 실제 토큰 추가 (문자열 토큰인 경우 슬래시/백슬래시 치환, 정규식인 경우 / -> | 치환)
                 var tokenValue = sourceCode.substring(start, end);
                 if (token.type === 'String' || token.type === 'Template') {
                     tokenValue = replaceSlashesInQuotes(tokenValue);
+                } else if (token.type === 'RegularExpression') {
+                    // 정규식의 / -> | 치환
+                    tokenValue = tokenValue.replace(/\//g, '|');
                 }
                 result += tokenValue;
                 lastEnd = end;
@@ -292,6 +301,9 @@ var CommentRemover = (function() {
         },
         getMultiLineComment: function(index) {
             return multiLineComments[index] || null;
+        },
+        getWarnings: function() {
+            return warningMessages;
         },
         version: '1.0.0'
     };
