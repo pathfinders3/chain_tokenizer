@@ -116,7 +116,12 @@
                 comments.forEach(function(comment, index) {
                     var btn = document.createElement('button');
                     btn.className = 'comment-item';
-                    btn.textContent = 'multi-' + String(index + 1).padStart(3, '0');
+                    // 줄 번호 정보 포함
+                    var label = 'multi-' + String(index + 1).padStart(3, '0');
+                    if (comment.startLine && comment.endLine) {
+                        label += ' (L' + comment.startLine + '-L' + comment.endLine + ')';
+                    }
+                    btn.textContent = label;
                     btn.onclick = function() {
                         showCommentDetail(index);
                     };
@@ -129,7 +134,16 @@
                 var commentDetail = document.getElementById('commentDetail');
                 
                 if (comment !== null) {
-                    commentDetail.value = comment;
+                    // 객체인 경우 content 속성 사용, 문자열이면 그대로 사용 (하위 호환성)
+                    var content = (typeof comment === 'object') ? comment.content : comment;
+                    var header = '';
+                    
+                    // 줄 번호 정보가 있으면 헤더에 표시
+                    if (typeof comment === 'object' && comment.startLine && comment.endLine) {
+                        header = '/* Lines ' + comment.startLine + '-' + comment.endLine + ' */\n\n';
+                    }
+                    
+                    commentDetail.value = header + content;
                 }
             }
 

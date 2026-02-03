@@ -103,7 +103,7 @@ var CommentRemover = (function() {
                     range: true,
                     comment: true,
                     tolerant: true,
-                    loc: false
+                    loc: true
                 });
                 comments = parsed.comments || [];
             } catch (e) {
@@ -113,7 +113,7 @@ var CommentRemover = (function() {
                         range: true,
                         comment: true,
                         tolerant: true,
-                        loc: false
+                        loc: true
                     });
                     comments = parsed.comments || [];
                 } catch (e2) {
@@ -160,9 +160,13 @@ var CommentRemover = (function() {
                                 
                                 // 2줄 이상인 경우만 플레이스홀더로 치환 (1줄은 삭제)
                                 if (content.indexOf('\n') !== -1) {
-                                    // 배열에 저장
+                                    // 배열에 저장 (줄 번호 포함)
                                     var index = multiLineComments.length;
-                                    multiLineComments.push(content);
+                                    multiLineComments.push({
+                                        content: content,
+                                        startLine: comment.loc.start.line,
+                                        endLine: comment.loc.end.line
+                                    });
                                     
                                     // `** multi-001 **` 형식으로 치환
                                     var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
@@ -217,9 +221,13 @@ var CommentRemover = (function() {
                             
                             // 2줄 이상인 경우만 플레이스홀더로 치환 (1줄은 삭제)
                             if (content.indexOf('\n') !== -1) {
-                                // 배열에 저장
+                                // 배열에 저장 (줄 번호 포함)
                                 var index = multiLineComments.length;
-                                multiLineComments.push(content);
+                                multiLineComments.push({
+                                    content: content,
+                                    startLine: comment.loc.start.line,
+                                    endLine: comment.loc.end.line
+                                });
                                 
                                 // `** multi-001 **` 형식으로 치환
                                 var placeholder = '`** multi-' + String(index + 1).padStart(3, '0') + ' **`';
