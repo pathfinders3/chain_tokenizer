@@ -212,8 +212,8 @@ var CommentRemover = (function() {
         if (token.type === 'String' || token.type === 'Template') {
             return replaceSlashesInQuotes(tokenValue);
         } else if (token.type === 'RegularExpression') {
-            // / → |, \ → ⍀ 치환 후 따옴표로 감싸기
-            var transformed = tokenValue.replace(/\//g, '|').replace(/\\/g, '⍀');
+            // / → |, \ → ⍀ 치환. " → UTF8 문자 ‟로 치환 후 따옴표로 감싸기
+            var transformed = tokenValue.replace(/\//g, '|').replace(/\\/g, '⍀').replace(/"/g, '‟');
             return '"' + transformed + '"';
         }
         return tokenValue;
