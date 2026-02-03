@@ -19,7 +19,7 @@
             </div>
 
             <div class="editor-section">
-                <h2>출력 (주석 제거됨)</h2>
+                <h2>출력 (주석 제거됨) <span id="lineInfo" class="line-info"></span></h2>
                 <textarea id="output" readonly placeholder="주석이 제거된 코드가 여기에 표시됩니다..."></textarea>
             </div>
         </div>
@@ -60,6 +60,32 @@
             var clearBtn = document.getElementById('clearBtn');
             var copyBtn = document.getElementById('copyBtn');
             var statusDiv = document.getElementById('status');
+            var lineInfo = document.getElementById('lineInfo');
+
+            // 줄 번호 업데이트 함수
+            function updateLineNumber() {
+                var text = outputTextarea.value;
+                var cursorPos = outputTextarea.selectionStart;
+                
+                if (!text) {
+                    lineInfo.textContent = '';
+                    return;
+                }
+                
+                // 커서 위치까지의 줄바꿈 개수 세기
+                var textBeforeCursor = text.substring(0, cursorPos);
+                var lineNumber = (textBeforeCursor.match(/\n/g) || []).length + 1;
+                
+                // 전체 줄 수
+                var totalLines = (text.match(/\n/g) || []).length + 1;
+                
+                lineInfo.textContent = '(줄 ' + lineNumber + ' / ' + totalLines + ')';
+            }
+
+            // output textarea에 이벤트 리스너 추가
+            outputTextarea.addEventListener('click', updateLineNumber);
+            outputTextarea.addEventListener('keyup', updateLineNumber);
+            outputTextarea.addEventListener('focus', updateLineNumber);
 
             function showStatus(message, isError) {
                 statusDiv.textContent = message;
