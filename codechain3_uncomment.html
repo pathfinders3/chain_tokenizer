@@ -209,14 +209,66 @@
                 showStatus('📋 클립보드에 복사되었습니다!');
             }
 
+            // 줄 번호로 이동하는 함수
+            function goToLine(textarea) {
+                var text = textarea.value;
+                if (!text) {
+                    showStatus('내용이 없습니다.', true);
+                    return;
+                }
+
+                var totalLines = (text.match(/\n/g) || []).length + 1;
+                var lineNumber = prompt('이동할 줄 번호를 입력하세요 (1-' + totalLines + '):');
+                
+                if (lineNumber === null) return; // 취소
+                
+                lineNumber = parseInt(lineNumber, 10);
+                
+                if (isNaN(lineNumber) || lineNumber < 1 || lineNumber > totalLines) {
+                    showStatus('❌ 유효하지 않은 줄 번호입니다. (1-' + totalLines + ' 사이의 숫자를 입력하세요)', true);
+                    return;
+                }
+
+                // 해당 줄의 시작 위치 계산
+                var lines = text.split('\n');
+                var position = 0;
+                
+                for (var i = 0; i < lineNumber - 1; i++) {
+                    position += lines[i].length + 1; // +1은 \n 문자
+                }
+
+                // 커서를 해당 위치로 이동
+                textarea.focus();
+                textarea.setSelectionRange(position, position);
+                
+                // 해당 줄을 화면에 보이도록 스크롤
+                textarea.scrollTop = textarea.scrollHeight * (lineNumber - 1) / totalLines;
+                
+                // output textarea인 경우 줄 번호 업데이트
+                if (textarea === outputTextarea) {
+                    updateLineNumber();
+                }
+            }
+
             removeBtn.addEventListener('click', removeComments);
             restoreBtn.addEventListener('click', loadOriginalFromStorage);
             clearBtn.addEventListener('click', clearAll);
             copyBtn.addEventListener('click', copyOutput);
 
+            // Ctrl+G로 줄 이동 (양쪽 textarea 모두)
             inputTextarea.addEventListener('keydown', function(e) {
                 if (e.ctrlKey && e.key === 'Enter') {
                     removeComments();
+                } else if (e.ctrlKey && e.key === 'g') {
+                    e.preventDefault();
+                    goToLine(inputTextarea);
+                }
+            });
+
+            outputTextarea.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'g') {
+                    e.preventDefault();
+                    goToLine(outputTextarea);
                 }
             });
 
