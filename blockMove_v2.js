@@ -65,6 +65,14 @@ const canvas = document.getElementById('canvas');
                             ctx.drawImage(img, 0, 0);
                             imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                             
+                            // LocalStorage에 이미지 저장
+                            try {
+                                localStorage.setItem('savedImage', event.target.result);
+                                console.log('이미지가 LocalStorage에 저장되었습니다.');
+                            } catch (e) {
+                                console.error('LocalStorage 저장 실패:', e);
+                            }
+                            
                             // 모든 방향 버튼 활성화
                             ['NW', 'N', 'NE', 'W', 'SE', 'E', 'SW', 'S', 'C'].forEach(dir => {
                                 document.getElementById('btn' + dir).disabled = false;
@@ -242,5 +250,28 @@ const canvas = document.getElementById('canvas');
             }
         }
 
+        // LocalStorage에서 이미지 불러오기
+        function loadImageFromStorage() {
+            const savedImage = localStorage.getItem('savedImage');
+            if (savedImage) {
+                const img = new Image();
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // 모든 방향 버튼 활성화
+                    ['NW', 'N', 'NE', 'W', 'SE', 'E', 'SW', 'S', 'C'].forEach(dir => {
+                        document.getElementById('btn' + dir).disabled = false;
+                    });
+                    
+                    showMessage('저장된 이미지가 자동으로 로드되었습니다. 크기: ' + img.width + 'x' + img.height, 'info');
+                };
+                img.src = savedImage;
+            }
+        }
+
         // 초기화
         updateRegionsList();
+        loadImageFromStorage();
