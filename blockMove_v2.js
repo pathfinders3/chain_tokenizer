@@ -149,8 +149,8 @@ const canvas = document.getElementById('canvas');
             
             messages.push(`<strong>확장 방향: ${getDirectionName(direction)}</strong><br>`);
 
-            // 1x1, 2x2, 3x3, 4x4 순서로 탐색
-            for (let size = 1; size <= 4; size++) {
+            // 1x1, 2x2, 3x3 ... 8x8 순서로 탐색
+            for (let size = 1; size <= 8; size++) {
                 const area = size * size;
                 
                 // 방향에 따라 실제 사각형의 시작점 계산
