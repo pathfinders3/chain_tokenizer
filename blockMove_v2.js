@@ -302,9 +302,8 @@ const canvas = document.getElementById('canvas');
 
         // 캔버스에 사각형 그리기
         function drawRectangle(x, y, size, color) {
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, size, size);
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, size, size);
         }
 
         // 찾은 영역 목록 업데이트
