@@ -4,6 +4,7 @@ const canvas = document.getElementById('canvas');
         
         let imageData = null;
         let foundRegions = []; // 전역 배열: 찾은 영역 저장
+        let currentRegion = null; // 현재 표시 중인 영역 정보
 
         // 방향별 시작점 계산 함수
         function getStartPoint(inputX, inputY, size, direction) {
@@ -242,6 +243,9 @@ const canvas = document.getElementById('canvas');
         // 정보 버튼에 색상 개수 업데이트
         // 정보 버튼에 색상 개수 업데이트
         function updateInfoButtons(startX, startY, size) {
+            // 현재 영역 정보 저장
+            currentRegion = { startX, startY, size };
+            
             const edgePixels = countEdgePixels(startX, startY, size);
 
             // 텍스트 포맷: 0개인 색상은 표시하지 않음
@@ -287,6 +291,108 @@ const canvas = document.getElementById('canvas');
             ['NW', 'N', 'NE', 'W', 'SE', 'E', 'SW', 'S', 'C'].forEach(dir => {
                 document.getElementById('info' + dir).textContent = '';
             });
+            currentRegion = null;
+        }
+
+        // 특정 변의 점들 정보를 표시하는 함수
+        function showEdgePointsInfo(edge) {
+            if (!currentRegion) {
+                showMessage('먼저 영역을 찾아주세요!', 'error');
+                return;
+            }
+
+            const { startX, startY, size } = currentRegion;
+            let points = [];
+            let edgeName = '';
+
+            switch(edge) {
+                case 'top': // 상
+                    edgeName = '상단';
+                    if (startY > 0) {
+                        for (let x = startX; x < startX + size; x++) {
+                            if (x >= 0 && x < canvas.width) {
+                                const isWhite = isWhitePixel(x, startY - 1);
+                                points.push({ x, y: startY - 1, isWhite });
+                            }
+                        }
+                    }
+                    break;
+                
+                case 'bottom': // 하
+                    edgeName = '하단';
+                    if (startY + size < canvas.height) {
+                        for (let x = startX; x < startX + size; x++) {
+                            if (x >= 0 && x < canvas.width) {
+                                const isWhite = isWhitePixel(x, startY + size);
+                                points.push({ x, y: startY + size, isWhite });
+                            }
+                        }
+                    }
+                    break;
+                
+                case 'left': // 좌
+                    edgeName = '좌측';
+                    if (startX > 0) {
+                        for (let y = startY; y < startY + size; y++) {
+                            if (y >= 0 && y < canvas.height) {
+                                const isWhite = isWhitePixel(startX - 1, y);
+                                points.push({ x: startX - 1, y, isWhite });
+                            }
+                        }
+                    }
+                    break;
+                
+                case 'right': // 우
+                    edgeName = '우측';
+                    if (startX + size < canvas.width) {
+                        for (let y = startY; y < startY + size; y++) {
+                            if (y >= 0 && y < canvas.height) {
+                                const isWhite = isWhitePixel(startX + size, y);
+                                points.push({ x: startX + size, y, isWhite });
+                            }
+                        }
+                    }
+                    break;
+            }
+
+            // 결과 메시지 생성
+            if (points.length === 0) {
+                showMessage(`${edgeName} 변의 점이 없습니다 (이미지 경계에 닿음)`, 'info');
+                return;
+            }
+
+            const blackPoints = points.filter(p => !p.isWhite);
+            const whitePoints = points.filter(p => p.isWhite);
+
+            let html = `<div style="padding: 10px;"><strong>${edgeName} 변의 점 정보</strong><br><br>`;
+            html += `총 ${points.length}개 점: `;
+            html += `<span style="color: black; background: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">검은 점 ${blackPoints.length}개</span> `;
+            html += `<span style="color: #666; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-weight: bold;">흰 점 ${whitePoints.length}개</span><br><br>`;
+
+            // 검은 점 표시
+            if (blackPoints.length > 0) {
+                html += '<div style="margin-bottom: 15px;">';
+                html += '<strong style="background: black; color: white; padding: 3px 8px; border-radius: 3px;">● 검은 점</strong><br>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
+                blackPoints.forEach(p => {
+                    html += `<div style="background: black; color: white; padding: 6px 10px; border-radius: 4px; font-family: monospace; font-size: 13px;">(${p.x}, ${p.y})</div>`;
+                });
+                html += '</div></div>';
+            }
+
+            // 흰 점 표시
+            if (whitePoints.length > 0) {
+                html += '<div style="margin-bottom: 10px;">';
+                html += '<strong style="background: white; color: black; padding: 3px 8px; border-radius: 3px; border: 1px solid #ccc;">○ 흰 점</strong><br>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
+                whitePoints.forEach(p => {
+                    html += `<div style="background: white; color: black; padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-family: monospace; font-size: 13px;">(${p.x}, ${p.y})</div>`;
+                });
+                html += '</div></div>';
+            }
+
+            html += '</div>';
+            showMessage(html, 'result');
         }
 
         // 영역 찾기 메인 함수
