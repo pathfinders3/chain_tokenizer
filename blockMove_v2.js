@@ -129,7 +129,7 @@ const canvas = document.getElementById('canvas');
         }
 
         // 작은 캔버스에 픽셀을 확대하여 표시
-        function createPixelCanvas(startX, startY, size, maxSize) {
+        function createPixelCanvas(startX, startY, size, foundStartX, foundStartY, foundSize) {
             const pixelSize = 10; // 각 픽셀을 10px × 10px로 확대
             const smallCanvas = document.createElement('canvas');
             smallCanvas.width = size * pixelSize;
@@ -141,19 +141,25 @@ const canvas = document.getElementById('canvas');
                     const imgX = startX + x;
                     const imgY = startY + y;
                     
-                    // 이미 찾은 영역(maxSize) 내부인지 확인
-                    const isInFoundArea = (x < maxSize && y < maxSize);
+                    // 이미 찾은 영역의 절대 좌표로 확인
+                    const isInFoundArea = foundSize > 0 && 
+                                         imgX >= foundStartX && imgX < foundStartX + foundSize &&
+                                         imgY >= foundStartY && imgY < foundStartY + foundSize;
                     
                     let color;
                     if (isInFoundArea) {
                         color = 'lime'; // 녹색으로 표시
                     } else {
                         // 원본 이미지의 실제 RGB 색상 가져오기
-                        const index = (imgY * canvas.width + imgX) * 4;
-                        const r = imageData.data[index];
-                        const g = imageData.data[index + 1];
-                        const b = imageData.data[index + 2];
-                        color = `rgb(${r}, ${g}, ${b})`;
+                        if (imgX >= 0 && imgX < canvas.width && imgY >= 0 && imgY < canvas.height) {
+                            const index = (imgY * canvas.width + imgX) * 4;
+                            const r = imageData.data[index];
+                            const g = imageData.data[index + 1];
+                            const b = imageData.data[index + 2];
+                            color = `rgb(${r}, ${g}, ${b})`;
+                        } else {
+                            color = '#555'; // 이미지 범위 밖은 회색
+                        }
                     }
                     
                     smallCtx.fillStyle = color;
@@ -300,6 +306,8 @@ const canvas = document.getElementById('canvas');
 
             let maxSize = 0;
             let maxArea = 0;
+            let maxStartX = 0;
+            let maxStartY = 0;
             let messages = [];
             
             messages.push(`<strong>확장 방향: ${getDirectionName(direction)}</strong><br>`);
@@ -316,6 +324,8 @@ const canvas = document.getElementById('canvas');
                 if (isWhiteRectangle(startX, startY, size)) {
                     maxSize = size;
                     maxArea = area;
+                    maxStartX = startX;
+                    maxStartY = startY;
                     const endX = startX + size - 1;
                     const endY = startY + size - 1;
                     messages.push(`${area} (${startX},${startY})~(${endX},${endY}) : Good ✓`);
@@ -324,10 +334,10 @@ const canvas = document.getElementById('canvas');
                     drawRectangle(startX, startY, size, 'lime');
                 } else {
                     // 실패 시 작은 캔버스로 픽셀 상태 표시
-                    const canvasDataUrl = createPixelCanvas(startX, startY, size, maxSize);
+                    const canvasDataUrl = createPixelCanvas(startX, startY, size, maxStartX, maxStartY, maxSize);
                     messages.push(`넓이 ${area}인 사각형 찾기 실패 ✗`);
                     messages.push(`<div style="margin: 10px 0;"><img src="${canvasDataUrl}" style="image-rendering: pixelated; border: 1px solid #666;"></div>`);
-                    messages.push(`<span style="font-size: 12px; color: #999;">(녹색: 이미 찾은 영역, 흰색/검은색: 원본 픽셀)</span>`);
+                    messages.push(`<span style="font-size: 12px; color: #999;">(녹색: 이미 찾은 영역, 회색: 이미지 밖, 나머지: 원본 픽셀)</span>`);
                     break;
                 }
             }
