@@ -21,34 +21,47 @@
             <div style="margin: 15px 0;">
                 <strong>확장 방향 선택:</strong>
             </div>
-            <div class="direction-buttons">
-                <button class="dir-btn" onclick="findRectangle('nw')" id="btnNW" disabled>
-                    ↖
-                </button>
-                <button class="dir-btn" onclick="findRectangle('n')" id="btnN" disabled>
-                    ↑
-                </button>
-                <button class="dir-btn" onclick="findRectangle('ne')" id="btnNE" disabled>
-                    ↗
-                </button>
-                <button class="dir-btn" onclick="findRectangle('w')" id="btnW" disabled>
-                    ←
-                </button>
-                <button class="dir-btn" onclick="findRectangle('se')" id="btnSE" disabled style="background-color: #4CAF50;">
-                    ↘
-                </button>
-                <button class="dir-btn" onclick="findRectangle('e')" id="btnE" disabled>
-                    →
-                </button>
-                <button class="dir-btn" onclick="findRectangle('sw')" id="btnSW" disabled>
-                    ↙
-                </button>
-                <button class="dir-btn" onclick="findRectangle('s')" id="btnS" disabled>
-                    ↓
-                </button>
-                <button class="dir-btn" onclick="findRectangle('c')" id="btnC" disabled>
-                    ●
-                </button>
+            <div class="buttons-container">
+                <div class="direction-buttons">
+                    <button class="dir-btn" onclick="findRectangle('nw')" id="btnNW" disabled>
+                        ↖
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('n')" id="btnN" disabled>
+                        ↑
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('ne')" id="btnNE" disabled>
+                        ↗
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('w')" id="btnW" disabled>
+                        ←
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('se')" id="btnSE" disabled style="background-color: #4CAF50;">
+                        ↘
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('e')" id="btnE" disabled>
+                        →
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('sw')" id="btnSW" disabled>
+                        ↙
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('s')" id="btnS" disabled>
+                        ↓
+                    </button>
+                    <button class="dir-btn" onclick="findRectangle('c')" id="btnC" disabled>
+                        ●
+                    </button>
+                </div>
+                <div class="info-buttons">
+                    <button class="info-btn" id="infoNW"></button>
+                    <button class="info-btn" id="infoN"></button>
+                    <button class="info-btn" id="infoNE"></button>
+                    <button class="info-btn" id="infoW"></button>
+                    <button class="info-btn" id="infoSE"></button>
+                    <button class="info-btn" id="infoE"></button>
+                    <button class="info-btn" id="infoSW"></button>
+                    <button class="info-btn" id="infoS"></button>
+                    <button class="info-btn" id="infoC"></button>
+                </div>
             </div>
             <button onclick="clearResults()">결과 초기화</button>
         </div>

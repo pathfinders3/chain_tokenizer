@@ -128,6 +128,98 @@ const canvas = document.getElementById('canvas');
             return ascii.join('\n');
         }
 
+        // 각 변의 외부 픽셀 색상 개수 계산
+        function countEdgePixels(startX, startY, size) {
+            const result = {
+                top: { black: 0, white: 0 },
+                bottom: { black: 0, white: 0 },
+                left: { black: 0, white: 0 },
+                right: { black: 0, white: 0 }
+            };
+
+            // 윗변 (y = startY - 1, x = startX to startX + size - 1)
+            if (startY > 0) {
+                for (let x = startX; x < startX + size; x++) {
+                    if (x >= 0 && x < canvas.width) {
+                        if (isWhitePixel(x, startY - 1)) {
+                            result.top.white++;
+                        } else {
+                            result.top.black++;
+                        }
+                    }
+                }
+            }
+
+            // 아랫변 (y = startY + size, x = startX to startX + size - 1)
+            if (startY + size < canvas.height) {
+                for (let x = startX; x < startX + size; x++) {
+                    if (x >= 0 && x < canvas.width) {
+                        if (isWhitePixel(x, startY + size)) {
+                            result.bottom.white++;
+                        } else {
+                            result.bottom.black++;
+                        }
+                    }
+                }
+            }
+
+            // 좌변 (x = startX - 1, y = startY to startY + size - 1)
+            if (startX > 0) {
+                for (let y = startY; y < startY + size; y++) {
+                    if (y >= 0 && y < canvas.height) {
+                        if (isWhitePixel(startX - 1, y)) {
+                            result.left.white++;
+                        } else {
+                            result.left.black++;
+                        }
+                    }
+                }
+            }
+
+            // 우변 (x = startX + size, y = startY to startY + size - 1)
+            if (startX + size < canvas.width) {
+                for (let y = startY; y < startY + size; y++) {
+                    if (y >= 0 && y < canvas.height) {
+                        if (isWhitePixel(startX + size, y)) {
+                            result.right.white++;
+                        } else {
+                            result.right.black++;
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // 정보 버튼에 색상 개수 업데이트
+        function updateInfoButtons(startX, startY, size) {
+            const edgePixels = countEdgePixels(startX, startY, size);
+
+            // 각 버튼 매핑: 윗변(NW, N, NE), 좌변(W), 우변(E), 아랫변(SW, S, SE), 중앙(C)
+            const topText = `B${edgePixels.top.black}W${edgePixels.top.white}`;
+            const bottomText = `B${edgePixels.bottom.black}W${edgePixels.bottom.white}`;
+            const leftText = `B${edgePixels.left.black}W${edgePixels.left.white}`;
+            const rightText = `B${edgePixels.right.black}W${edgePixels.right.white}`;
+
+            document.getElementById('infoNW').textContent = topText;
+            document.getElementById('infoN').textContent = topText;
+            document.getElementById('infoNE').textContent = topText;
+            document.getElementById('infoW').textContent = leftText;
+            document.getElementById('infoSE').textContent = '';
+            document.getElementById('infoE').textContent = rightText;
+            document.getElementById('infoSW').textContent = bottomText;
+            document.getElementById('infoS').textContent = bottomText;
+            document.getElementById('infoC').textContent = '';
+        }
+
+        // 정보 버튼 초기화
+        function clearInfoButtons() {
+            ['NW', 'N', 'NE', 'W', 'SE', 'E', 'SW', 'S', 'C'].forEach(dir => {
+                document.getElementById('info' + dir).textContent = '';
+            });
+        }
+
         // 영역 찾기 메인 함수
         function findRectangle(direction = 'se') {
             if (!imageData) {
@@ -197,6 +289,9 @@ const canvas = document.getElementById('canvas');
                 messages.push(`입력 좌표: (${inputX},${inputY})`);
                 messages.push(`저장된 영역: (${region.startX},${region.startY}) ~ (${region.endX},${region.endY})`);
                 
+                // 정보 버튼 업데이트
+                updateInfoButtons(finalStartPoint.x, finalStartPoint.y, maxSize);
+                
                 updateRegionsList();
             } else {
                 messages.push('<br><strong>흰색 영역을 찾을 수 없습니다.</strong>');
@@ -243,6 +338,7 @@ const canvas = document.getElementById('canvas');
             foundRegions = [];
             messageDiv.innerHTML = '';
             updateRegionsList();
+            clearInfoButtons();
             
             // 캔버스 다시 그리기 (사각형 제거)
             if (imageData) {
