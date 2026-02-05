@@ -234,22 +234,44 @@ const canvas = document.getElementById('canvas');
         }
 
         // 정보 버튼에 색상 개수 업데이트
+        // 정보 버튼에 색상 개수 업데이트
         function updateInfoButtons(startX, startY, size) {
             const edgePixels = countEdgePixels(startX, startY, size);
 
-            // 각 버튼 매핑: 윗변(NW, N, NE), 좌변(W), 우변(E), 아랫변(SW, S, SE), 중앙(C)
-            const topText = `B${edgePixels.top.black}W${edgePixels.top.white}`;
-            const bottomText = `B${edgePixels.bottom.black}W${edgePixels.bottom.white}`;
-            const leftText = `B${edgePixels.left.black}W${edgePixels.left.white}`;
-            const rightText = `B${edgePixels.right.black}W${edgePixels.right.white}`;
+            // 텍스트 포맷: 0개인 색상은 표시하지 않음
+            const formatEdgeText = (blackCount, whiteCount) => {
+                let text = '';
+                if (blackCount > 0) text += `B${blackCount}`;
+                if (whiteCount > 0) text += `W${whiteCount}`;
+                return text;
+            };
 
-            document.getElementById('infoNW').textContent = topText;
+            // 대각선 픽셀 체크 (1개만)
+            const checkDiagonalPixel = (x, y) => {
+                if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) {
+                    return '';
+                }
+                return isWhitePixel(x, y) ? 'W1' : 'B1';
+            };
+
+            const topText = formatEdgeText(edgePixels.top.black, edgePixels.top.white);
+            const bottomText = formatEdgeText(edgePixels.bottom.black, edgePixels.bottom.white);
+            const leftText = formatEdgeText(edgePixels.left.black, edgePixels.left.white);
+            const rightText = formatEdgeText(edgePixels.right.black, edgePixels.right.white);
+
+            // 대각선 위치
+            const nwText = checkDiagonalPixel(startX - 1, startY - 1);  // 좌상
+            const neText = checkDiagonalPixel(startX + size, startY - 1);  // 우상
+            const swText = checkDiagonalPixel(startX - 1, startY + size);  // 좌하
+            const seText = checkDiagonalPixel(startX + size, startY + size);  // 우하
+
+            document.getElementById('infoNW').textContent = nwText;
             document.getElementById('infoN').textContent = topText;
-            document.getElementById('infoNE').textContent = topText;
+            document.getElementById('infoNE').textContent = neText;
             document.getElementById('infoW').textContent = leftText;
-            document.getElementById('infoSE').textContent = '';
+            document.getElementById('infoSE').textContent = seText;
             document.getElementById('infoE').textContent = rightText;
-            document.getElementById('infoSW').textContent = bottomText;
+            document.getElementById('infoSW').textContent = swText;
             document.getElementById('infoS').textContent = bottomText;
             document.getElementById('infoC').textContent = '';
         }
