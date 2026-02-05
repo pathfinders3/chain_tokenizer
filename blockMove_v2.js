@@ -294,11 +294,60 @@ const canvas = document.getElementById('canvas');
             currentRegion = null;
         }
 
-        // 흰색 점 클릭 핸들러 (나중에 기능 추가 예정)
+        // 특정 좌표가 찾은 영역들(녹색 사각형) 중 하나라도 내부에 있는지 확인
+        function isInsideFoundRegion(x, y) {
+            return foundRegions.some(region => {
+                return x >= region.startX && x < region.startX + region.size && 
+                       y >= region.startY && y < region.startY + region.size;
+            });
+        }
+
+        // 흰색 점 클릭 핸들러 (주변 점 조사)
         function onWhitePointClick(x, y) {
             console.log(`흰색 점 클릭: (${x}, ${y})`);
-            // TODO: 주변 픽셀 조사 등 기능 추가
-            showMessage(`흰색 점 (${x}, ${y}) 클릭됨<br>이곳에 기능을 추가할 수 있습니다.`, 'info');
+            
+            // 상하좌우 주변 점 조사
+            const neighbors = [
+                { x: x, y: y - 1, dir: '상(↑)' },
+                { x: x, y: y + 1, dir: '하(↓)' },
+                { x: x - 1, y: y, dir: '좌(←)' },
+                { x: x + 1, y: y, dir: '우(→)' }
+            ];
+
+            let html = `<div style="padding: 10px;"><strong>흰색 점 (${x}, ${y}) 주변 조사</strong><br><br>`;
+            
+            neighbors.forEach(neighbor => {
+                const { x: nx, y: ny, dir } = neighbor;
+                
+                // 이미지 범위 체크
+                if (nx < 0 || ny < 0 || nx >= canvas.width || ny >= canvas.height) {
+                    html += `${dir} (${nx}, ${ny}): <span style="color: #999;">이미지 밖</span><br>`;
+                    return;
+                }
+                
+                // 픽셀 색상 정보
+                const isWhite = isWhitePixel(nx, ny);
+                const index = (ny * canvas.width + nx) * 4;
+                const r = imageData.data[index];
+                const g = imageData.data[index + 1];
+                const b = imageData.data[index + 2];
+                
+                // 녹색 영역 체크
+                const inGreenRegion = isInsideFoundRegion(nx, ny);
+                
+                const bgColor = isWhite ? 'white' : `rgb(${r}, ${g}, ${b})`;
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                const textColor = isWhite ? 'black' : (brightness > 128 ? 'black' : 'white');
+                const borderColor = isWhite ? '#ccc' : '#999';
+                
+                html += `${dir} <span style="background: ${bgColor}; color: ${textColor}; padding: 2px 8px; border: 1px solid ${borderColor}; border-radius: 3px; font-family: monospace;">(${nx}, ${ny})</span>`;
+                html += ` ${isWhite ? '흰색' : '검은색'}`;
+                html += inGreenRegion ? ' <span style="color: green; font-weight: bold;">[녹색 영역 내부]</span>' : ' <span style="color: #999;">[녹색 영역 외부]</span>';
+                html += '<br>';
+            });
+            
+            html += '</div>';
+            showMessage(html, 'result');
         }
 
         // 특정 변의 점들 정보를 표시하는 함수
