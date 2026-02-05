@@ -294,6 +294,13 @@ const canvas = document.getElementById('canvas');
             currentRegion = null;
         }
 
+        // 흰색 점 클릭 핸들러 (나중에 기능 추가 예정)
+        function onWhitePointClick(x, y) {
+            console.log(`흰색 점 클릭: (${x}, ${y})`);
+            // TODO: 주변 픽셀 조사 등 기능 추가
+            showMessage(`흰색 점 (${x}, ${y}) 클릭됨<br>이곳에 기능을 추가할 수 있습니다.`, 'info');
+        }
+
         // 특정 변의 점들 정보를 표시하는 함수
         function showEdgePointsInfo(edge) {
             if (!currentRegion) {
@@ -312,7 +319,11 @@ const canvas = document.getElementById('canvas');
                         for (let x = startX; x < startX + size; x++) {
                             if (x >= 0 && x < canvas.width) {
                                 const isWhite = isWhitePixel(x, startY - 1);
-                                points.push({ x, y: startY - 1, isWhite });
+                                const index = ((startY - 1) * canvas.width + x) * 4;
+                                const r = imageData.data[index];
+                                const g = imageData.data[index + 1];
+                                const b = imageData.data[index + 2];
+                                points.push({ x, y: startY - 1, isWhite, r, g, b });
                             }
                         }
                     }
@@ -324,7 +335,11 @@ const canvas = document.getElementById('canvas');
                         for (let x = startX; x < startX + size; x++) {
                             if (x >= 0 && x < canvas.width) {
                                 const isWhite = isWhitePixel(x, startY + size);
-                                points.push({ x, y: startY + size, isWhite });
+                                const index = ((startY + size) * canvas.width + x) * 4;
+                                const r = imageData.data[index];
+                                const g = imageData.data[index + 1];
+                                const b = imageData.data[index + 2];
+                                points.push({ x, y: startY + size, isWhite, r, g, b });
                             }
                         }
                     }
@@ -336,7 +351,11 @@ const canvas = document.getElementById('canvas');
                         for (let y = startY; y < startY + size; y++) {
                             if (y >= 0 && y < canvas.height) {
                                 const isWhite = isWhitePixel(startX - 1, y);
-                                points.push({ x: startX - 1, y, isWhite });
+                                const index = (y * canvas.width + (startX - 1)) * 4;
+                                const r = imageData.data[index];
+                                const g = imageData.data[index + 1];
+                                const b = imageData.data[index + 2];
+                                points.push({ x: startX - 1, y, isWhite, r, g, b });
                             }
                         }
                     }
@@ -348,7 +367,11 @@ const canvas = document.getElementById('canvas');
                         for (let y = startY; y < startY + size; y++) {
                             if (y >= 0 && y < canvas.height) {
                                 const isWhite = isWhitePixel(startX + size, y);
-                                points.push({ x: startX + size, y, isWhite });
+                                const index = (y * canvas.width + (startX + size)) * 4;
+                                const r = imageData.data[index];
+                                const g = imageData.data[index + 1];
+                                const b = imageData.data[index + 2];
+                                points.push({ x: startX + size, y, isWhite, r, g, b });
                             }
                         }
                     }
@@ -369,27 +392,22 @@ const canvas = document.getElementById('canvas');
             html += `<span style="color: black; background: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">검은 점 ${blackPoints.length}개</span> `;
             html += `<span style="color: #666; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-weight: bold;">흰 점 ${whitePoints.length}개</span><br><br>`;
 
-            // 검은 점 표시
-            if (blackPoints.length > 0) {
-                html += '<div style="margin-bottom: 15px;">';
-                html += '<strong style="background: black; color: white; padding: 3px 8px; border-radius: 3px;">● 검은 점</strong><br>';
-                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
-                blackPoints.forEach(p => {
-                    html += `<div style="background: black; color: white; padding: 6px 10px; border-radius: 4px; font-family: monospace; font-size: 13px;">(${p.x}, ${p.y})</div>`;
-                });
-                html += '</div></div>';
-            }
-
-            // 흰 점 표시
-            if (whitePoints.length > 0) {
-                html += '<div style="margin-bottom: 10px;">';
-                html += '<strong style="background: white; color: black; padding: 3px 8px; border-radius: 3px; border: 1px solid #ccc;">○ 흰 점</strong><br>';
-                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
-                whitePoints.forEach(p => {
-                    html += `<div style="background: white; color: black; padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-family: monospace; font-size: 13px;">(${p.x}, ${p.y})</div>`;
-                });
-                html += '</div></div>';
-            }
+            // 모든 점을 위치 순서대로 한 줄로 표시
+            html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
+            points.forEach(p => {
+                if (p.isWhite) {
+                    // 흰 점: 버튼으로 만들어 클릭 가능하게 함
+                    html += `<button onclick="onWhitePointClick(${p.x}, ${p.y})" style="background: white; color: black; padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-family: monospace; font-size: 13px; cursor: pointer; transition: all 0.2s; box-sizing: border-box; line-height: 1.2; display: inline-flex; align-items: center;" onmouseover="this.style.background='#f0f0f0'; this.style.borderColor='#999';" onmouseout="this.style.background='white'; this.style.borderColor='#ccc';">(${p.x}, ${p.y})</button>`;
+                } else {
+                    // 검은 점(흰색 아닌 점): 실제 픽셀의 RGB 색상을 배경으로 사용
+                    const bgColor = `rgb(${p.r}, ${p.g}, ${p.b})`;
+                    // 밝기 계산하여 글씨 색상 결정 (밝은 배경이면 검은 글씨, 어두운 배경이면 흰 글씨)
+                    const brightness = (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
+                    const textColor = brightness > 128 ? 'black' : 'white';
+                    html += `<div style="background: ${bgColor}; color: ${textColor}; padding: 6px 10px; border-radius: 4px; border: 1px solid #999; font-family: monospace; font-size: 13px; box-sizing: border-box; line-height: 1.2; display: inline-flex; align-items: center;">(${p.x}, ${p.y})</div>`;
+                }
+            });
+            html += '</div>';
 
             html += '</div>';
             showMessage(html, 'result');
