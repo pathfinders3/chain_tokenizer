@@ -171,8 +171,8 @@ const canvas = document.getElementById('canvas');
                     // 실패 시 아스키 아트로 어떤 픽셀이 검은색인지 표시
                     const asciiArt = getAsciiArt(startX, startY, size);
                     messages.push(`넓이 ${area}인 사각형 찾기 실패 ✗`);
-                    messages.push(`<pre style="background-color: #f0f0f0; padding: 10px; margin: 5px 0; display: inline-block; font-family: monospace; line-height: 1.2;">${asciiArt}</pre>`);
-                    messages.push(`<span style="font-size: 12px; color: #666;">(x: 흰색 픽셀, _: 검은색 픽셀)</span>`);
+                    messages.push(`<pre style="background-color: #2a2a2a; color: #e0e0e0; padding: 10px; margin: 5px 0; display: inline-block; font-family: monospace; line-height: 1.2;">${asciiArt}</pre>`);
+                    messages.push(`<span style="font-size: 12px; color: #999;">(x: 흰색 픽셀, _: 검은색 픽셀)</span>`);
                     break;
                 }
             }
