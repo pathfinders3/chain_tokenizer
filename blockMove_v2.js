@@ -392,6 +392,9 @@ const canvas = document.getElementById('canvas');
             html += `<span style="color: black; background: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">검은 점 ${blackPoints.length}개</span> `;
             html += `<span style="color: #666; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-weight: bold;">흰 점 ${whitePoints.length}개</span><br><br>`;
 
+            // 점 조사 레이블 추가
+            html += '<div style="margin-top: 10px;"><strong>점 조사:</strong></div>';
+            
             // 모든 점을 위치 순서대로 한 줄로 표시
             html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
             points.forEach(p => {
