@@ -528,7 +528,7 @@ const canvas = document.getElementById('canvas');
             html += createExpansionGrid(startX, startY, size, expandDirection, candidatePoints, results);
             
             // 상세 결과 (접을 수 있도록)
-            html += `<details style="margin-top: 15px;"><summary style="cursor: pointer; color: #4CAF50; font-weight: bold;">상세 결과 보기 (${candidatePoints.length}개)</summary>`;
+            html += `<details style="margin-top: 15px;"><summary style="cursor: pointer; color: #4CAF50; font-weight: bold;">상세 결과 보기 (${results.length}개)</summary>`;
             html += `<div style="max-height: 400px; overflow-y: auto; margin-top: 10px;">`;
             results.forEach(result => {
                 const { point, canCreate, foundSize, bgColor, textColor, borderColor, rectStart, endX, endY } = result;
@@ -546,7 +546,6 @@ const canvas = document.getElementById('canvas');
                     html += ` → 영역 (${rectStart.x}, ${rectStart.y}) ~ (${endX}, ${endY}) `;
                 }
                 html += `<span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>`;
-                html += `</div>`;
                 html += `</div>`;
             });
             html += `</div></details>`;
