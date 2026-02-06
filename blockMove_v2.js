@@ -71,6 +71,25 @@ const canvas = document.getElementById('canvas');
             updateZoomWindow();
         }
 
+        // 줌 캔버스 클릭 이벤트 (클릭한 픽셀 좌표를 시작 X, Y에 할당)
+        zoomCanvas.addEventListener('click', function(e) {
+            if (!imageData) return;
+            
+            const rect = zoomCanvas.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+            
+            // 클릭한 위치의 실제 이미지 좌표 계산
+            const pixelX = zoomX + Math.floor(canvasX / zoomScale);
+            const pixelY = zoomY + Math.floor(canvasY / zoomScale);
+            
+            // 이미지 범위 내에 있는지 확인
+            if (pixelX >= 0 && pixelX < canvas.width && pixelY >= 0 && pixelY < canvas.height) {
+                document.getElementById('startX').value = pixelX;
+                document.getElementById('startY').value = pixelY;
+            }
+        });
+
         // 키보드 이벤트 리스너 (IJKL로 줌 윈도우 이동)
         document.addEventListener('keydown', function(e) {
             if (!imageData) return;
