@@ -306,45 +306,99 @@ const canvas = document.getElementById('canvas');
         function onWhitePointClick(x, y) {
             console.log(`흰색 점 클릭: (${x}, ${y})`);
             
-            // 상하좌우 주변 점 조사
-            const neighbors = [
-                { x: x, y: y - 1, dir: '상(↑)' },
-                { x: x, y: y + 1, dir: '하(↓)' },
-                { x: x - 1, y: y, dir: '좌(←)' },
-                { x: x + 1, y: y, dir: '우(→)' }
-            ];
+            if (!currentRegion) {
+                showMessage('영역 정보가 없습니다.', 'error');
+                return;
+            }
 
-            let html = `<div style="padding: 10px;"><strong>흰색 점 (${x}, ${y}) 주변 조사</strong><br><br>`;
+            const { startX, startY, size } = currentRegion;
             
-            neighbors.forEach(neighbor => {
-                const { x: nx, y: ny, dir } = neighbor;
-                
-                // 이미지 범위 체크
-                if (nx < 0 || ny < 0 || nx >= canvas.width || ny >= canvas.height) {
-                    html += `${dir} (${nx}, ${ny}): <span style="color: #999;">이미지 밖</span><br>`;
-                    return;
+            // 주변 확장 가능 영역 검사
+            let html = `<div class="expansion-check-container"><strong>흰색 점 (${x}, ${y}) 주변 확장 검사</strong><br>`;
+            html += `<span style="color: #999;">기존 영역: (${startX}, ${startY}) ~ (${startX + size - 1}, ${startY + size - 1}), 크기: ${size}x${size}</span><br><br>`;
+            
+            // 검사할 시작점들 수집
+            let candidatePoints = [];
+            
+            // 1. 우측 변의 바깥 픽셀들 (우하 방향으로 확장 가능한 것들만)
+            const rightEdgeX = startX + size;
+            for (let y = startY; y < startY + size; y++) {
+                if (rightEdgeX >= 0 && rightEdgeX < canvas.width && y >= 0 && y < canvas.height) {
+                    candidatePoints.push({ x: rightEdgeX, y: y, label: '우측변' });
                 }
+            }
+            
+            // 2. 하단 변의 바깥 픽셀들
+            const bottomEdgeY = startY + size;
+            for (let x = startX; x < startX + size; x++) {
+                if (x >= 0 && x < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
+                    candidatePoints.push({ x: x, y: bottomEdgeY, label: '하단변' });
+                }
+            }
+            
+            // 3. 우하 대각선 코너
+            if (rightEdgeX >= 0 && rightEdgeX < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
+                candidatePoints.push({ x: rightEdgeX, y: bottomEdgeY, label: '우하코너' });
+            }
+            
+            html += `<strong>검사 대상 픽셀: ${candidatePoints.length}개</strong><br><br>`;
+            
+            // 각 시작점에서 우하 방향으로 size x size 사각형을 만들 수 있는지 검사
+            let successCount = 0;
+            let results = [];
+            
+            candidatePoints.forEach(point => {
+                const canCreate = isWhiteRectangle(point.x, point.y, size);
                 
-                // 픽셀 색상 정보
-                const isWhite = isWhitePixel(nx, ny);
-                const index = (ny * canvas.width + nx) * 4;
+                const index = (point.y * canvas.width + point.x) * 4;
                 const r = imageData.data[index];
                 const g = imageData.data[index + 1];
                 const b = imageData.data[index + 2];
-                
-                // 녹색 영역 체크
-                const inGreenRegion = isInsideFoundRegion(nx, ny);
+                const isWhite = isWhitePixel(point.x, point.y);
                 
                 const bgColor = isWhite ? 'white' : `rgb(${r}, ${g}, ${b})`;
                 const brightness = (r * 299 + g * 587 + b * 114) / 1000;
                 const textColor = isWhite ? 'black' : (brightness > 128 ? 'black' : 'white');
                 const borderColor = isWhite ? '#ccc' : '#999';
                 
-                html += `${dir} <span style="background: ${bgColor}; color: ${textColor}; padding: 2px 8px; border: 1px solid ${borderColor}; border-radius: 3px; font-family: monospace;">(${nx}, ${ny})</span>`;
-                html += ` ${isWhite ? '흰색' : '검은색'}`;
-                html += inGreenRegion ? ' <span style="color: green; font-weight: bold;">[녹색 영역 내부]</span>' : ' <span style="color: #999;">[녹색 영역 외부]</span>';
-                html += '<br>';
+                results.push({
+                    point,
+                    canCreate,
+                    bgColor,
+                    textColor,
+                    borderColor,
+                    endX: point.x + size - 1,
+                    endY: point.y + size - 1
+                });
+                
+                if (canCreate) successCount++;
             });
+            
+            // 성공/실패 요약
+            html += `<div style="background: #2a2a2a; color: #e0e0e0; padding: 10px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #444;">`;
+            html += `<strong>확장 가능:</strong> <span style="color: #90EE90; font-weight: bold;">${successCount}개</span> / `;
+            html += `<strong>불가능:</strong> <span style="color: #FF6B6B; font-weight: bold;">${candidatePoints.length - successCount}개</span>`;
+            html += `</div>`;
+            
+            // 상세 결과
+            html += `<div style="max-height: 400px; overflow-y: auto;">`;
+            results.forEach(result => {
+                const { point, canCreate, bgColor, textColor, borderColor, endX, endY } = result;
+                const icon = canCreate ? '✓' : '✗';
+                const statusColor = canCreate ? '#90EE90' : '#FF6B6B';
+                const statusText = canCreate ? 'Good' : 'Fail';
+                const itemBgColor = canCreate ? '#2d5016' : '#5c1a1a';
+                const itemTextColor = canCreate ? '#c8ffc8' : '#ffc8c8';
+                
+                html += `<div style="margin-bottom: 8px; padding: 8px; background: ${itemBgColor}; color: ${itemTextColor}; border-left: 3px solid ${statusColor}; border-radius: 3px;">`;
+                html += `<span style="color: ${statusColor}; font-weight: bold; margin-right: 8px;">${icon}</span>`;
+                html += `[${point.label}] `;
+                html += `<span style="background: ${bgColor}; color: ${textColor}; padding: 2px 8px; border: 1px solid ${borderColor}; border-radius: 3px; font-family: monospace;">(${point.x}, ${point.y})</span>`;
+                html += ` → (${endX}, ${endY}) `;
+                html += `<span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>`;
+                html += `</div>`;
+            });
+            html += `</div>`;
             
             html += '</div>';
             showMessage(html, 'result');
@@ -436,10 +490,10 @@ const canvas = document.getElementById('canvas');
             const blackPoints = points.filter(p => !p.isWhite);
             const whitePoints = points.filter(p => p.isWhite);
 
-            let html = `<div style="padding: 10px;"><strong>${edgeName} 변의 점 정보</strong><br><br>`;
+            let html = `<div style="padding: 10px; background: #1a1a1a; color: #e0e0e0;"><strong>${edgeName} 변의 점 정보</strong><br><br>`;
             html += `총 ${points.length}개 점: `;
-            html += `<span style="color: black; background: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">검은 점 ${blackPoints.length}개</span> `;
-            html += `<span style="color: #666; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-weight: bold;">흰 점 ${whitePoints.length}개</span><br><br>`;
+            html += `<span style="color: #e0e0e0; background: #333; padding: 2px 6px; border-radius: 3px; font-weight: bold; border: 1px solid #666;">검은 점 ${blackPoints.length}개</span> `;
+            html += `<span style="color: #e0e0e0; background: #444; padding: 2px 6px; border-radius: 3px; font-weight: bold; border: 1px solid #666;">흰 점 ${whitePoints.length}개</span><br><br>`;
 
             // 점 조사 레이블 추가
             html += '<div style="margin-top: 10px;"><strong>점 조사:</strong></div>';

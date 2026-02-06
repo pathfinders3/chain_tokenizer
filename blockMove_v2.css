@@ -156,3 +156,20 @@ body {
             justify-content: center;
             text-align: center;
         }
+        
+        /* message DIV 기본 스타일 - 밝은 배경 방지 */
+        #message {
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+        }
+        #message div {
+            background-color: inherit;
+            color: inherit;
+        }
+        
+        /* 흰색 점 주변 확장 검사 컨테이너 */
+        .expansion-check-container {
+            padding: 10px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
