@@ -1,10 +1,91 @@
 const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const zoomCanvas = document.getElementById('zoomCanvas');
+        const zoomCtx = zoomCanvas.getContext('2d');
         const messageDiv = document.getElementById('message');
         
         let imageData = null;
         let foundRegions = []; // 전역 배열: 찾은 영역 저장
         let currentRegion = null; // 현재 표시 중인 영역 정보
+        
+        // 줌 윈도우 관련
+        let zoomX = 0; // 줌 윈도우 좌상 X 좌표
+        let zoomY = 0; // 줌 윈도우 좌상 Y 좌표
+        const zoomSize = 16; // 줌 윈도우 크기 (16×16 픽셀)
+        const zoomScale = 2; // 확대 배율 (2배)
+
+        // 줌 윈도우 그리기
+        function updateZoomWindow() {
+            if (!imageData) return;
+            
+            // 줌 캔버스 클리어
+            zoomCtx.clearRect(0, 0, zoomCanvas.width, zoomCanvas.height);
+            
+            // 16×16 픽셀을 2×2로 확대하여 그리기
+            for (let y = 0; y < zoomSize; y++) {
+                for (let x = 0; x < zoomSize; x++) {
+                    const srcX = zoomX + x;
+                    const srcY = zoomY + y;
+                    
+                    // 이미지 범위 체크
+                    if (srcX >= 0 && srcX < canvas.width && srcY >= 0 && srcY < canvas.height) {
+                        const index = (srcY * canvas.width + srcX) * 4;
+                        const r = imageData.data[index];
+                        const g = imageData.data[index + 1];
+                        const b = imageData.data[index + 2];
+                        
+                        zoomCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                        zoomCtx.fillRect(x * zoomScale, y * zoomScale, zoomScale, zoomScale);
+                    } else {
+                        // 이미지 밖은 회색으로
+                        zoomCtx.fillStyle = '#555';
+                        zoomCtx.fillRect(x * zoomScale, y * zoomScale, zoomScale, zoomScale);
+                    }
+                }
+            }
+            
+            // 위치 표시 업데이트
+            document.getElementById('zoomPos').textContent = `(${zoomX}, ${zoomY})`;
+        }
+
+        // 키보드 이벤트 리스너 (IJKL로 줌 윈도우 이동)
+        document.addEventListener('keydown', function(e) {
+            if (!imageData) return;
+            
+            let moved = false;
+            
+            switch(e.key.toLowerCase()) {
+                case 'i': // 상
+                    if (zoomY > 0) {
+                        zoomY--;
+                        moved = true;
+                    }
+                    break;
+                case 'k': // 하
+                    if (zoomY < canvas.height - 1) {
+                        zoomY++;
+                        moved = true;
+                    }
+                    break;
+                case 'j': // 좌
+                    if (zoomX > 0) {
+                        zoomX--;
+                        moved = true;
+                    }
+                    break;
+                case 'l': // 우
+                    if (zoomX < canvas.width - 1) {
+                        zoomX++;
+                        moved = true;
+                    }
+                    break;
+            }
+            
+            if (moved) {
+                updateZoomWindow();
+                e.preventDefault();
+            }
+        });
 
         // 방향별 시작점 계산 함수
         function getStartPoint(inputX, inputY, size, direction) {
@@ -78,6 +159,11 @@ const canvas = document.getElementById('canvas');
                             ['NW', 'N', 'NE', 'W', 'SE', 'E', 'SW', 'S', 'C'].forEach(dir => {
                                 document.getElementById('btn' + dir).disabled = false;
                             });
+                            
+                            // 줌 윈도우 초기화 및 업데이트
+                            zoomX = 0;
+                            zoomY = 0;
+                            updateZoomWindow();
                             
                             showMessage('이미지가 로드되었습니다. 크기: ' + img.width + 'x' + img.height, 'info');
                         };
@@ -1001,6 +1087,11 @@ const canvas = document.getElementById('canvas');
                     ['NW', 'N', 'NE', 'W', 'SE', 'E', 'SW', 'S', 'C'].forEach(dir => {
                         document.getElementById('btn' + dir).disabled = false;
                     });
+                    
+                    // 줌 윈도우 초기화 및 업데이트
+                    zoomX = 0;
+                    zoomY = 0;
+                    updateZoomWindow();
                     
                     showMessage('저장된 이미지가 자동으로 로드되었습니다. 크기: ' + img.width + 'x' + img.height, 'info');
                 };

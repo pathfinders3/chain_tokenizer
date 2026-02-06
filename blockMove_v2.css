@@ -57,10 +57,31 @@ body {
             background-color: #cccccc;
             cursor: not-allowed;
         }
+        .canvas-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            margin: 10px 0;
+        }
         canvas {
             border: 2px solid #555;
-            margin: 10px 0;
             display: block;
+        }
+        #canvas {
+            margin: 10px 0;
+        }
+        .zoom-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 4px;
+        }
+        #zoomCanvas {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
         }
         .info {
             margin: 10px 0;
