@@ -313,8 +313,32 @@ const canvas = document.getElementById('canvas');
 
             const { startX, startY, size } = currentRegion;
             
+            // 흰색 점이 사각형의 어느 코너에 속하는지 판단
+            let cornerPosition = '';
+            const centerX = startX + size / 2;
+            const centerY = startY + size / 2;
+            
+            const isTop = (y === startY - 1);
+            const isBottom = (y === startY + size);
+            const isLeft = (x === startX - 1);
+            const isRight = (x === startX + size);
+            
+            if (isTop) {
+                cornerPosition = x < centerX ? '좌상(↖)' : '우상(↗)';
+            } else if (isBottom) {
+                cornerPosition = x < centerX ? '좌하(↙)' : '우하(↘)';
+            } else if (isLeft) {
+                cornerPosition = y < centerY ? '좌상(↖)' : '좌하(↙)';
+            } else if (isRight) {
+                cornerPosition = y < centerY ? '우상(↗)' : '우하(↘)';
+            }
+            
             // 주변 확장 가능 영역 검사
-            let html = `<div class="expansion-check-container"><strong>흰색 점 (${x}, ${y}) 주변 확장 검사</strong><br>`;
+            let html = `<div class="expansion-check-container"><strong>흰색 점 (${x}, ${y}) 주변 확장 검사</strong>`;
+            if (cornerPosition) {
+                html += ` <span style="color: #4CAF50; font-weight: bold;">[${cornerPosition}]</span>`;
+            }
+            html += `<br>`;
             html += `<span style="color: #999;">기존 영역: (${startX}, ${startY}) ~ (${startX + size - 1}, ${startY + size - 1}), 크기: ${size}x${size}</span><br><br>`;
             
             // 검사할 시작점들 수집
