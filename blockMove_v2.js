@@ -636,7 +636,7 @@ const canvas = document.getElementById('canvas');
             html += '<div style="margin-top: 10px;"><strong>점 조사:</strong></div>';
             
             // CSS Grid로 사각형과 버튼 표시
-            const cellSize = '40px';
+            const cellSize = '22px';
             const gridGap = '2px';
             
             // 사각형의 각 셀 생성 (테두리만 표시, 내부는 빈 칸)
