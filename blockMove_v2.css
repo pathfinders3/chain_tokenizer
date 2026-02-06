@@ -78,6 +78,14 @@ body {
             background-color: #333;
             border-radius: 4px;
         }
+        .zoom-btn {
+            width: 30px;
+            height: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 0;
+            margin: 0;
+        }
         #zoomCanvas {
             image-rendering: pixelated;
             image-rendering: -moz-crisp-edges;

@@ -11,17 +11,20 @@ const canvas = document.getElementById('canvas');
         // 줌 윈도우 관련
         let zoomX = 0; // 줌 윈도우 좌상 X 좌표
         let zoomY = 0; // 줌 윈도우 좌상 Y 좌표
-        const zoomSize = 16; // 줌 윈도우 크기 (16×16 픽셀)
-        const zoomScale = 2; // 확대 배율 (2배)
+        const zoomCanvasSize = 100; // 줌 캔버스의 고정 크기 (100×100px)
+        let zoomScale = 2; // 확대 배율 (2, 4, 8, 16 등)
 
         // 줌 윈도우 그리기
         function updateZoomWindow() {
             if (!imageData) return;
             
+            // 확대 배율에 따라 보이는 픽셀 개수 계산
+            const zoomSize = Math.floor(zoomCanvasSize / zoomScale);
+            
             // 줌 캔버스 클리어
             zoomCtx.clearRect(0, 0, zoomCanvas.width, zoomCanvas.height);
             
-            // 16×16 픽셀을 2×2로 확대하여 그리기
+            // 픽셀을 확대하여 그리기
             for (let y = 0; y < zoomSize; y++) {
                 for (let x = 0; x < zoomSize; x++) {
                     const srcX = zoomX + x;
@@ -46,6 +49,26 @@ const canvas = document.getElementById('canvas');
             
             // 위치 표시 업데이트
             document.getElementById('zoomPos').textContent = `(${zoomX}, ${zoomY})`;
+        }
+
+        // 줌 배율 변경
+        function changeZoomScale(delta) {
+            if (!imageData) return;
+            
+            const scales = [1, 2, 4, 8, 16, 32]; // 가능한 확대 배율
+            let currentIndex = scales.indexOf(zoomScale);
+            
+            if (currentIndex === -1) {
+                currentIndex = 0; // 기본값
+            }
+            
+            currentIndex += delta;
+            currentIndex = Math.max(0, Math.min(scales.length - 1, currentIndex));
+            
+            zoomScale = scales[currentIndex];
+            document.getElementById('zoomScale').textContent = zoomScale;
+            
+            updateZoomWindow();
         }
 
         // 키보드 이벤트 리스너 (IJKL로 줌 윈도우 이동)
