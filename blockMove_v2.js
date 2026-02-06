@@ -450,14 +450,34 @@ const canvas = document.getElementById('canvas');
             
             html += `<strong>검사 대상 픽셀: ${candidatePoints.length}개</strong><br><br>`;
             
-            // 각 시작점에서 해당 방향으로 size x size 사각형을 만들 수 있는지 검사
+            // 각 시작점에서 해당 방향으로 크기를 줄여가며 사각형을 만들 수 있는지 검사
             let successCount = 0;
             let results = [];
+            let coveredPixels = new Set(); // 이미 커버된 픽셀들
             
             candidatePoints.forEach(point => {
-                // 방향에 따라 실제 사각형의 시작점(좌상) 계산
-                const rectStart = getStartPoint(point.x, point.y, size, point.direction);
-                const canCreate = isWhiteRectangle(rectStart.x, rectStart.y, size);
+                const pointKey = `${point.x},${point.y}`;
+                
+                // 이미 다른 사각형으로 커버되었는지 확인
+                if (coveredPixels.has(pointKey)) {
+                    // 커버된 픽셀은 스킵 (결과에 추가하지 않음)
+                    return;
+                }
+                
+                // 크기를 줄여가며 검사 (size, size-1, ..., 1)
+                let foundSize = 0;
+                let rectStart = null;
+                
+                for (let testSize = size; testSize >= 1; testSize--) {
+                    // 방향에 따라 실제 사각형의 시작점(좌상) 계산
+                    const tempRectStart = getStartPoint(point.x, point.y, testSize, point.direction);
+                    
+                    if (isWhiteRectangle(tempRectStart.x, tempRectStart.y, testSize)) {
+                        foundSize = testSize;
+                        rectStart = tempRectStart;
+                        break; // 가장 큰 크기를 찾았으므로 중단
+                    }
+                }
                 
                 const index = (point.y * canvas.width + point.x) * 4;
                 const r = imageData.data[index];
@@ -472,16 +492,29 @@ const canvas = document.getElementById('canvas');
                 
                 results.push({
                     point,
-                    canCreate,
+                    canCreate: foundSize > 0,
+                    foundSize: foundSize, // 찾은 사각형 크기 (0이면 실패)
                     bgColor,
                     textColor,
                     borderColor,
-                    rectStart: rectStart,
-                    endX: rectStart.x + size - 1,
-                    endY: rectStart.y + size - 1
+                    rectStart: rectStart || { x: point.x, y: point.y },
+                    endX: rectStart ? rectStart.x + foundSize - 1 : point.x,
+                    endY: rectStart ? rectStart.y + foundSize - 1 : point.y
                 });
                 
-                if (canCreate) successCount++;
+                if (foundSize > 0) {
+                    successCount++;
+                    
+                    // 이 사각형이 커버하는 모든 candidatePoints의 픽셀을 커버 목록에 추가
+                    candidatePoints.forEach(cp => {
+                        const cpRectStart = getStartPoint(cp.x, cp.y, foundSize, cp.direction);
+                        // cp 픽셀이 현재 찾은 사각형 영역 내에 있는지 확인
+                        if (cp.x >= rectStart.x && cp.x < rectStart.x + foundSize &&
+                            cp.y >= rectStart.y && cp.y < rectStart.y + foundSize) {
+                            coveredPixels.add(`${cp.x},${cp.y}`);
+                        }
+                    });
+                }
             });
             
             // 성공/실패 요약
@@ -498,10 +531,10 @@ const canvas = document.getElementById('canvas');
             html += `<details style="margin-top: 15px;"><summary style="cursor: pointer; color: #4CAF50; font-weight: bold;">상세 결과 보기 (${candidatePoints.length}개)</summary>`;
             html += `<div style="max-height: 400px; overflow-y: auto; margin-top: 10px;">`;
             results.forEach(result => {
-                const { point, canCreate, bgColor, textColor, borderColor, rectStart, endX, endY } = result;
-                const icon = canCreate ? '✓' : '✗';
+                const { point, canCreate, foundSize, bgColor, textColor, borderColor, rectStart, endX, endY } = result;
+                const icon = canCreate ? `${foundSize}×${foundSize}` : '✗';
                 const statusColor = canCreate ? '#90EE90' : '#FF6B6B';
-                const statusText = canCreate ? 'Good' : 'Fail';
+                const statusText = canCreate ? `Good (${foundSize}×${foundSize})` : 'Fail';
                 const itemBgColor = canCreate ? '#2d5016' : '#5c1a1a';
                 const itemTextColor = canCreate ? '#c8ffc8' : '#ffc8c8';
                 
@@ -509,8 +542,11 @@ const canvas = document.getElementById('canvas');
                 html += `<span style="color: ${statusColor}; font-weight: bold; margin-right: 8px;">${icon}</span>`;
                 html += `[${point.label}] `;
                 html += `<span style="background: ${bgColor}; color: ${textColor}; padding: 2px 8px; border: 1px solid ${borderColor}; border-radius: 3px; font-family: monospace;">(${point.x}, ${point.y})</span>`;
-                html += ` → 영역 (${rectStart.x}, ${rectStart.y}) ~ (${endX}, ${endY}) `;
+                if (canCreate) {
+                    html += ` → 영역 (${rectStart.x}, ${rectStart.y}) ~ (${endX}, ${endY}) `;
+                }
                 html += `<span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>`;
+                html += `</div>`;
                 html += `</div>`;
             });
             html += `</div></details>`;
@@ -596,9 +632,10 @@ const canvas = document.getElementById('canvas');
                         const pixelBgColor = result.bgColor; // 실제 픽셀 색상
                         const borderColor = result.canCreate ? '#90EE90' : '#FF6B6B';
                         const borderWidth = result.canCreate ? '2px' : '3px';
-                        const icon = result.canCreate ? '✓' : '✗';
-                        const iconColor = result.canCreate ? '#90EE90' : '#FF6B6B';
-                        cellHTML = `<div style="width: ${cellSize}; height: ${cellSize}; background: ${pixelBgColor}; border: ${borderWidth} solid ${borderColor}; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: ${iconColor}; cursor: help; text-shadow: 0 0 3px #000;" title="(${actualX}, ${actualY}) - ${result.canCreate ? 'Good' : 'Fail'}">${icon}</div>`;
+                        const displayText = result.canCreate ? result.foundSize : '✗';
+                        const iconColor = result.canCreate ? '#1a2a4a' : '#FF6B6B'; // 성공: 어두운 파란색, 실패: 붉은색
+                        const tooltipText = result.canCreate ? `Good: ${result.foundSize}×${result.foundSize}` : 'Fail';
+                        cellHTML = `<div style="width: ${cellSize}; height: ${cellSize}; background: ${pixelBgColor}; border: ${borderWidth} solid ${borderColor}; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: ${iconColor}; cursor: help; text-shadow: 0 0 3px #000;" title="(${actualX}, ${actualY}) - ${tooltipText}">${displayText}</div>`;
                     } else {
                         // 빈 공간
                         cellHTML = `<div style="width: ${cellSize}; height: ${cellSize}; background: #1a1a1a; border: 1px solid #333; box-sizing: border-box;"></div>`;
