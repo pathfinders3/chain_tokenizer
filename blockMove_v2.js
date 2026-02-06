@@ -315,6 +315,7 @@ const canvas = document.getElementById('canvas');
             
             // 흰색 점이 사각형의 어느 코너에 속하는지 판단
             let cornerPosition = '';
+            let expandDirection = ''; // 확장 방향 (nw, ne, sw, se)
             const centerX = startX + size / 2;
             const centerY = startY + size / 2;
             
@@ -324,55 +325,139 @@ const canvas = document.getElementById('canvas');
             const isRight = (x === startX + size);
             
             if (isTop) {
-                cornerPosition = x < centerX ? '좌상(↖)' : '우상(↗)';
+                if (x < centerX) {
+                    cornerPosition = '좌상(↖)';
+                    expandDirection = 'nw';
+                } else {
+                    cornerPosition = '우상(↗)';
+                    expandDirection = 'ne';
+                }
             } else if (isBottom) {
-                cornerPosition = x < centerX ? '좌하(↙)' : '우하(↘)';
+                if (x < centerX) {
+                    cornerPosition = '좌하(↙)';
+                    expandDirection = 'sw';
+                } else {
+                    cornerPosition = '우하(↘)';
+                    expandDirection = 'se';
+                }
             } else if (isLeft) {
-                cornerPosition = y < centerY ? '좌상(↖)' : '좌하(↙)';
+                if (y < centerY) {
+                    cornerPosition = '좌상(↖)';
+                    expandDirection = 'nw';
+                } else {
+                    cornerPosition = '좌하(↙)';
+                    expandDirection = 'sw';
+                }
             } else if (isRight) {
-                cornerPosition = y < centerY ? '우상(↗)' : '우하(↘)';
+                if (y < centerY) {
+                    cornerPosition = '우상(↗)';
+                    expandDirection = 'ne';
+                } else {
+                    cornerPosition = '우하(↘)';
+                    expandDirection = 'se';
+                }
             }
             
             // 주변 확장 가능 영역 검사
             let html = `<div class="expansion-check-container"><strong>흰색 점 (${x}, ${y}) 주변 확장 검사</strong>`;
             if (cornerPosition) {
                 html += ` <span style="color: #4CAF50; font-weight: bold;">[${cornerPosition}]</span>`;
+                html += ` <span style="color: #FFD700; font-size: 0.9em;">(${getDirectionName(expandDirection)} 방향 검사)</span>`;
             }
             html += `<br>`;
             html += `<span style="color: #999;">기존 영역: (${startX}, ${startY}) ~ (${startX + size - 1}, ${startY + size - 1}), 크기: ${size}x${size}</span><br><br>`;
             
-            // 검사할 시작점들 수집
+            // 검사할 시작점들 수집 (expandDirection에 따라 다른 변 검사)
             let candidatePoints = [];
             
-            // 1. 우측 변의 바깥 픽셀들 (우하 방향으로 확장 가능한 것들만)
-            const rightEdgeX = startX + size;
-            for (let y = startY; y < startY + size; y++) {
-                if (rightEdgeX >= 0 && rightEdgeX < canvas.width && y >= 0 && y < canvas.height) {
-                    candidatePoints.push({ x: rightEdgeX, y: y, label: '우측변' });
+            if (expandDirection === 'se') { // 우하
+                // 우측 변
+                const rightEdgeX = startX + size;
+                for (let y = startY; y < startY + size; y++) {
+                    if (rightEdgeX >= 0 && rightEdgeX < canvas.width && y >= 0 && y < canvas.height) {
+                        candidatePoints.push({ x: rightEdgeX, y: y, label: '우측변', direction: 'se' });
+                    }
                 }
-            }
-            
-            // 2. 하단 변의 바깥 픽셀들
-            const bottomEdgeY = startY + size;
-            for (let x = startX; x < startX + size; x++) {
-                if (x >= 0 && x < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
-                    candidatePoints.push({ x: x, y: bottomEdgeY, label: '하단변' });
+                // 하단 변
+                const bottomEdgeY = startY + size;
+                for (let x = startX; x < startX + size; x++) {
+                    if (x >= 0 && x < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
+                        candidatePoints.push({ x: x, y: bottomEdgeY, label: '하단변', direction: 'se' });
+                    }
                 }
-            }
-            
-            // 3. 우하 대각선 코너
-            if (rightEdgeX >= 0 && rightEdgeX < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
-                candidatePoints.push({ x: rightEdgeX, y: bottomEdgeY, label: '우하코너' });
+                // 우하 코너
+                if (rightEdgeX >= 0 && rightEdgeX < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
+                    candidatePoints.push({ x: rightEdgeX, y: bottomEdgeY, label: '우하코너', direction: 'se' });
+                }
+            } else if (expandDirection === 'sw') { // 좌하
+                // 좌측 변
+                const leftEdgeX = startX - 1;
+                for (let y = startY; y < startY + size; y++) {
+                    if (leftEdgeX >= 0 && leftEdgeX < canvas.width && y >= 0 && y < canvas.height) {
+                        candidatePoints.push({ x: leftEdgeX, y: y, label: '좌측변', direction: 'sw' });
+                    }
+                }
+                // 하단 변
+                const bottomEdgeY = startY + size;
+                for (let x = startX; x < startX + size; x++) {
+                    if (x >= 0 && x < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
+                        candidatePoints.push({ x: x, y: bottomEdgeY, label: '하단변', direction: 'sw' });
+                    }
+                }
+                // 좌하 코너
+                if (leftEdgeX >= 0 && leftEdgeX < canvas.width && bottomEdgeY >= 0 && bottomEdgeY < canvas.height) {
+                    candidatePoints.push({ x: leftEdgeX, y: bottomEdgeY, label: '좌하코너', direction: 'sw' });
+                }
+            } else if (expandDirection === 'ne') { // 우상
+                // 우측 변
+                const rightEdgeX = startX + size;
+                for (let y = startY; y < startY + size; y++) {
+                    if (rightEdgeX >= 0 && rightEdgeX < canvas.width && y >= 0 && y < canvas.height) {
+                        candidatePoints.push({ x: rightEdgeX, y: y, label: '우측변', direction: 'ne' });
+                    }
+                }
+                // 상단 변
+                const topEdgeY = startY - 1;
+                for (let x = startX; x < startX + size; x++) {
+                    if (x >= 0 && x < canvas.width && topEdgeY >= 0 && topEdgeY < canvas.height) {
+                        candidatePoints.push({ x: x, y: topEdgeY, label: '상단변', direction: 'ne' });
+                    }
+                }
+                // 우상 코너
+                if (rightEdgeX >= 0 && rightEdgeX < canvas.width && topEdgeY >= 0 && topEdgeY < canvas.height) {
+                    candidatePoints.push({ x: rightEdgeX, y: topEdgeY, label: '우상코너', direction: 'ne' });
+                }
+            } else if (expandDirection === 'nw') { // 좌상
+                // 좌측 변
+                const leftEdgeX = startX - 1;
+                for (let y = startY; y < startY + size; y++) {
+                    if (leftEdgeX >= 0 && leftEdgeX < canvas.width && y >= 0 && y < canvas.height) {
+                        candidatePoints.push({ x: leftEdgeX, y: y, label: '좌측변', direction: 'nw' });
+                    }
+                }
+                // 상단 변
+                const topEdgeY = startY - 1;
+                for (let x = startX; x < startX + size; x++) {
+                    if (x >= 0 && x < canvas.width && topEdgeY >= 0 && topEdgeY < canvas.height) {
+                        candidatePoints.push({ x: x, y: topEdgeY, label: '상단변', direction: 'nw' });
+                    }
+                }
+                // 좌상 코너
+                if (leftEdgeX >= 0 && leftEdgeX < canvas.width && topEdgeY >= 0 && topEdgeY < canvas.height) {
+                    candidatePoints.push({ x: leftEdgeX, y: topEdgeY, label: '좌상코너', direction: 'nw' });
+                }
             }
             
             html += `<strong>검사 대상 픽셀: ${candidatePoints.length}개</strong><br><br>`;
             
-            // 각 시작점에서 우하 방향으로 size x size 사각형을 만들 수 있는지 검사
+            // 각 시작점에서 해당 방향으로 size x size 사각형을 만들 수 있는지 검사
             let successCount = 0;
             let results = [];
             
             candidatePoints.forEach(point => {
-                const canCreate = isWhiteRectangle(point.x, point.y, size);
+                // 방향에 따라 실제 사각형의 시작점(좌상) 계산
+                const rectStart = getStartPoint(point.x, point.y, size, point.direction);
+                const canCreate = isWhiteRectangle(rectStart.x, rectStart.y, size);
                 
                 const index = (point.y * canvas.width + point.x) * 4;
                 const r = imageData.data[index];
@@ -391,8 +476,9 @@ const canvas = document.getElementById('canvas');
                     bgColor,
                     textColor,
                     borderColor,
-                    endX: point.x + size - 1,
-                    endY: point.y + size - 1
+                    rectStart: rectStart,
+                    endX: rectStart.x + size - 1,
+                    endY: rectStart.y + size - 1
                 });
                 
                 if (canCreate) successCount++;
@@ -407,7 +493,7 @@ const canvas = document.getElementById('canvas');
             // 상세 결과
             html += `<div style="max-height: 400px; overflow-y: auto;">`;
             results.forEach(result => {
-                const { point, canCreate, bgColor, textColor, borderColor, endX, endY } = result;
+                const { point, canCreate, bgColor, textColor, borderColor, rectStart, endX, endY } = result;
                 const icon = canCreate ? '✓' : '✗';
                 const statusColor = canCreate ? '#90EE90' : '#FF6B6B';
                 const statusText = canCreate ? 'Good' : 'Fail';
@@ -418,7 +504,7 @@ const canvas = document.getElementById('canvas');
                 html += `<span style="color: ${statusColor}; font-weight: bold; margin-right: 8px;">${icon}</span>`;
                 html += `[${point.label}] `;
                 html += `<span style="background: ${bgColor}; color: ${textColor}; padding: 2px 8px; border: 1px solid ${borderColor}; border-radius: 3px; font-family: monospace;">(${point.x}, ${point.y})</span>`;
-                html += ` → (${endX}, ${endY}) `;
+                html += ` → 영역 (${rectStart.x}, ${rectStart.y}) ~ (${endX}, ${endY}) `;
                 html += `<span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>`;
                 html += `</div>`;
             });
@@ -426,6 +512,33 @@ const canvas = document.getElementById('canvas');
             
             html += '</div>';
             showMessage(html, 'result');
+        }
+
+        // 점 셀 생성 헬퍼 함수 (버튼 또는 div)
+        function createPointCell(p, cellSize) {
+            if (!p) return `<div style="width: ${cellSize}; height: ${cellSize};"></div>`;
+            
+            if (p.isWhite) {
+                // 흰 점: 버튼
+                return `<button onclick="onWhitePointClick(${p.x}, ${p.y})" style="width: ${cellSize}; height: ${cellSize}; background: white; color: black; border-radius: 4px; border: 1px solid #ccc; font-family: monospace; font-size: 11px; cursor: pointer; transition: all 0.2s; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 2px;" onmouseover="this.style.background='#f0f0f0'; this.style.borderColor='#999';" onmouseout="this.style.background='white'; this.style.borderColor='#ccc';" title="(${p.x}, ${p.y})">●</button>`;
+            } else {
+                // 검은 점: 실제 픽셀 색상
+                const bgColor = `rgb(${p.r}, ${p.g}, ${p.b})`;
+                const brightness = (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
+                const textColor = brightness > 128 ? 'black' : 'white';
+                return `<div style="width: ${cellSize}; height: ${cellSize}; background: ${bgColor}; color: ${textColor}; border-radius: 4px; border: 1px solid #999; font-family: monospace; font-size: 11px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 2px;" title="(${p.x}, ${p.y})">●</div>`;
+            }
+        }
+
+        // 사각형 그리드 셀 생성 헬퍼 함수
+        function createGridCell(cell, cellSize) {
+            if (cell.isEmpty) {
+                // 내부 빈 칸
+                return `<div style="width: ${cellSize}; height: ${cellSize}; background: transparent; border: 1px dashed #444; box-sizing: border-box;"></div>`;
+            } else {
+                // 테두리 (실제 픽셀 색상)
+                return `<div style="width: ${cellSize}; height: ${cellSize}; background: ${cell.bgColor}; color: ${cell.textColor}; border: 1px solid #666; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 10px;" title="(${cell.x}, ${cell.y})"></div>`;
+            }
         }
 
         // 특정 변의 점들 정보를 표시하는 함수
@@ -522,22 +635,116 @@ const canvas = document.getElementById('canvas');
             // 점 조사 레이블 추가
             html += '<div style="margin-top: 10px;"><strong>점 조사:</strong></div>';
             
-            // 모든 점을 위치 순서대로 한 줄로 표시
-            html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">';
-            points.forEach(p => {
-                if (p.isWhite) {
-                    // 흰 점: 버튼으로 만들어 클릭 가능하게 함
-                    html += `<button onclick="onWhitePointClick(${p.x}, ${p.y})" style="background: white; color: black; padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-family: monospace; font-size: 13px; cursor: pointer; transition: all 0.2s; box-sizing: border-box; line-height: 1.2; display: inline-flex; align-items: center;" onmouseover="this.style.background='#f0f0f0'; this.style.borderColor='#999';" onmouseout="this.style.background='white'; this.style.borderColor='#ccc';">(${p.x}, ${p.y})</button>`;
-                } else {
-                    // 검은 점(흰색 아닌 점): 실제 픽셀의 RGB 색상을 배경으로 사용
-                    const bgColor = `rgb(${p.r}, ${p.g}, ${p.b})`;
-                    // 밝기 계산하여 글씨 색상 결정 (밝은 배경이면 검은 글씨, 어두운 배경이면 흰 글씨)
-                    const brightness = (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
-                    const textColor = brightness > 128 ? 'black' : 'white';
-                    html += `<div style="background: ${bgColor}; color: ${textColor}; padding: 6px 10px; border-radius: 4px; border: 1px solid #999; font-family: monospace; font-size: 13px; box-sizing: border-box; line-height: 1.2; display: inline-flex; align-items: center;">(${p.x}, ${p.y})</div>`;
+            // CSS Grid로 사각형과 버튼 표시
+            const cellSize = '40px';
+            const gridGap = '2px';
+            
+            // 사각형의 각 셀 생성 (테두리만 표시, 내부는 빈 칸)
+            const gridCells = [];
+            for (let row = 0; row < size; row++) {
+                for (let col = 0; col < size; col++) {
+                    const isEdge = (row === 0 || row === size - 1 || col === 0 || col === size - 1);
+                    if (isEdge) {
+                        const x = startX + col;
+                        const y = startY + row;
+                        const index = (y * canvas.width + x) * 4;
+                        const r = imageData.data[index];
+                        const g = imageData.data[index + 1];
+                        const b = imageData.data[index + 2];
+                        const bgColor = `rgb(${r}, ${g}, ${b})`;
+                        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                        const textColor = brightness > 128 ? 'black' : 'white';
+                        gridCells.push({ row, col, bgColor, textColor, x, y, isEmpty: false });
+                    } else {
+                        gridCells.push({ row, col, isEmpty: true });
+                    }
                 }
-            });
-            html += '</div>';
+            }
+            
+            // Grid 레이아웃 구성
+            let gridTemplateRows, gridTemplateColumns;
+            let gridHTML = '';
+            
+            if (edge === 'top') {
+                // 상단 변: 버튼들이 위에
+                gridTemplateRows = `${cellSize} repeat(${size}, ${cellSize})`;
+                gridTemplateColumns = `repeat(${size}, ${cellSize})`;
+                
+                gridHTML += `<div style="display: grid; grid-template-rows: ${gridTemplateRows}; grid-template-columns: ${gridTemplateColumns}; gap: ${gridGap}; margin-top: 8px; width: fit-content;">`;
+                
+                // 첫 번째 행: 버튼들
+                points.forEach((p, idx) => {
+                    gridHTML += createPointCell(p, cellSize);
+                });
+                
+                // 사각형 셀들
+                gridCells.forEach(cell => {
+                    gridHTML += createGridCell(cell, cellSize);
+                });
+                
+                gridHTML += '</div>';
+                
+            } else if (edge === 'bottom') {
+                // 하단 변: 버튼들이 아래에
+                gridTemplateRows = `repeat(${size}, ${cellSize}) ${cellSize}`;
+                gridTemplateColumns = `repeat(${size}, ${cellSize})`;
+                
+                gridHTML += `<div style="display: grid; grid-template-rows: ${gridTemplateRows}; grid-template-columns: ${gridTemplateColumns}; gap: ${gridGap}; margin-top: 8px; width: fit-content;">`;
+                
+                // 사각형 셀들
+                gridCells.forEach(cell => {
+                    gridHTML += createGridCell(cell, cellSize);
+                });
+                
+                // 마지막 행: 버튼들
+                points.forEach((p, idx) => {
+                    gridHTML += createPointCell(p, cellSize);
+                });
+                
+                gridHTML += '</div>';
+                
+            } else if (edge === 'left') {
+                // 좌측 변: 버튼들이 왼쪽에
+                gridTemplateRows = `repeat(${size}, ${cellSize})`;
+                gridTemplateColumns = `${cellSize} repeat(${size}, ${cellSize})`;
+                
+                gridHTML += `<div style="display: grid; grid-template-rows: ${gridTemplateRows}; grid-template-columns: ${gridTemplateColumns}; gap: ${gridGap}; margin-top: 8px; width: fit-content;">`;
+                
+                // 각 행마다 버튼 + 사각형 셀들
+                for (let row = 0; row < size; row++) {
+                    // 버튼
+                    gridHTML += createPointCell(points[row], cellSize);
+                    // 해당 행의 사각형 셀들
+                    for (let col = 0; col < size; col++) {
+                        const cell = gridCells[row * size + col];
+                        gridHTML += createGridCell(cell, cellSize);
+                    }
+                }
+                
+                gridHTML += '</div>';
+                
+            } else if (edge === 'right') {
+                // 우측 변: 버튼들이 오른쪽에
+                gridTemplateRows = `repeat(${size}, ${cellSize})`;
+                gridTemplateColumns = `repeat(${size}, ${cellSize}) ${cellSize}`;
+                
+                gridHTML += `<div style="display: grid; grid-template-rows: ${gridTemplateRows}; grid-template-columns: ${gridTemplateColumns}; gap: ${gridGap}; margin-top: 8px; width: fit-content;">`;
+                
+                // 각 행마다 사각형 셀들 + 버튼
+                for (let row = 0; row < size; row++) {
+                    // 해당 행의 사각형 셀들
+                    for (let col = 0; col < size; col++) {
+                        const cell = gridCells[row * size + col];
+                        gridHTML += createGridCell(cell, cellSize);
+                    }
+                    // 버튼
+                    gridHTML += createPointCell(points[row], cellSize);
+                }
+                
+                gridHTML += '</div>';
+            }
+            
+            html += gridHTML;
 
             html += '</div>';
             showMessage(html, 'result');
