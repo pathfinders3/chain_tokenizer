@@ -490,8 +490,13 @@ const canvas = document.getElementById('canvas');
             html += `<strong>불가능:</strong> <span style="color: #FF6B6B; font-weight: bold;">${candidatePoints.length - successCount}개</span>`;
             html += `</div>`;
             
-            // 상세 결과
-            html += `<div style="max-height: 400px; overflow-y: auto;">`;
+            // CSS Grid로 시각화
+            html += '<div style="margin-top: 15px;"><strong>시각화:</strong></div>';
+            html += createExpansionGrid(startX, startY, size, expandDirection, candidatePoints, results);
+            
+            // 상세 결과 (접을 수 있도록)
+            html += `<details style="margin-top: 15px;"><summary style="cursor: pointer; color: #4CAF50; font-weight: bold;">상세 결과 보기 (${candidatePoints.length}개)</summary>`;
+            html += `<div style="max-height: 400px; overflow-y: auto; margin-top: 10px;">`;
             results.forEach(result => {
                 const { point, canCreate, bgColor, textColor, borderColor, rectStart, endX, endY } = result;
                 const icon = canCreate ? '✓' : '✗';
@@ -508,7 +513,7 @@ const canvas = document.getElementById('canvas');
                 html += `<span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>`;
                 html += `</div>`;
             });
-            html += `</div>`;
+            html += `</div></details>`;
             
             html += '</div>';
             showMessage(html, 'result');
@@ -539,6 +544,72 @@ const canvas = document.getElementById('canvas');
                 // 테두리 (실제 픽셀 색상)
                 return `<div style="width: ${cellSize}; height: ${cellSize}; background: ${cell.bgColor}; color: ${cell.textColor}; border: 1px solid #666; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 10px;" title="(${cell.x}, ${cell.y})"></div>`;
             }
+        }
+
+        // 확장 검사 결과를 CSS Grid로 시각화
+        function createExpansionGrid(startX, startY, size, direction, candidatePoints, results) {
+            const cellSize = '24px';
+            const gridSize = size + 1; // 기존 영역 + 확장 영역
+            
+            // 결과를 좌표로 매핑
+            const resultMap = new Map();
+            results.forEach(result => {
+                const key = `${result.point.x},${result.point.y}`;
+                resultMap.set(key, result);
+            });
+            
+            // 그리드 생성
+            let html = `<div style="display: grid; grid-template-columns: repeat(${gridSize}, ${cellSize}); grid-template-rows: repeat(${gridSize}, ${cellSize}); gap: 1px; margin-top: 8px; width: fit-content; background: #333; padding: 2px; border-radius: 4px;">`;
+            
+            // 방향에 따라 오프셋 계산
+            let offsetX = 0, offsetY = 0;
+            if (direction === 'se') {
+                offsetX = 0; offsetY = 0;
+            } else if (direction === 'sw') {
+                offsetX = 1; offsetY = 0;
+            } else if (direction === 'ne') {
+                offsetX = 0; offsetY = 1;
+            } else if (direction === 'nw') {
+                offsetX = 1; offsetY = 1;
+            }
+            
+            // 각 셀 생성
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col < gridSize; col++) {
+                    const actualX = startX - offsetX + col;
+                    const actualY = startY - offsetY + row;
+                    const key = `${actualX},${actualY}`;
+                    
+                    // 기존 영역인지 확인
+                    const isInOriginal = actualX >= startX && actualX < startX + size && 
+                                        actualY >= startY && actualY < startY + size;
+                    
+                    // 검사 대상 픽셀인지 확인
+                    const result = resultMap.get(key);
+                    
+                    let cellHTML = '';
+                    if (isInOriginal) {
+                        // 기존 영역 (녹색)
+                        cellHTML = `<div style="width: ${cellSize}; height: ${cellSize}; background: #2d5016; border: 1px solid #4CAF50; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #90EE90;" title="기존 영역 (${actualX}, ${actualY})">■</div>`;
+                    } else if (result) {
+                        // 검사 대상 픽셀 - 실제 픽셀 색상을 배경으로 사용
+                        const pixelBgColor = result.bgColor; // 실제 픽셀 색상
+                        const borderColor = result.canCreate ? '#90EE90' : '#FF6B6B';
+                        const borderWidth = result.canCreate ? '2px' : '3px';
+                        const icon = result.canCreate ? '✓' : '✗';
+                        const iconColor = result.canCreate ? '#90EE90' : '#FF6B6B';
+                        cellHTML = `<div style="width: ${cellSize}; height: ${cellSize}; background: ${pixelBgColor}; border: ${borderWidth} solid ${borderColor}; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: ${iconColor}; cursor: help; text-shadow: 0 0 3px #000;" title="(${actualX}, ${actualY}) - ${result.canCreate ? 'Good' : 'Fail'}">${icon}</div>`;
+                    } else {
+                        // 빈 공간
+                        cellHTML = `<div style="width: ${cellSize}; height: ${cellSize}; background: #1a1a1a; border: 1px solid #333; box-sizing: border-box;"></div>`;
+                    }
+                    
+                    html += cellHTML;
+                }
+            }
+            
+            html += '</div>';
+            return html;
         }
 
         // 특정 변의 점들 정보를 표시하는 함수
